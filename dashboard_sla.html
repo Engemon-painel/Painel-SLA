@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel SLA · Indisponibilidade de Sites</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #0a0f1c;
+    --panel: #10182b;
+    --panel-2: #141f38;
+    --line: #223055;
+    --text: #e7ecf7;
+    --muted: #7d8bb0;
+    --accent: #2dd4bf;
+    --good: #34d399;
+    --warn: #f5a524;
+    --bad: #f5546c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: radial-gradient(circle at 15% 0%, #101d3a 0%, var(--bg) 45%);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    padding: 28px clamp(16px, 4vw, 48px) 60px;
+  }
+  .mono{ font-family: 'JetBrains Mono', monospace; }
+  .display{ font-family: 'Space Grotesk', sans-serif; }
+
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    flex-wrap:wrap; gap:16px;
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 20px;
+  }
+  .brand-eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.18em;
+    color: var(--accent); text-transform:uppercase; margin-bottom:6px;
+  }
+  h1{ font-family:'Space Grotesk', sans-serif; font-size: clamp(22px, 3vw, 30px); font-weight:700; }
+  .subtitle{ color: var(--muted); font-size: 13px; margin-top:4px;}
+
+  .month-strip{ display:flex; gap:6px; flex-wrap:wrap; }
+  .chip{
+    font-family:'JetBrains Mono', monospace; font-size:11px; padding:7px 12px;
+    border-radius:999px; border:1px solid var(--line); color:var(--muted);
+    cursor:pointer; background:var(--panel); transition:.15s;
+  }
+  .chip.active{ background:var(--accent); color:#04211c; border-color:var(--accent); font-weight:600;}
+  .chip:hover:not(.active){ border-color:var(--accent); color:var(--text); }
+
+  .signal-strip{
+    display:flex; gap:2px; margin-bottom: 26px; height:34px; border-radius:8px; overflow:hidden;
+    border:1px solid var(--line);
+  }
+  .signal-strip div{ flex:1; }
+
+  .kpi-row{
+    display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr));
+    gap: 14px; margin-bottom: 22px;
+  }
+  .kpi{
+    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    border:1px solid var(--line); border-radius:12px; padding:16px 18px;
+  }
+  .kpi .label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;}
+  .kpi .value{ font-family:'JetBrains Mono', monospace; font-size: 26px; font-weight:600; }
+  .kpi .delta{ font-size:12px; margin-top:6px; font-family:'JetBrains Mono', monospace; }
+  .up{ color: var(--good); } .down{ color: var(--bad); }
+
+  .grid{
+    display:grid; grid-template-columns: 1.4fr 1fr; gap:16px; margin-bottom:16px;
+  }
+  @media (max-width: 860px){ .grid{ grid-template-columns: 1fr; } }
+
+  .panel{
+    background: var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px;
+  }
+  .panel h2{ font-family:'Space Grotesk', sans-serif; font-size:15px; font-weight:600; margin-bottom:2px;}
+  .panel .hint{ font-size:12px; color:var(--muted); margin-bottom:14px;}
+
+  .gauge-wrap{ display:flex; flex-direction:column; align-items:center; }
+  .gauge-value{ font-family:'JetBrains Mono', monospace; font-size:34px; font-weight:700; margin-top:-70px; }
+  .gauge-target{ font-size:11px; color:var(--muted); margin-top:4px; }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:8px 6px; border-bottom:1px solid var(--line);}
+  td{ padding:10px 6px; border-bottom:1px solid var(--line); }
+  td.num, th.num{ text-align:right; font-family:'JetBrains Mono', monospace; }
+  .pill{ display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px; font-family:'JetBrains Mono', monospace; font-weight:600;}
+  .pill.good{ background:rgba(52,211,153,.14); color:var(--good); }
+  .pill.warn{ background:rgba(245,165,36,.14); color:var(--warn); }
+  .pill.bad{ background:rgba(245,84,108,.14); color:var(--bad); }
+
+  footer{ margin-top:30px; color:var(--muted); font-size:11px; text-align:center; font-family:'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand-eyebrow">OPS · Monitoramento de Indisponibilidade</div>
+    <h1>Painel de SLA — Atendimento 4h</h1>
+    <div class="subtitle">Edite o array <span class="mono">DADOS</span> no final do arquivo para conectar seus números reais.</div>
+    <div class="subtitle mono" id="loadStatus" style="margin-top:4px;">Carregando dados...</div>
+  </div>
+  <div class="month-strip" id="monthStrip"></div>
+</header>
+
+<div class="signal-strip" id="signalStrip"></div>
+
+<div class="kpi-row" id="kpiRow"></div>
+
+<div class="grid">
+  <div class="panel">
+    <h2>Dentro vs. Fora do prazo — por Área</h2>
+    <div class="hint">Incidentes de indisponibilidade agrupados por área, mês selecionado.</div>
+    <canvas id="areaChart" height="230"></canvas>
+  </div>
+  <div class="panel">
+    <h2>% Atendimento no prazo</h2>
+    <div class="hint">Meta: 85%</div>
+    <div class="gauge-wrap">
+      <canvas id="gaugeChart" width="220" height="130"></canvas>
+      <div class="gauge-value" id="gaugeValue">—</div>
+      <div class="gauge-target" id="gaugeDiff">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:16px;">
+  <h2>Visão diarizada</h2>
+  <div class="hint">Dentro / fora do prazo por dia · últimos 25 dias.</div>
+  <canvas id="dailyChart" height="110"></canvas>
+</div>
+
+<div class="panel" style="margin-bottom:16px;">
+  <h2>Visão semanal</h2>
+  <div class="hint">Dentro / fora do prazo por semana · últimas 8 semanas.</div>
+  <canvas id="weeklyChart" height="110"></canvas>
+</div>
+
+<div class="panel" style="margin-bottom:16px;">
+  <h2>Tendência mensal</h2>
+  <div class="hint">% dentro do prazo ao longo dos meses.</div>
+  <canvas id="trendChart" height="90"></canvas>
+</div>
+
+<div class="panel">
+  <h2>Detalhe por Área — mês selecionado</h2>
+  <table>
+    <thead>
+      <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th></tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<footer>gerado localmente · sem conexão com o Power BI · dados de exemplo</footer>
+
+<script>
+// ======================================================
+// Os dados vêm de dados.json (mesma pasta deste arquivo).
+// Edite/atualize esse JSON — não precisa mexer neste HTML.
+// ======================================================
+let DADOS, DIARIO, SEMANAL, mesAtualIdx;
+const cor = { good:'#34d399', warn:'#f5a524', bad:'#f5546c', accent:'#2dd4bf', muted:'#7d8bb0', line:'#223055' };
+
+async function carregarDados(){
+  const status = document.getElementById('loadStatus');
+  try{
+    const resp = await fetch('dados.json?_=' + Date.now());
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    DADOS = { meta: data.meta, meses: data.meses };
+    DIARIO = data.diario;
+    SEMANAL = data.semanal;
+    mesAtualIdx = DADOS.meses.length - 1;
+    if(status) status.textContent = data.atualizado_em ? ('Dados atualizados em ' + data.atualizado_em) : '';
+    montarPagina();
+  }catch(err){
+    if(status){ status.textContent = 'Não foi possível carregar dados.json (' + err.message + ')'; status.style.color = cor.bad; }
+    console.error(err);
+  }
+}
+
+function totais(mesObj){
+  const areas = mesObj.areas;
+  let dentro=0, fora=0;
+  Object.values(areas).forEach(a=>{ dentro+=a.dentro; fora+=a.fora; });
+  return { dentro, fora, total: dentro+fora, pct: dentro/(dentro+fora) };
+}
+
+function statusColor(pct){
+  if(pct >= DADOS.meta) return cor.good;
+  if(pct >= DADOS.meta - 0.05) return cor.warn;
+  return cor.bad;
+}
+
+function montarPagina(){
+
+// ---- Month chips ----
+const monthStrip = document.getElementById('monthStrip');
+monthStrip.innerHTML = '';
+DADOS.meses.forEach((m, i)=>{
+  const chip = document.createElement('div');
+  chip.className = 'chip' + (i===mesAtualIdx ? ' active' : '');
+  chip.textContent = m.mes;
+  chip.onclick = ()=>{ mesAtualIdx = i; render(); };
+  chip.dataset.idx = i;
+  monthStrip.appendChild(chip);
+});
+
+// ---- Signal strip (visão diária simulada a partir do % do mês) ----
+const signalStrip = document.getElementById('signalStrip');
+function renderSignal(pct){
+  signalStrip.innerHTML = '';
+  const blocks = 30;
+  const onCount = Math.round(pct * blocks);
+  for(let i=0;i<blocks;i++){
+    const d = document.createElement('div');
+    const isGood = i < onCount;
+    d.style.background = isGood ? 'rgba(52,211,153,.55)' : 'rgba(245,84,108,.55)';
+    signalStrip.appendChild(d);
+  }
+}
+
+let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart;
+
+function renderDailyWeekly(){
+  if(dailyChart) dailyChart.destroy();
+  dailyChart = new Chart(document.getElementById('dailyChart'), {
+    data:{
+      labels: DIARIO.map(d=>d.data),
+      datasets:[
+        { type:'bar', label:'Dentro', data: DIARIO.map(d=>d.dentro), backgroundColor:'rgba(148,163,184,.5)', borderRadius:4, order:2 },
+        { type:'bar', label:'Fora', data: DIARIO.map(d=>d.fora), backgroundColor: cor.bad, borderRadius:4, order:2 },
+        { type:'line', label:'% Dentro', data: DIARIO.map(d=> d.dentro/(d.dentro+d.fora)*100 ), borderColor: cor.warn, backgroundColor: cor.warn, tension:.3, pointRadius:3, yAxisID:'y1', order:1 },
+      ]
+    },
+    options:{ responsive:true,
+      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } } },
+      scales:{
+        x:{ stacked:true, ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
+        y:{ stacked:true, ticks:{color:cor.muted}, grid:{color:cor.line} },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+
+  if(weeklyChart) weeklyChart.destroy();
+  weeklyChart = new Chart(document.getElementById('weeklyChart'), {
+    data:{
+      labels: SEMANAL.map(d=>d.semana),
+      datasets:[
+        { type:'bar', label:'Dentro', data: SEMANAL.map(d=>d.dentro), backgroundColor:'rgba(148,163,184,.5)', borderRadius:5, order:2 },
+        { type:'bar', label:'Fora', data: SEMANAL.map(d=>d.fora), backgroundColor: cor.bad, borderRadius:5, order:2 },
+        { type:'line', label:'% Dentro', data: SEMANAL.map(d=> d.dentro/(d.dentro+d.fora)*100 ), borderColor: cor.warn, backgroundColor: cor.warn, tension:.3, pointRadius:4, yAxisID:'y1', order:1 },
+        { type:'line', label:'Meta 85%', data: SEMANAL.map(()=>85), borderColor:'#a78bfa', borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1 },
+      ]
+    },
+    options:{ responsive:true,
+      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } } },
+      scales:{
+        x:{ stacked:true, ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} },
+        y:{ stacked:true, ticks:{color:cor.muted}, grid:{color:cor.line} },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function render(){
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.classList.toggle('active', Number(c.dataset.idx) === mesAtualIdx);
+  });
+
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const t = totais(mesObj);
+  renderSignal(t.pct);
+
+  // KPIs
+  const prevIdx = mesAtualIdx - 1;
+  const prevPct = prevIdx >= 0 ? totais(DADOS.meses[prevIdx]).pct : null;
+  const deltaPP = prevPct !== null ? (t.pct - prevPct) * 100 : null;
+
+  const kpiRow = document.getElementById('kpiRow');
+  kpiRow.innerHTML = `
+    <div class="kpi"><div class="label">Total Indisponibilidade</div><div class="value">${t.total.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">Dentro do Prazo</div><div class="value" style="color:${cor.good}">${t.dentro.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">Fora do Prazo</div><div class="value" style="color:${cor.bad}">${t.fora.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">% Atendimento</div><div class="value" style="color:${statusColor(t.pct)}">${(t.pct*100).toFixed(1)}%</div>
+      ${deltaPP!==null ? `<div class="delta ${deltaPP>=0?'up':'down'}">${deltaPP>=0?'▲ +':'▼ '}${deltaPP.toFixed(1)} p.p. vs mês anterior</div>` : ''}
+    </div>
+  `;
+
+  // Area chart
+  const areaNames = Object.keys(mesObj.areas);
+  const dentroArr = areaNames.map(a=>mesObj.areas[a].dentro);
+  const foraArr = areaNames.map(a=>mesObj.areas[a].fora);
+
+  if(areaChart) areaChart.destroy();
+  areaChart = new Chart(document.getElementById('areaChart'), {
+    type:'bar',
+    data:{ labels: areaNames, datasets:[
+      { label:'Dentro do prazo', data:dentroArr, backgroundColor: cor.good, borderRadius:5 },
+      { label:'Fora do prazo', data:foraArr, backgroundColor: cor.bad, borderRadius:5 },
+    ]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } } },
+      scales:{ x:{ stacked:true, ticks:{color:cor.muted}, grid:{color:cor.line} }, y:{ stacked:true, ticks:{color:cor.muted}, grid:{color:cor.line} } } }
+  });
+
+  // Gauge (doughnut hack)
+  const pct = t.pct;
+  if(gaugeChart) gaugeChart.destroy();
+  gaugeChart = new Chart(document.getElementById('gaugeChart'), {
+    type:'doughnut',
+    data:{ datasets:[{ data:[pct, 1-pct], backgroundColor:[statusColor(pct), 'rgba(255,255,255,.06)'], borderWidth:0 }] },
+    options:{ rotation:-90, circumference:180, cutout:'75%', plugins:{ tooltip:{enabled:false}, legend:{display:false} } }
+  });
+  document.getElementById('gaugeValue').textContent = (pct*100).toFixed(1) + '%';
+  document.getElementById('gaugeValue').style.color = statusColor(pct);
+  const diffPP = (pct - DADOS.meta)*100;
+  document.getElementById('gaugeDiff').textContent = `Meta 85% · ${diffPP>=0?'+':''}${diffPP.toFixed(1)} p.p.`;
+
+  // Trend
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trendChart'), {
+    type:'line',
+    data:{ labels: DADOS.meses.map(m=>m.mes), datasets:[{
+      label:'% dentro do prazo', data: DADOS.meses.map(m=>totais(m).pct*100),
+      borderColor: cor.accent, backgroundColor:'rgba(45,212,191,.12)', fill:true, tension:.35, pointRadius:4,
+      pointBackgroundColor: DADOS.meses.map((m,i)=> i===mesAtualIdx ? cor.accent : cor.muted)
+    },{
+      label:'Meta', data: DADOS.meses.map(()=>DADOS.meta*100), borderColor: cor.warn, borderDash:[5,5], pointRadius:0
+    }]},
+    options:{ responsive:true, plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } } },
+      scales:{ x:{ ticks:{color:cor.muted}, grid:{display:false} }, y:{ ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{color:cor.line} } } }
+  });
+
+  // Table
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = areaNames.map(a=>{
+    const d = mesObj.areas[a];
+    const total = d.dentro + d.fora;
+    const p = d.dentro/total;
+    const cls = p>=DADOS.meta ? 'good' : (p>=DADOS.meta-0.05 ? 'warn' : 'bad');
+    return `<tr>
+      <td>${a}</td>
+      <td class="num">${total}</td>
+      <td class="num">${d.dentro}</td>
+      <td class="num">${d.fora}</td>
+      <td class="num"><span class="pill ${cls}">${(p*100).toFixed(1)}%</span></td>
+    </tr>`;
+  }).join('');
+}
+
+render();
+renderDailyWeekly();
+
+} // fim montarPagina
+
+carregarDados();
+</script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+{
+  "meta": 0.85,
+  "meses": [
+    {
+      "mes": "Jan/26",
+      "areas": {
+        "SPC1": {
+          "dentro": 330,
+          "fora": 143
+        },
+        "SPC2": {
+          "dentro": 275,
+          "fora": 75
+        },
+        "SPC3": {
+          "dentro": 273,
+          "fora": 106
+        },
+        "SPC4": {
+          "dentro": 165,
+          "fora": 96
+        },
+        "Outras": {
+          "dentro": 7,
+          "fora": 0
+        }
+      }
+    },
+    {
+      "mes": "Fev/26",
+      "areas": {
+        "SPC1": {
+          "dentro": 234,
+          "fora": 69
+        },
+        "SPC2": {
+          "dentro": 319,
+          "fora": 121
+        },
+        "SPC3": {
+          "dentro": 264,
+          "fora": 74
+        },
+        "SPC4": {
+          "dentro": 301,
+          "fora": 112
+        },
+        "Outras": {
+          "dentro": 9,
+          "fora": 1
+        }
+      }
+    },
+    {
+      "mes": "Mar/26",
+      "areas": {
+        "SPC1": {
+          "dentro": 254,
+          "fora": 92
+        },
+        "SPC2": {
+          "dentro": 271,
+          "fora": 78
+        },
+        "SPC3": {
+          "dentro": 209,
+          "fora": 62
+        },
+        "SPC4": {
+          "dentro": 197,
+          "fora": 117
+        },
+        "Outras": {
+          "dentro": 7,
+          "fora": 0
+        }
+      }
+    },
+    {
+      "mes": "Abr/26",
+      "areas": {
+        "SPC1": {
+          "dentro": 137,
+          "fora": 52
+        },
+        "SPC2": {
+          "dentro": 131,
+          "fora": 49
+        },
+        "SPC3": {
+          "dentro": 149,
+          "fora": 66
+        },
+        "SPC4": {
+          "dentro": 112,
+          "fora": 37
+        },
+        "Outras": {
+          "dentro": 3,
+          "fora": 1
+        }
+      }
+    },
+    {
+      "mes": "Mai/26",
+      "areas": {
+        "SPC1": {
+          "dentro": 131,
+          "fora": 40
+        },
+        "SPC2": {
+          "dentro": 105,
+          "fora": 41
+        },
+        "SPC3": {
+          "dentro": 130,
+          "fora": 54
+        },
+        "SPC4": {
+          "dentro": 135,
+          "fora": 50
+        },
+        "Outras": {
+          "dentro": 7,
+          "fora": 0
+        }
+      }
+    },
+    {
+      "mes": "Jun/26",
+      "areas": {
+        "SPC1": {
+          "dentro": 133,
+          "fora": 20
+        },
+        "SPC2": {
+          "dentro": 184,
+          "fora": 54
+        },
+        "SPC3": {
+          "dentro": 155,
+          "fora": 51
+        },
+        "SPC4": {
+          "dentro": 144,
+          "fora": 45
+        },
+        "Outras": {
+          "dentro": 3,
+          "fora": 0
+        }
+      }
+    },
+    {
+      "mes": "Jul/26",
+      "areas": {
+        "SPC1": {
+          "dentro": 152,
+          "fora": 42
+        },
+        "SPC2": {
+          "dentro": 145,
+          "fora": 28
+        },
+        "SPC3": {
+          "dentro": 186,
+          "fora": 64
+        },
+        "SPC4": {
+          "dentro": 114,
+          "fora": 52
+        },
+        "Outras": {
+          "dentro": 1,
+          "fora": 0
+        }
+      }
+    },
+    {
+      "mes": "Ago/26",
+      "areas": {
+        "SPC1": {
+          "dentro": 111,
+          "fora": 33
+        },
+        "SPC2": {
+          "dentro": 113,
+          "fora": 17
+        },
+        "SPC3": {
+          "dentro": 102,
+          "fora": 23
+        },
+        "SPC4": {
+          "dentro": 78,
+          "fora": 23
+        }
+      }
+    }
+  ],
+  "diario": [
+    {
+      "data": "28/07",
+      "dentro": 32,
+      "fora": 6
+    },
+    {
+      "data": "29/07",
+      "dentro": 35,
+      "fora": 11
+    },
+    {
+      "data": "30/07",
+      "dentro": 21,
+      "fora": 11
+    },
+    {
+      "data": "31/07",
+      "dentro": 23,
+      "fora": 4
+    },
+    {
+      "data": "01/08",
+      "dentro": 25,
+      "fora": 3
+    },
+    {
+      "data": "02/08",
+      "dentro": 15,
+      "fora": 2
+    },
+    {
+      "data": "03/08",
+      "dentro": 13,
+      "fora": 1
+    },
+    {
+      "data": "04/08",
+      "dentro": 14,
+      "fora": 3
+    },
+    {
+      "data": "05/08",
+      "dentro": 17,
+      "fora": 5
+    },
+    {
+      "data": "06/08",
+      "dentro": 25,
+      "fora": 2
+    },
+    {
+      "data": "07/08",
+      "dentro": 17,
+      "fora": 5
+    },
+    {
+      "data": "08/08",
+      "dentro": 34,
+      "fora": 7
+    },
+    {
+      "data": "09/08",
+      "dentro": 18,
+      "fora": 4
+    },
+    {
+      "data": "10/08",
+      "dentro": 23,
+      "fora": 11
+    },
+    {
+      "data": "11/08",
+      "dentro": 27,
+      "fora": 4
+    },
+    {
+      "data": "12/08",
+      "dentro": 16,
+      "fora": 9
+    },
+    {
+      "data": "13/08",
+      "dentro": 16,
+      "fora": 0
+    },
+    {
+      "data": "14/08",
+      "dentro": 12,
+      "fora": 1
+    },
+    {
+      "data": "15/08",
+      "dentro": 34,
+      "fora": 6
+    },
+    {
+      "data": "16/08",
+      "dentro": 16,
+      "fora": 5
+    },
+    {
+      "data": "17/08",
+      "dentro": 11,
+      "fora": 4
+    },
+    {
+      "data": "18/08",
+      "dentro": 27,
+      "fora": 9
+    },
+    {
+      "data": "19/08",
+      "dentro": 23,
+      "fora": 5
+    },
+    {
+      "data": "20/08",
+      "dentro": 20,
+      "fora": 9
+    },
+    {
+      "data": "21/08",
+      "dentro": 1,
+      "fora": 1
+    }
+  ],
+  "semanal": [
+    {
+      "semana": "Sem 27",
+      "dentro": 177,
+      "fora": 65
+    },
+    {
+      "semana": "Sem 28",
+      "dentro": 123,
+      "fora": 21
+    },
+    {
+      "semana": "Sem 29",
+      "dentro": 127,
+      "fora": 50
+    },
+    {
+      "semana": "Sem 30",
+      "dentro": 103,
+      "fora": 23
+    },
+    {
+      "semana": "Sem 31",
+      "dentro": 160,
+      "fora": 44
+    },
+    {
+      "semana": "Sem 32",
+      "dentro": 138,
+      "fora": 27
+    },
+    {
+      "semana": "Sem 33",
+      "dentro": 144,
+      "fora": 36
+    },
+    {
+      "semana": "Sem 34",
+      "dentro": 82,
+      "fora": 28
+    }
+  ],
+  "atualizado_em": "2026-08-20"
+}
