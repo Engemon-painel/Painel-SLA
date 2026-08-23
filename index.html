@@ -97,6 +97,14 @@
   .pill.warn{ background:rgba(245,165,36,.14); color:var(--warn); }
   .pill.bad{ background:rgba(245,84,108,.14); color:var(--bad); }
 
+  .link-base{
+    display:inline-flex; align-items:center; gap:6px;
+    font-family:'JetBrains Mono', monospace; font-size:11px; padding:7px 12px;
+    border-radius:999px; border:1px solid var(--line); color:var(--accent);
+    background:var(--panel); text-decoration:none; transition:.15s;
+  }
+  .link-base:hover{ border-color:var(--accent); background:rgba(45,212,191,.08); }
+
   footer{ margin-top:30px; color:var(--muted); font-size:11px; text-align:center; font-family:'JetBrains Mono', monospace; }
 </style>
 </head>
@@ -113,6 +121,7 @@
   <div class="month-strip" style="margin-top:8px;">
     <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
     <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
+    <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
   </div>
 </header>
 
@@ -209,8 +218,16 @@ async function carregarDados(){
   }
 }
 
+const AREAS_VALIDAS = ['SPC1','SPC2','SPC3','SPC4'];
+
+function areasValidas(areasObj){
+  const out = {};
+  AREAS_VALIDAS.forEach(k=>{ if(areasObj[k]) out[k] = areasObj[k]; });
+  return out;
+}
+
 function totais(mesObj){
-  const areas = mesObj.areas;
+  const areas = areasValidas(mesObj.areas);
   let dentro=0, fora=0;
   Object.values(areas).forEach(a=>{ dentro+=a.dentro; fora+=a.fora; });
   return { dentro, fora, total: dentro+fora, pct: dentro/(dentro+fora) };
@@ -320,11 +337,13 @@ function render(){
   `;
 
   // ---- Area chart: barras lado a lado (não empilhadas) + linha de % dentro do prazo + valores visíveis ----
-  const areaNames = Object.keys(mesObj.areas);
-  const dentroArr = areaNames.map(a=>mesObj.areas[a].dentro);
-  const foraArr = areaNames.map(a=>mesObj.areas[a].fora);
+  // Considera apenas SPC1, SPC2, SPC3 e SPC4 — áreas vazias/"Outras" ficam de fora do total e do gráfico.
+  const areasFiltradas = areasValidas(mesObj.areas);
+  const areaNames = Object.keys(areasFiltradas);
+  const dentroArr = areaNames.map(a=>areasFiltradas[a].dentro);
+  const foraArr = areaNames.map(a=>areasFiltradas[a].fora);
   const pctPorArea = areaNames.map(a=>{
-    const d = mesObj.areas[a];
+    const d = areasFiltradas[a];
     const totalArea = d.dentro + d.fora;
     return totalArea ? (d.dentro/totalArea*100) : 0;
   });
