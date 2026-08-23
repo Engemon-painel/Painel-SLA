@@ -109,6 +109,10 @@
     <div class="subtitle mono" id="loadStatus" style="margin-top:4px;">Carregando dados...</div>
   </div>
   <div class="month-strip" id="monthStrip"></div>
+  <div class="month-strip" style="margin-top:8px;">
+    <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
+    <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
+  </div>
 </header>
 
 <div class="signal-strip" id="signalStrip"></div>
@@ -122,7 +126,7 @@
     <canvas id="areaChart" height="230"></canvas>
   </div>
   <div class="panel">
-    <h2>% Atendimento no prazo</h2>
+    <h2 id="gaugeTitulo">% Atendimento no prazo</h2>
     <div class="hint">Meta: 85%</div>
     <div class="gauge-wrap">
       <canvas id="gaugeChart" width="220" height="130"></canvas>
@@ -168,7 +172,19 @@
 // Edite/atualize esse JSON — não precisa mexer neste HTML.
 // ======================================================
 let DADOS, DIARIO, SEMANAL, mesAtualIdx;
+let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H;
+let slaAtivo = '4h';
 const cor = { good:'#34d399', warn:'#f5a524', bad:'#f5546c', accent:'#2dd4bf', muted:'#7d8bb0', line:'#223055' };
+
+function trocarSla(sla){
+  slaAtivo = sla;
+  document.getElementById('btnSla4h').classList.toggle('active', sla === '4h');
+  document.getElementById('btnSla6h').classList.toggle('active', sla === '6h');
+  DADOS = sla === '4h' ? DADOS_4H : DADOS_6H;
+  SEMANAL = sla === '4h' ? SEMANAL_4H : SEMANAL_6H;
+  if (mesAtualIdx >= DADOS.meses.length) mesAtualIdx = DADOS.meses.length - 1;
+  montarPagina();
+}
 
 async function carregarDados(){
   const status = document.getElementById('loadStatus');
@@ -176,9 +192,13 @@ async function carregarDados(){
     const resp = await fetch('dados.json?_=' + Date.now());
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
-    DADOS = { meta: data.meta, meses: data.meses };
+    DADOS_4H = { meta: data.meta, meses: data.meses };
+    DADOS_6H = { meta: data.meta, meses: data.meses6h && data.meses6h.length ? data.meses6h : data.meses };
+    SEMANAL_4H = data.semanal;
+    SEMANAL_6H = data.semanal6h && data.semanal6h.length ? data.semanal6h : data.semanal;
+    DADOS = DADOS_4H;
+    SEMANAL = SEMANAL_4H;
     DIARIO = data.diario;
-    SEMANAL = data.semanal;
     mesAtualIdx = DADOS.meses.length - 1;
     if(status) status.textContent = data.atualizado_em ? ('Dados atualizados em ' + data.atualizado_em) : '';
     montarPagina();
@@ -322,6 +342,7 @@ function render(){
     data:{ datasets:[{ data:[pct, 1-pct], backgroundColor:[statusColor(pct), 'rgba(255,255,255,.06)'], borderWidth:0 }] },
     options:{ rotation:-90, circumference:180, cutout:'75%', plugins:{ tooltip:{enabled:false}, legend:{display:false} } }
   });
+  document.getElementById('gaugeTitulo').textContent = '% Atendimento no prazo (SLA ' + slaAtivo + ')';
   document.getElementById('gaugeValue').textContent = (pct*100).toFixed(1) + '%';
   document.getElementById('gaugeValue').style.color = statusColor(pct);
   const diffPP = (pct - DADOS.meta)*100;
