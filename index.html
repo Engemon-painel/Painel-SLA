@@ -353,7 +353,7 @@ function render(){
     data:{ labels: areaNames, datasets:[
       {
         type:'bar', label:'Dentro do prazo', data:dentroArr,
-        backgroundColor: cor.good, borderRadius:5, order:2, yAxisID:'y',
+        backgroundColor: 'rgba(148,163,184,.65)', borderRadius:5, order:2, yAxisID:'y',
         datalabels:{
           color: cor.text, anchor:'end', align:'top',
           font:{ size:10, family:'JetBrains Mono', weight:'600' }
@@ -369,11 +369,11 @@ function render(){
       },
       {
         type:'line', label:'% Dentro do prazo', data:pctPorArea,
-        borderColor: cor.accent, backgroundColor: cor.accent,
-        tension:.3, pointRadius:4, pointBackgroundColor: cor.accent,
+        borderColor: cor.warn, backgroundColor: cor.warn,
+        tension:.3, pointRadius:4, pointBackgroundColor: cor.warn,
         yAxisID:'y1', order:1,
         datalabels:{
-          color: cor.accent, align:'top', offset:8,
+          color: cor.warn, align:'top', offset:8,
           font:{ size:10, family:'JetBrains Mono', weight:'600' },
           formatter: v => v.toFixed(0) + '%'
         }
