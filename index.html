@@ -275,16 +275,30 @@ function renderDailyWeekly(){
     data:{
       labels: DIARIO.map(d=>d.data),
       datasets:[
-        { type:'bar', label:'Dentro', data: DIARIO.map(d=>d.dentro), backgroundColor:'rgba(148,163,184,.5)', borderRadius:4, order:2 },
-        { type:'bar', label:'Fora', data: DIARIO.map(d=>d.fora), backgroundColor: cor.bad, borderRadius:4, order:2 },
-        { type:'line', label:'% Dentro', data: DIARIO.map(d=> d.dentro/(d.dentro+d.fora)*100 ), borderColor: cor.warn, backgroundColor: cor.warn, tension:.3, pointRadius:3, yAxisID:'y1', order:1 },
+        {
+          type:'bar', label:'Dentro', data: DIARIO.map(d=>d.dentro),
+          backgroundColor:'rgba(148,163,184,.65)', borderRadius:4, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: DIARIO.map(d=>d.fora),
+          backgroundColor: cor.bad, borderRadius:4, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: DIARIO.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius:3, yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
+        },
       ]
     },
+    plugins:[ChartDataLabels],
     options:{ responsive:true,
-      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:false } },
+      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:true } },
       scales:{
-        x:{ stacked:true, ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
-        y:{ stacked:true, ticks:{color:cor.muted}, grid:{color:cor.line} },
+        x:{ stacked:false, ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
         y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
       }
     }
@@ -295,17 +309,35 @@ function renderDailyWeekly(){
     data:{
       labels: SEMANAL.map(d=>d.semana),
       datasets:[
-        { type:'bar', label:'Dentro', data: SEMANAL.map(d=>d.dentro), backgroundColor:'rgba(148,163,184,.5)', borderRadius:5, order:2 },
-        { type:'bar', label:'Fora', data: SEMANAL.map(d=>d.fora), backgroundColor: cor.bad, borderRadius:5, order:2 },
-        { type:'line', label:'% Dentro', data: SEMANAL.map(d=> d.dentro/(d.dentro+d.fora)*100 ), borderColor: cor.warn, backgroundColor: cor.warn, tension:.3, pointRadius:4, yAxisID:'y1', order:1 },
-        { type:'line', label:'Meta 85%', data: SEMANAL.map(()=>85), borderColor:'#a78bfa', borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1 },
+        {
+          type:'bar', label:'Dentro', data: SEMANAL.map(d=>d.dentro),
+          backgroundColor:'rgba(148,163,184,.65)', borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: SEMANAL.map(d=>d.fora),
+          backgroundColor: cor.bad, borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: SEMANAL.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius:4, yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
+        },
+        {
+          type:'line', label:'Meta 85%', data: SEMANAL.map(()=>85),
+          borderColor:'#a78bfa', borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1,
+          datalabels:{ display:false }
+        },
       ]
     },
+    plugins:[ChartDataLabels],
     options:{ responsive:true,
-      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:false } },
+      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:true } },
       scales:{
-        x:{ stacked:true, ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} },
-        y:{ stacked:true, ticks:{color:cor.muted}, grid:{color:cor.line} },
+        x:{ stacked:false, ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
         y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
       }
     }
