@@ -198,6 +198,12 @@
 
   <h2 style="margin-top:20px;">Pendências de preenchimento</h2>
   <div class="hint">Incidentes fora do prazo cujo Fato/Causa ainda não foram preenchidos. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
+  <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
+    <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
+      <option value="">Todos</option>
+    </select>
+  </div>
   <table>
     <thead>
       <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
@@ -217,6 +223,12 @@ let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
 let slaAtivo = '4h';
+let supervisorFiltroAtual = '';
+
+function filtrarPorSupervisor(valor){
+  supervisorFiltroAtual = valor;
+  renderPendenciasFca();
+}
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
 
 // Mapa de nome de mês (abreviação em pt-BR) -> número do mês com 2 dígitos.
@@ -647,13 +659,32 @@ function renderPendenciasFca(){
     });
   }
 
+  // ---- Filtro por Supervisor ----
+  const selectSupervisor = document.getElementById('supervisorFiltro');
+  if(selectSupervisor){
+    const supervisores = Array.from(new Set(pendentesDoMes.map(p => p.supervisor).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    // Se o supervisor selecionado não existir mais na lista do mês atual, volta para "Todos".
+    if(supervisorFiltroAtual && supervisores.indexOf(supervisorFiltroAtual) === -1){
+      supervisorFiltroAtual = '';
+    }
+    selectSupervisor.innerHTML = '<option value="">Todos</option>' +
+      supervisores.map(s => `<option value="${s}" ${s===supervisorFiltroAtual?'selected':''}>${s}</option>`).join('');
+  }
+
+  const pendentesFiltrados = supervisorFiltroAtual
+    ? pendentesDoMes.filter(p => p.supervisor === supervisorFiltroAtual)
+    : pendentesDoMes;
+
   // ---- Tabela de pendências ----
-  if(pendentesDoMes.length === 0){
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:${cor.muted};">Nenhuma pendência de FCA neste mês 🎉</td></tr>`;
+  if(pendentesFiltrados.length === 0){
+    const msg = supervisorFiltroAtual
+      ? 'Nenhuma pendência para este supervisor neste mês.'
+      : 'Nenhuma pendência de FCA neste mês 🎉';
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:${cor.muted};">${msg}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = pendentesDoMes.map(p => `<tr>
+  tbody.innerHTML = pendentesFiltrados.map(p => `<tr>
     <td>${p.supervisor || '-'}</td>
     <td>${p.area || '-'}</td>
     <td>${p.site || '-'}</td>
