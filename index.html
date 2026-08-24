@@ -148,7 +148,7 @@
 
 <div class="panel" style="margin-bottom:16px;">
   <h2>Visão diarizada</h2>
-  <div class="hint">Dentro / fora do prazo por dia · últimos 25 dias.</div>
+  <div class="hint">Dentro / fora do prazo por dia · mês selecionado.</div>
   <canvas id="dailyChart" height="110"></canvas>
 </div>
 
@@ -182,9 +182,17 @@
 // Edite/atualize esse JSON — não precisa mexer neste HTML.
 // ======================================================
 let DADOS, DIARIO, SEMANAL, mesAtualIdx;
-let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H;
+let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let slaAtivo = '4h';
 const cor = { good:'#34d399', warn:'#f5a524', bad:'#f5546c', accent:'#2dd4bf', muted:'#7d8bb0', line:'#223055', text:'#e7ecf7' };
+
+// Mapa de nome de mês (abreviação em pt-BR) -> número do mês com 2 dígitos.
+// Usado para filtrar o array "diario" (formato "dd/mm") pelo mês selecionado
+// nos chips (formato "Mes/aa", ex.: "Ago/26").
+const NOME_MES = {
+  Jan:'01', Fev:'02', Mar:'03', Abr:'04', Mai:'05', Jun:'06',
+  Jul:'07', Ago:'08', Set:'09', Out:'10', Nov:'11', Dez:'12'
+};
 
 function trocarSla(sla){
   slaAtivo = sla;
@@ -192,6 +200,7 @@ function trocarSla(sla){
   document.getElementById('btnSla6h').classList.toggle('active', sla === '6h');
   DADOS = sla === '4h' ? DADOS_4H : DADOS_6H;
   SEMANAL = sla === '4h' ? SEMANAL_4H : SEMANAL_6H;
+  DIARIO = sla === '4h' ? DIARIO_4H : DIARIO_6H;
   if (mesAtualIdx >= DADOS.meses.length) mesAtualIdx = DADOS.meses.length - 1;
   montarPagina();
 }
@@ -206,9 +215,11 @@ async function carregarDados(){
     DADOS_6H = { meta: data.meta, meses: data.meses6h && data.meses6h.length ? data.meses6h : data.meses };
     SEMANAL_4H = data.semanal;
     SEMANAL_6H = data.semanal6h && data.semanal6h.length ? data.semanal6h : data.semanal;
+    DIARIO_4H = data.diario || [];
+    DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
-    DIARIO = data.diario;
+    DIARIO = DIARIO_4H;
     mesAtualIdx = DADOS.meses.length - 1;
     if(status) status.textContent = data.atualizado_em ? ('Dados atualizados em ' + data.atualizado_em) : '';
     montarPagina();
@@ -237,6 +248,15 @@ function statusColor(pct){
   if(pct >= DADOS.meta) return cor.good;
   if(pct >= DADOS.meta - 0.05) return cor.warn;
   return cor.bad;
+}
+
+// Retorna apenas os itens de DIARIO cujo mês (segunda parte de "dd/mm")
+// bate com o mês do chip selecionado (primeira parte de "Mes/aa", ex.: "Ago/26" -> "08").
+function diarioDoMesAtual(){
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const nomeMes = mesObj.mes.split('/')[0]; // "Ago/26" -> "Ago"
+  const mm = NOME_MES[nomeMes];
+  return (DIARIO || []).filter(d => d.data.split('/')[1] === mm);
 }
 
 function montarPagina(){
@@ -270,23 +290,26 @@ function renderSignal(pct){
 let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart;
 
 function renderDailyWeekly(){
+  // Filtra o diário pelo mês atualmente selecionado nos chips.
+  const diarioFiltrado = diarioDoMesAtual();
+
   if(dailyChart) dailyChart.destroy();
   dailyChart = new Chart(document.getElementById('dailyChart'), {
     data:{
-      labels: DIARIO.map(d=>d.data),
+      labels: diarioFiltrado.map(d=>d.data),
       datasets:[
         {
-          type:'bar', label:'Dentro', data: DIARIO.map(d=>d.dentro),
+          type:'bar', label:'Dentro', data: diarioFiltrado.map(d=>d.dentro),
           backgroundColor:'rgba(148,163,184,.65)', borderRadius:4, order:2,
           datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
         },
         {
-          type:'bar', label:'Fora', data: DIARIO.map(d=>d.fora),
+          type:'bar', label:'Fora', data: diarioFiltrado.map(d=>d.fora),
           backgroundColor: cor.bad, borderRadius:4, order:2,
           datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
         },
         {
-          type:'line', label:'% Dentro', data: DIARIO.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
+          type:'line', label:'% Dentro', data: diarioFiltrado.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
           borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
           tension:.3, pointRadius:3, yAxisID:'y1', order:1,
           datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
@@ -471,10 +494,12 @@ function render(){
       <td class="num"><span class="pill ${cls}">${(p*100).toFixed(1)}%</span></td>
     </tr>`;
   }).join('');
+
+  // Redesenha os gráficos diário e semanal para refletir o mês recém-selecionado.
+  renderDailyWeekly();
 }
 
 render();
-renderDailyWeekly();
 
 } // fim montarPagina
 
