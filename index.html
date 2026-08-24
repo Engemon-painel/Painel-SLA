@@ -10,20 +10,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
   :root{
-    --bg: #0a0f1c;
-    --panel: #10182b;
-    --panel-2: #141f38;
-    --line: #223055;
-    --text: #e7ecf7;
-    --muted: #7d8bb0;
-    --accent: #2dd4bf;
-    --good: #34d399;
-    --warn: #f5a524;
-    --bad: #f5546c;
+    --bg: #f3f5fa;
+    --panel: #ffffff;
+    --panel-2: #f7f9fc;
+    --line: #e1e5f0;
+    --text: #1b2440;
+    --muted: #6b7590;
+    --accent: #0e7c86;
+    --good: #059669;
+    --warn: #d97706;
+    --bad: #dc2626;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
-    background: radial-gradient(circle at 15% 0%, #101d3a 0%, var(--bg) 45%);
+    background: radial-gradient(circle at 15% 0%, #ffffff 0%, var(--bg) 45%);
     color: var(--text);
     font-family: 'Inter', sans-serif;
     padding: 28px clamp(16px, 4vw, 48px) 60px;
@@ -51,7 +51,7 @@
     border-radius:999px; border:1px solid var(--line); color:var(--muted);
     cursor:pointer; background:var(--panel); transition:.15s;
   }
-  .chip.active{ background:var(--accent); color:#04211c; border-color:var(--accent); font-weight:600;}
+  .chip.active{ background:var(--accent); color:#ffffff; border-color:var(--accent); font-weight:600;}
   .chip:hover:not(.active){ border-color:var(--accent); color:var(--text); }
 
   .signal-strip{
@@ -67,6 +67,7 @@
   .kpi{
     background: linear-gradient(160deg, var(--panel-2), var(--panel));
     border:1px solid var(--line); border-radius:12px; padding:16px 18px;
+    box-shadow: 0 2px 8px rgba(27,36,64,.06);
   }
   .kpi .label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;}
   .kpi .value{ font-family:'JetBrains Mono', monospace; font-size: 26px; font-weight:600; }
@@ -80,6 +81,7 @@
 
   .panel{
     background: var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px;
+    box-shadow: 0 2px 8px rgba(27,36,64,.06);
   }
   .panel h2{ font-family:'Space Grotesk', sans-serif; font-size:15px; font-weight:600; margin-bottom:2px;}
   .panel .hint{ font-size:12px; color:var(--muted); margin-bottom:14px;}
@@ -93,9 +95,9 @@
   td{ padding:10px 6px; border-bottom:1px solid var(--line); }
   td.num, th.num{ text-align:right; font-family:'JetBrains Mono', monospace; }
   .pill{ display:inline-block; padding:2px 9px; border-radius:999px; font-size:11px; font-family:'JetBrains Mono', monospace; font-weight:600;}
-  .pill.good{ background:rgba(52,211,153,.14); color:var(--good); }
-  .pill.warn{ background:rgba(245,165,36,.14); color:var(--warn); }
-  .pill.bad{ background:rgba(245,84,108,.14); color:var(--bad); }
+  .pill.good{ background:rgba(5,150,105,.14); color:var(--good); }
+  .pill.warn{ background:rgba(217,119,6,.14); color:var(--warn); }
+  .pill.bad{ background:rgba(220,38,38,.14); color:var(--bad); }
 
   .link-base{
     display:inline-flex; align-items:center; gap:6px;
@@ -184,7 +186,7 @@
 let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let slaAtivo = '4h';
-const cor = { good:'#34d399', warn:'#f5a524', bad:'#f5546c', accent:'#2dd4bf', muted:'#7d8bb0', line:'#223055', text:'#e7ecf7' };
+const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
 
 // Mapa de nome de mês (abreviação em pt-BR) -> número do mês com 2 dígitos.
 // Usado para filtrar o array "diario" (formato "dd/mm") pelo mês selecionado
@@ -282,7 +284,7 @@ function renderSignal(pct){
   for(let i=0;i<blocks;i++){
     const d = document.createElement('div');
     const isGood = i < onCount;
-    d.style.background = isGood ? 'rgba(52,211,153,.55)' : 'rgba(245,84,108,.55)';
+    d.style.background = isGood ? 'rgba(5,150,105,.7)' : 'rgba(220,38,38,.7)';
     signalStrip.appendChild(d);
   }
 }
@@ -300,7 +302,7 @@ function renderDailyWeekly(){
       datasets:[
         {
           type:'bar', label:'Dentro', data: diarioFiltrado.map(d=>d.dentro),
-          backgroundColor:'rgba(148,163,184,.65)', borderRadius:4, order:2,
+          backgroundColor:'rgba(37,99,235,.75)', borderRadius:4, order:2,
           datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
         },
         {
@@ -334,7 +336,7 @@ function renderDailyWeekly(){
       datasets:[
         {
           type:'bar', label:'Dentro', data: SEMANAL.map(d=>d.dentro),
-          backgroundColor:'rgba(148,163,184,.65)', borderRadius:5, order:2,
+          backgroundColor:'rgba(37,99,235,.75)', borderRadius:5, order:2,
           datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
         },
         {
@@ -408,7 +410,7 @@ function render(){
     data:{ labels: areaNames, datasets:[
       {
         type:'bar', label:'Dentro do prazo', data:dentroArr,
-        backgroundColor: 'rgba(148,163,184,.65)', borderRadius:5, order:2, yAxisID:'y',
+        backgroundColor: 'rgba(37,99,235,.75)', borderRadius:5, order:2, yAxisID:'y',
         datalabels:{
           color: cor.text, anchor:'end', align:'top',
           font:{ size:10, family:'JetBrains Mono', weight:'600' }
@@ -455,7 +457,7 @@ function render(){
   if(gaugeChart) gaugeChart.destroy();
   gaugeChart = new Chart(document.getElementById('gaugeChart'), {
     type:'doughnut',
-    data:{ datasets:[{ data:[pct, 1-pct], backgroundColor:[statusColor(pct), 'rgba(255,255,255,.06)'], borderWidth:0 }] },
+    data:{ datasets:[{ data:[pct, 1-pct], backgroundColor:[statusColor(pct), 'rgba(27,36,64,.08)'], borderWidth:0 }] },
     options:{ rotation:-90, circumference:180, cutout:'75%', plugins:{ tooltip:{enabled:false}, legend:{display:false}, datalabels:{display:false} } }
   });
   document.getElementById('gaugeTitulo').textContent = '% Atendimento no prazo (SLA ' + slaAtivo + ')';
