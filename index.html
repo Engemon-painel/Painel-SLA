@@ -665,9 +665,12 @@ function renderPendenciasFca(){
   // Só reconstrói as <option> quando o mês muda de fato — reconstruir o
   // <select> de dentro do seu próprio evento "change" faz alguns navegadores
   // (Safari/Chrome no macOS) perderem a seleção logo em seguida.
+  // Normaliza espaços em branco extras (comuns em dados vindos do Excel) para
+  // que "Fulano" e "Fulano " (com espaço a mais) sejam tratados como o mesmo supervisor.
+  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
   const selectSupervisor = document.getElementById('supervisorFiltro');
   if(selectSupervisor && mesPopuladoFiltro !== mesAtualIdx){
-    const supervisores = Array.from(new Set(pendentesDoMes.map(p => p.supervisor).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const supervisores = Array.from(new Set(pendentesDoMes.map(p => norm(p.supervisor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     // Se o supervisor selecionado não existir mais na lista do mês atual, volta para "Todos".
     if(supervisorFiltroAtual && supervisores.indexOf(supervisorFiltroAtual) === -1){
       supervisorFiltroAtual = '';
@@ -679,7 +682,7 @@ function renderPendenciasFca(){
   }
 
   const pendentesFiltrados = supervisorFiltroAtual
-    ? pendentesDoMes.filter(p => p.supervisor === supervisorFiltroAtual)
+    ? pendentesDoMes.filter(p => norm(p.supervisor) === supervisorFiltroAtual)
     : pendentesDoMes;
 
   // ---- Tabela de pendências ----
