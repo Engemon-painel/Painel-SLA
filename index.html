@@ -196,17 +196,23 @@
     </div>
   </div>
 
-  <h2 style="margin-top:20px;">Pendências de preenchimento</h2>
-  <div class="hint">Incidentes fora do prazo cujo Fato/Causa ainda não foram preenchidos. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
+  <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
+  <div class="hint">Incidentes fora do prazo. Use os filtros para ver por supervisor e/ou por status de preenchimento do Fato/Causa. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
   <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
     <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
       <option value="">Todos</option>
     </select>
+    <label for="statusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
+    <select id="statusFiltro" class="mono" onchange="filtrarPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+      <option value="">Todos</option>
+      <option value="pendente">A preencher</option>
+      <option value="preenchido">Preenchido</option>
+    </select>
   </div>
   <table>
     <thead>
-      <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
+      <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Status</th><th>Causa</th><th>Ação</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
     </thead>
     <tbody id="pendenciasBody"></tbody>
   </table>
@@ -224,11 +230,17 @@ let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
+let statusFiltroAtual = '';
 let mesPopuladoFiltro = null;
 let renderPendenciasFcaRef = null;
 
 function filtrarPorSupervisor(valor){
   supervisorFiltroAtual = valor;
+  if(renderPendenciasFcaRef) renderPendenciasFcaRef();
+}
+
+function filtrarPorStatus(valor){
+  statusFiltroAtual = valor;
   if(renderPendenciasFcaRef) renderPendenciasFcaRef();
 }
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
@@ -569,6 +581,7 @@ function montarLinkForms(p){
 function renderPendenciasFca(){
   const tbody = document.getElementById('pendenciasBody');
   if(!tbody) return;
+  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
   const mesObj = DADOS.meses[mesAtualIdx];
   const areasDoMes = Object.keys(areasValidas(mesObj.areas));
   const nomeMes = mesObj.mes.split('/')[0];
@@ -577,13 +590,19 @@ function renderPendenciasFca(){
   const mesOrdAtual = '20' + anoCurto + '-' + mm;
   const todosDoMes = PENDENTES_FCA.filter(p => areasDoMes.indexOf(p.area) !== -1 && p.mesOrd === mesOrdAtual);
   const pendentesDoMes = todosDoMes.filter(p => p.pendente);
-  const justificadosDoMes = todosDoMes.filter(p => !p.pendente);
+
+  // Todo o restante do painel (KPIs, gráficos de Causa/Ação e tabela) reflete
+  // o supervisor selecionado — não só a tabela.
+  const todosDoMesSup = supervisorFiltroAtual
+    ? todosDoMes.filter(p => norm(p.supervisor) === supervisorFiltroAtual)
+    : todosDoMes;
+  const justificadosDoMes = todosDoMesSup.filter(p => !p.pendente);
 
   const badge = document.getElementById('fcaCount');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
 
   // ---- KPIs ----
-  const total = todosDoMes.length;
+  const total = todosDoMesSup.length;
   const qtdJustificado = justificadosDoMes.length;
   const pctJustificado = total > 0 ? (qtdJustificado / total * 100) : 0;
   const kpiRow = document.getElementById('fcaKpiRow');
@@ -665,12 +684,9 @@ function renderPendenciasFca(){
   // Só reconstrói as <option> quando o mês muda de fato — reconstruir o
   // <select> de dentro do seu próprio evento "change" faz alguns navegadores
   // (Safari/Chrome no macOS) perderem a seleção logo em seguida.
-  // Normaliza espaços em branco extras (comuns em dados vindos do Excel) para
-  // que "Fulano" e "Fulano " (com espaço a mais) sejam tratados como o mesmo supervisor.
-  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
   const selectSupervisor = document.getElementById('supervisorFiltro');
   if(selectSupervisor && mesPopuladoFiltro !== mesAtualIdx){
-    const supervisores = Array.from(new Set(pendentesDoMes.map(p => norm(p.supervisor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const supervisores = Array.from(new Set(todosDoMes.map(p => norm(p.supervisor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     // Se o supervisor selecionado não existir mais na lista do mês atual, volta para "Todos".
     if(supervisorFiltroAtual && supervisores.indexOf(supervisorFiltroAtual) === -1){
       supervisorFiltroAtual = '';
@@ -678,32 +694,46 @@ function renderPendenciasFca(){
     selectSupervisor.innerHTML = '<option value="">Todos</option>' +
       supervisores.map(s => `<option value="${s}">${s}</option>`).join('');
     selectSupervisor.value = supervisorFiltroAtual;
+    const selectStatus = document.getElementById('statusFiltro');
+    if(selectStatus) selectStatus.value = statusFiltroAtual;
     mesPopuladoFiltro = mesAtualIdx;
   }
 
-  const pendentesFiltrados = supervisorFiltroAtual
-    ? pendentesDoMes.filter(p => norm(p.supervisor) === supervisorFiltroAtual)
-    : pendentesDoMes;
+  // ---- Filtro por Status (a preencher / preenchido) ----
+  const itensFiltrados = statusFiltroAtual === 'pendente' ? todosDoMesSup.filter(p => p.pendente)
+    : statusFiltroAtual === 'preenchido' ? todosDoMesSup.filter(p => !p.pendente)
+    : todosDoMesSup;
 
-  // ---- Tabela de pendências ----
-  if(pendentesFiltrados.length === 0){
-    const msg = supervisorFiltroAtual
-      ? 'Nenhuma pendência para este supervisor neste mês.'
-      : 'Nenhuma pendência de FCA neste mês 🎉';
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:${cor.muted};">${msg}</td></tr>`;
+  // ---- Tabela ----
+  if(itensFiltrados.length === 0){
+    const msg = (supervisorFiltroAtual || statusFiltroAtual)
+      ? 'Nenhum incidente para os filtros selecionados neste mês.'
+      : 'Nenhum incidente fora do prazo neste mês 🎉';
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:${cor.muted};">${msg}</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = pendentesFiltrados.map(p => `<tr>
+  tbody.innerHTML = itensFiltrados.map(p => {
+    const statusPill = p.pendente
+      ? `<span class="pill bad">A preencher</span>`
+      : `<span class="pill good">Preenchido</span>`;
+    const ultimaCol = p.pendente
+      ? `<a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">Preencher</a>`
+      : '-';
+    return `<tr>
     <td>${p.supervisor || '-'}</td>
     <td>${p.area || '-'}</td>
     <td>${p.site || '-'}</td>
     <td>${p.incidente || '-'}</td>
+    <td>${statusPill}</td>
+    <td>${p.causa || '-'}</td>
+    <td>${p.acao || '-'}</td>
     <td class="mono" style="font-size:12px;">${p.submit || '-'}</td>
     <td class="mono" style="font-size:12px;">${p.clear || '-'}</td>
     <td class="mono" style="font-size:12px;">${p.resolved || '-'}</td>
-    <td><a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">Preencher</a></td>
-  </tr>`).join('');
+    <td>${ultimaCol}</td>
+  </tr>`;
+  }).join('');
 }
 
 renderPendenciasFcaRef = renderPendenciasFca;
