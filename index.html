@@ -224,6 +224,7 @@ let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
+let mesPopuladoFiltro = null;
 
 function filtrarPorSupervisor(valor){
   supervisorFiltroAtual = valor;
@@ -660,15 +661,20 @@ function renderPendenciasFca(){
   }
 
   // ---- Filtro por Supervisor ----
+  // Só reconstrói as <option> quando o mês muda de fato — reconstruir o
+  // <select> de dentro do seu próprio evento "change" faz alguns navegadores
+  // (Safari/Chrome no macOS) perderem a seleção logo em seguida.
   const selectSupervisor = document.getElementById('supervisorFiltro');
-  if(selectSupervisor){
+  if(selectSupervisor && mesPopuladoFiltro !== mesAtualIdx){
     const supervisores = Array.from(new Set(pendentesDoMes.map(p => p.supervisor).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     // Se o supervisor selecionado não existir mais na lista do mês atual, volta para "Todos".
     if(supervisorFiltroAtual && supervisores.indexOf(supervisorFiltroAtual) === -1){
       supervisorFiltroAtual = '';
     }
     selectSupervisor.innerHTML = '<option value="">Todos</option>' +
-      supervisores.map(s => `<option value="${s}" ${s===supervisorFiltroAtual?'selected':''}>${s}</option>`).join('');
+      supervisores.map(s => `<option value="${s}">${s}</option>`).join('');
+    selectSupervisor.value = supervisorFiltroAtual;
+    mesPopuladoFiltro = mesAtualIdx;
   }
 
   const pendentesFiltrados = supervisorFiltroAtual
