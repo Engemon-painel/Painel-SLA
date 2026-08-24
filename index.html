@@ -218,6 +218,45 @@
   </table>
 </div>
 
+<div class="panel" style="margin-top:16px;" id="headcountSecao">
+  <h2>Headcount — Organograma</h2>
+  <div class="hint">Dados da aba Organograma, mesma base do painel de SLA.</div>
+
+  <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <label for="contratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
+    <select id="contratoFiltro" class="mono" onchange="filtrarPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+      <option value="">Todos</option>
+    </select>
+  </div>
+
+  <div class="kpi-row" id="hcKpiRow" style="margin-bottom:20px;"></div>
+
+  <div class="panel" style="margin-bottom:16px;">
+    <h2>Departamentos</h2>
+    <div class="hint">Colaboradores ativos por área técnica.</div>
+    <div class="kpi-row" id="departamentosRow"></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Admitidos x Demitidos</h2>
+      <div class="hint">Últimos 8 meses.</div>
+      <canvas id="admDemChart" height="160"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Evolução da Equipe</h2>
+      <div class="hint">Headcount ativo ao final de cada mês.</div>
+      <canvas id="evolucaoChart" height="160"></canvas>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px;">
+    <h2>Técnicos Ativos Únicos por Supervisor</h2>
+    <div class="hint">Área técnica = Técnico, colaboradores ativos.</div>
+    <canvas id="tecnicosSupervisorChart" height="260"></canvas>
+  </div>
+</div>
+
 <footer>gerado localmente · sem conexão com o Power BI · dados de exemplo</footer>
 
 <script>
@@ -228,9 +267,11 @@
 let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
+let COLABORADORES = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
+let contratoFiltroAtual = '';
 let mesPopuladoFiltro = null;
 let renderPendenciasFcaRef = null;
 
@@ -242,6 +283,11 @@ function filtrarPorSupervisor(valor){
 function filtrarPorStatus(valor){
   statusFiltroAtual = valor;
   if(renderPendenciasFcaRef) renderPendenciasFcaRef();
+}
+
+function filtrarPorContrato(valor){
+  contratoFiltroAtual = valor;
+  renderHeadcount();
 }
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
 
@@ -277,12 +323,14 @@ async function carregarDados(){
     DIARIO_4H = data.diario || [];
     DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
     PENDENTES_FCA = data.pendentesFca || [];
+    COLABORADORES = data.colaboradores || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
     mesAtualIdx = DADOS.meses.length - 1;
     if(status) status.textContent = data.atualizado_em ? ('Dados atualizados em ' + data.atualizado_em) : '';
     montarPagina();
+    renderHeadcount();
   }catch(err){
     if(status){ status.textContent = 'Não foi possível carregar dados.json (' + err.message + ')'; status.style.color = cor.bad; }
     console.error(err);
@@ -317,6 +365,205 @@ function diarioDoMesAtual(){
   const nomeMes = mesObj.mes.split('/')[0]; // "Ago/26" -> "Ago"
   const mm = NOME_MES[nomeMes];
   return (DIARIO || []).filter(d => d.data.split('/')[1] === mm);
+}
+
+// ======================================================
+// HEADCOUNT — ORGANOGRAMA
+// Seção independente do mês/SLA selecionados acima; fica em escopo
+// global (não aninhada em montarPagina) para não repetir o bug de
+// escopo que já tivemos com renderPendenciasFca.
+// ======================================================
+
+let hcContratoPopulado = false;
+let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
+const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
+function normHc(s){ return (s || '').replace(/\s+/g, ' ').trim(); }
+function semAcentoHc(s){ return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+
+function ultimosNMesesHc(n){
+  const hoje = new Date();
+  const arr = [];
+  for(let i = n - 1; i >= 0; i--){
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    arr.push({
+      ano: d.getFullYear(),
+      mes: d.getMonth(),
+      label: MES_PT_ARR[d.getMonth()] + '/' + pad2hc(d.getFullYear() % 100)
+    });
+  }
+  return arr;
+}
+
+function renderHeadcount(){
+  const kpiRow = document.getElementById('hcKpiRow');
+  if(!kpiRow) return;
+
+  // ---- Filtro por Contrato ----
+  // Só popula o <select> uma vez (mesma lógica usada no filtro de
+  // Supervisor: reconstruir dentro do próprio "change" perde a seleção
+  // em alguns navegadores).
+  const selectContrato = document.getElementById('contratoFiltro');
+  if(selectContrato && !hcContratoPopulado){
+    const contratos = Array.from(new Set(COLABORADORES.map(c => normHc(c.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    selectContrato.innerHTML = '<option value="">Todos</option>' +
+      contratos.map(c => `<option value="${c}">${c}</option>`).join('');
+    selectContrato.value = contratoFiltroAtual;
+    hcContratoPopulado = true;
+  }
+
+  const colabFiltrados = contratoFiltroAtual
+    ? COLABORADORES.filter(c => normHc(c.contrato) === contratoFiltroAtual)
+    : COLABORADORES;
+
+  const ativos = colabFiltrados.filter(c => c.ativo);
+  const hcTotal = ativos.length;
+
+  // ---- HC's por contrato ----
+  const porContrato = {};
+  ativos.forEach(c => {
+    const k = normHc(c.contrato) || 'Sem contrato';
+    porContrato[k] = (porContrato[k] || 0) + 1;
+  });
+  const contratosOrdenados = Object.keys(porContrato).sort((a,b)=> porContrato[b]-porContrato[a]);
+
+  kpiRow.innerHTML = contratosOrdenados.map(k => {
+    const qtd = porContrato[k];
+    const pct = hcTotal > 0 ? (qtd/hcTotal*100).toFixed(0) : 0;
+    return `<div class="kpi"><div class="label">${k}</div><div class="value">${qtd}</div><div class="delta">${pct}%</div></div>`;
+  }).join('') + `<div class="kpi"><div class="label">HC Total</div><div class="value" style="color:${cor.accent}">${hcTotal}</div></div>`;
+
+  // ---- Departamentos (Área Técnica) ----
+  const porArea = {};
+  ativos.forEach(c => {
+    const k = normHc(c.areaTecnica) || 'Sem área';
+    porArea[k] = (porArea[k] || 0) + 1;
+  });
+  const areasOrdenadas = Object.keys(porArea).sort((a,b)=> porArea[b]-porArea[a]);
+  const departamentosRow = document.getElementById('departamentosRow');
+  if(departamentosRow){
+    departamentosRow.innerHTML = areasOrdenadas.map(k =>
+      `<div class="kpi"><div class="label">${k}</div><div class="value">${porArea[k]}</div></div>`
+    ).join('');
+  }
+
+  // ---- Admitidos x Demitidos (últimos 8 meses) ----
+  const meses8 = ultimosNMesesHc(8);
+  const admPorMes = meses8.map(()=>0);
+  const demPorMes = meses8.map(()=>0);
+
+  function indexDoMesHc(dataIso){
+    if(!dataIso) return -1;
+    const partes = dataIso.split('-');
+    const ano = Number(partes[0]);
+    const mes = Number(partes[1]) - 1;
+    return meses8.findIndex(m => m.ano === ano && m.mes === mes);
+  }
+
+  colabFiltrados.forEach(c => {
+    const iAdm = indexDoMesHc(c.dataAdmis);
+    if(iAdm !== -1) admPorMes[iAdm]++;
+    const iDem = indexDoMesHc(c.dataDemissao);
+    if(iDem !== -1) demPorMes[iDem]++;
+  });
+
+  const admDemCanvas = document.getElementById('admDemChart');
+  if(admDemCanvas){
+    if(admDemChartInst) admDemChartInst.destroy();
+    admDemChartInst = new Chart(admDemCanvas, {
+      type: 'bar',
+      data: {
+        labels: meses8.map(m => m.label),
+        datasets: [
+          { label: 'Admitidos', data: admPorMes, backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} } },
+          { label: 'Demitidos', data: demPorMes, backgroundColor: cor.bad, borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} } }
+        ]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: cor.muted, font: {family:'Inter', size:11} } }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {display:false} },
+          y: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  // ---- Evolução da Equipe (headcount ativo ao final de cada mês) ----
+  const evolucaoDados = meses8.map(m => {
+    const fimDoMes = new Date(m.ano, m.mes + 1, 0); // último dia do mês
+    const fimIso = fimDoMes.getFullYear() + '-' + pad2hc(fimDoMes.getMonth()+1) + '-' + pad2hc(fimDoMes.getDate());
+    return colabFiltrados.filter(c => {
+      if(!c.dataAdmis || c.dataAdmis > fimIso) return false;
+      if(c.dataDemissao && c.dataDemissao <= fimIso) return false;
+      return true;
+    }).length;
+  });
+
+  const evolucaoCanvas = document.getElementById('evolucaoChart');
+  if(evolucaoCanvas){
+    if(evolucaoChartInst) evolucaoChartInst.destroy();
+    evolucaoChartInst = new Chart(evolucaoCanvas, {
+      type: 'bar',
+      data: {
+        labels: meses8.map(m => m.label),
+        datasets: [{
+          label: 'Headcount', data: evolucaoDados,
+          backgroundColor: 'rgba(107,117,144,.6)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {display:false} },
+          y: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  // ---- Técnicos Ativos Únicos por Supervisor ----
+  const tecnicosAtivos = ativos.filter(c => semAcentoHc(c.areaTecnica) === 'tecnico');
+  const porSupervisor = {};
+  tecnicosAtivos.forEach(c => {
+    const k = normHc(c.supervisor) || 'Sem supervisor';
+    porSupervisor[k] = (porSupervisor[k] || 0) + 1;
+  });
+  const supervisoresOrdenados = Object.keys(porSupervisor).sort((a,b)=> porSupervisor[b]-porSupervisor[a]);
+
+  const tecnicosCanvas = document.getElementById('tecnicosSupervisorChart');
+  if(tecnicosCanvas){
+    if(tecnicosSupChartInst) tecnicosSupChartInst.destroy();
+    tecnicosSupChartInst = new Chart(tecnicosCanvas, {
+      type: 'bar',
+      data: {
+        labels: supervisoresOrdenados,
+        datasets: [{
+          label: 'Técnicos ativos', data: supervisoresOrdenados.map(k => porSupervisor[k]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true },
+          y: { ticks: {color: cor.muted, font:{size:11}}, grid: {display:false} }
+        }
+      }
+    });
+  }
 }
 
 function montarPagina(){
