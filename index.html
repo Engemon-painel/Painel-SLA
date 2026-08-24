@@ -225,10 +225,11 @@ let PENDENTES_FCA = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let mesPopuladoFiltro = null;
+let renderPendenciasFcaRef = null;
 
 function filtrarPorSupervisor(valor){
   supervisorFiltroAtual = valor;
-  renderPendenciasFca();
+  if(renderPendenciasFcaRef) renderPendenciasFcaRef();
 }
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
 
@@ -701,6 +702,8 @@ function renderPendenciasFca(){
     <td><a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">Preencher</a></td>
   </tr>`).join('');
 }
+
+renderPendenciasFcaRef = renderPendenciasFca;
 
 render();
 
