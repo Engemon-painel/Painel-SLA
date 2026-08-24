@@ -592,17 +592,20 @@ function renderPendenciasFca(){
   const pendentesDoMes = todosDoMes.filter(p => p.pendente);
 
   // Todo o restante do painel (KPIs, gráficos de Causa/Ação e tabela) reflete
-  // o supervisor selecionado — não só a tabela.
-  const todosDoMesSup = supervisorFiltroAtual
-    ? todosDoMes.filter(p => norm(p.supervisor) === supervisorFiltroAtual)
-    : todosDoMes;
-  const justificadosDoMes = todosDoMesSup.filter(p => !p.pendente);
+  // o supervisor E o status selecionados — não só a tabela.
+  const itensFiltrados = todosDoMes.filter(p => {
+    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return false;
+    if(statusFiltroAtual === 'pendente' && !p.pendente) return false;
+    if(statusFiltroAtual === 'preenchido' && p.pendente) return false;
+    return true;
+  });
+  const justificadosDoMes = itensFiltrados.filter(p => !p.pendente);
 
   const badge = document.getElementById('fcaCount');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
 
   // ---- KPIs ----
-  const total = todosDoMesSup.length;
+  const total = itensFiltrados.length;
   const qtdJustificado = justificadosDoMes.length;
   const pctJustificado = total > 0 ? (qtdJustificado / total * 100) : 0;
   const kpiRow = document.getElementById('fcaKpiRow');
@@ -698,11 +701,6 @@ function renderPendenciasFca(){
     if(selectStatus) selectStatus.value = statusFiltroAtual;
     mesPopuladoFiltro = mesAtualIdx;
   }
-
-  // ---- Filtro por Status (a preencher / preenchido) ----
-  const itensFiltrados = statusFiltroAtual === 'pendente' ? todosDoMesSup.filter(p => p.pendente)
-    : statusFiltroAtual === 'preenchido' ? todosDoMesSup.filter(p => !p.pendente)
-    : todosDoMesSup;
 
   // ---- Tabela ----
   if(itensFiltrados.length === 0){
