@@ -124,6 +124,7 @@
     <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
     <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
     <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
+    <a class="link-base" href="#pendenciasFca" onclick="document.getElementById('pendenciasFca').scrollIntoView({behavior:'smooth'}); return false;">⚠ FCA<span id="fcaCount" style="margin-left:4px;"></span></a>
   </div>
 </header>
 
@@ -176,6 +177,35 @@
   </table>
 </div>
 
+<div class="panel" style="margin-top:16px;" id="pendenciasFca">
+  <h2>Fora do Prazo — Justificativas (FCA)</h2>
+  <div class="hint">Incidentes fora do SLA de 4h, mês selecionado.</div>
+
+  <div class="kpi-row" id="fcaKpiRow" style="margin-bottom:20px;"></div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Causa</h2>
+      <div class="hint">Motivos mais frequentes entre os já justificados.</div>
+      <canvas id="causaChart" height="180"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Ação tomada</h2>
+      <div class="hint">Tipo de ação registrada entre os já justificados.</div>
+      <canvas id="acaoChart" height="180"></canvas>
+    </div>
+  </div>
+
+  <h2 style="margin-top:20px;">Pendências de preenchimento</h2>
+  <div class="hint">Incidentes fora do prazo cujo Fato/Causa ainda não foram preenchidos. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
+  <table>
+    <thead>
+      <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
+    </thead>
+    <tbody id="pendenciasBody"></tbody>
+  </table>
+</div>
+
 <footer>gerado localmente · sem conexão com o Power BI · dados de exemplo</footer>
 
 <script>
@@ -185,6 +215,7 @@
 // ======================================================
 let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
+let PENDENTES_FCA = [];
 let slaAtivo = '4h';
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
 
@@ -219,6 +250,7 @@ async function carregarDados(){
     SEMANAL_6H = data.semanal6h && data.semanal6h.length ? data.semanal6h : data.semanal;
     DIARIO_4H = data.diario || [];
     DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
+    PENDENTES_FCA = data.pendentesFca || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
@@ -289,7 +321,7 @@ function renderSignal(pct){
   }
 }
 
-let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart;
+let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart;
 
 function renderDailyWeekly(){
   // Filtra o diário pelo mês atualmente selecionado nos chips.
@@ -499,6 +531,138 @@ function render(){
 
   // Redesenha os gráficos diário e semanal para refletir o mês recém-selecionado.
   renderDailyWeekly();
+
+  // Pendências de FCA
+  renderPendenciasFca();
+}
+
+const FORMS_BASE_URL = 'https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=ihNOxfV5lEKqm7AEz41_9z2zZl5tQQRLpF5gH_pjKXBUNkZWM0REVzVIQ0w0VTA3SExKQlRHWkJHSC4u';
+
+function montarLinkForms(p){
+  const params = [
+    ['rd4af75b8855c4a468cac043c40f222ea', '%22Reclassifica%C3%A7%C3%A3o%22'],
+    ['rd70c550b6fc24c109aafe1ff8e97cc4d', encodeURIComponent(p.supervisor || '')],
+    ['r127daf30934e49e3a3b4d4713c1f5baa', encodeURIComponent(p.incidente || '')],
+    ['r8831081a06f742ffb01171c464ac2d90', encodeURIComponent(p.site || '')],
+    ['r8833ecb62ffe44d1b758d6fc09bdab3f', encodeURIComponent(p.clear || '')],
+    ['r04f7ca84c88d453f87de59e6ee186715', encodeURIComponent(p.resolved || '')],
+    ['rf640f293e2c14ec0bf1525bc18d9091e', encodeURIComponent(p.reported || '')],
+    ['r135a04b2690b4d1f9188fd657b0e0027', encodeURIComponent(p.submit || '')],
+  ];
+  return FORMS_BASE_URL + params.map(([k,v]) => '&' + k + '=' + v).join('');
+}
+
+function renderPendenciasFca(){
+  const tbody = document.getElementById('pendenciasBody');
+  if(!tbody) return;
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const areasDoMes = Object.keys(areasValidas(mesObj.areas));
+  const nomeMes = mesObj.mes.split('/')[0];
+  const mm = NOME_MES[nomeMes];
+  const anoCurto = mesObj.mes.split('/')[1];
+  const mesOrdAtual = '20' + anoCurto + '-' + mm;
+  const todosDoMes = PENDENTES_FCA.filter(p => areasDoMes.indexOf(p.area) !== -1 && p.mesOrd === mesOrdAtual);
+  const pendentesDoMes = todosDoMes.filter(p => p.pendente);
+  const justificadosDoMes = todosDoMes.filter(p => !p.pendente);
+
+  const badge = document.getElementById('fcaCount');
+  if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
+
+  // ---- KPIs ----
+  const total = todosDoMes.length;
+  const qtdJustificado = justificadosDoMes.length;
+  const pctJustificado = total > 0 ? (qtdJustificado / total * 100) : 0;
+  const kpiRow = document.getElementById('fcaKpiRow');
+  if(kpiRow){
+    kpiRow.innerHTML = `
+      <div class="kpi"><div class="label">Total Fora do Prazo</div><div class="value">${total.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi"><div class="label">Qtd Justificado</div><div class="value" style="color:${cor.accent}">${qtdJustificado.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi"><div class="label">% Justificado</div><div class="value" style="color:${statusColor(pctJustificado/100)}">${pctJustificado.toFixed(1)}%</div></div>
+    `;
+  }
+
+  // ---- Gráfico de Causa (top causas entre os já justificados) ----
+  const causaCounts = {};
+  justificadosDoMes.forEach(p => {
+    const c = p.causa || 'Não informado';
+    causaCounts[c] = (causaCounts[c] || 0) + 1;
+  });
+  const causaEntries = Object.entries(causaCounts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+
+  if(causaChart) causaChart.destroy();
+  const causaCanvas = document.getElementById('causaChart');
+  if(causaCanvas){
+    causaChart = new Chart(causaCanvas, {
+      type: 'bar',
+      data: {
+        labels: causaEntries.map(e => e[0]),
+        datasets: [{
+          label: 'Ocorrências', data: causaEntries.map(e => e[1]),
+          backgroundColor: 'rgba(94,52,181,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Gráfico de Ação tomada ----
+  const acaoCounts = {};
+  justificadosDoMes.forEach(p => {
+    const a = p.acao || 'Não informado';
+    acaoCounts[a] = (acaoCounts[a] || 0) + 1;
+  });
+  const acaoEntries = Object.entries(acaoCounts).sort((a,b) => b[1]-a[1]);
+
+  if(acaoChart) acaoChart.destroy();
+  const acaoCanvas = document.getElementById('acaoChart');
+  if(acaoCanvas){
+    acaoChart = new Chart(acaoCanvas, {
+      type: 'bar',
+      data: {
+        labels: acaoEntries.map(e => e[0]),
+        datasets: [{
+          label: 'Ocorrências', data: acaoEntries.map(e => e[1]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 5,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:11, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  // ---- Tabela de pendências ----
+  if(pendentesDoMes.length === 0){
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:${cor.muted};">Nenhuma pendência de FCA neste mês 🎉</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = pendentesDoMes.map(p => `<tr>
+    <td>${p.supervisor || '-'}</td>
+    <td>${p.area || '-'}</td>
+    <td>${p.site || '-'}</td>
+    <td>${p.incidente || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.submit || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.clear || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.resolved || '-'}</td>
+    <td><a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">Preencher</a></td>
+  </tr>`).join('');
 }
 
 render();
