@@ -89,6 +89,9 @@
   .gauge-wrap{ display:flex; flex-direction:column; align-items:center; }
   .gauge-value{ font-family:'JetBrains Mono', monospace; font-size:34px; font-weight:700; margin-top:-70px; }
   .gauge-target{ font-size:11px; color:var(--muted); margin-top:4px; }
+  .gauge-legend{ display:flex; gap:14px; margin-top:10px; }
+  .gauge-legend span{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
+  .gauge-legend i{ width:9px; height:9px; border-radius:50%; display:inline-block; }
 
   table{ width:100%; border-collapse:collapse; font-size:13px; }
   th{ text-align:left; color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:8px 6px; border-bottom:1px solid var(--line);}
@@ -149,6 +152,11 @@
       <canvas id="gaugeChart" width="220" height="130"></canvas>
       <div class="gauge-value" id="gaugeValue">—</div>
       <div class="gauge-target" id="gaugeDiff">—</div>
+      <div class="gauge-legend">
+        <span><i style="background:var(--bad)"></i>Ruim</span>
+        <span><i style="background:var(--warn)"></i>Regular</span>
+        <span><i style="background:var(--good)"></i>Ótimo</span>
+      </div>
     </div>
   </div>
 </div>
@@ -982,10 +990,43 @@ function render(){
 
   const pct = t.pct;
   if(gaugeChart) gaugeChart.destroy();
+  // Zonas fixas do mostrador: Ruim (vermelho) até meta-5pp, Regular (laranja) até a meta,
+  // Ótimo (verde) da meta até 100% — mesmos limites usados em statusColor()/nas pills das tabelas.
+  const zonaRuim = Math.max(0, DADOS.meta - 0.05);
+  const zonaRegular = 0.05;
+  const zonaOtimo = Math.max(0, 1 - DADOS.meta);
   gaugeChart = new Chart(document.getElementById('gaugeChart'), {
     type:'doughnut',
-    data:{ datasets:[{ data:[pct, 1-pct], backgroundColor:[statusColor(pct), 'rgba(27,36,64,.08)'], borderWidth:0 }] },
-    options:{ rotation:-90, circumference:180, cutout:'75%', plugins:{ tooltip:{enabled:false}, legend:{display:false}, datalabels:{display:false} } }
+    data:{ datasets:[{ data:[zonaRuim, zonaRegular, zonaOtimo], backgroundColor:[cor.bad, cor.warn, cor.good], borderWidth:0 }] },
+    options:{
+      rotation:-90, circumference:180, cutout:'75%',
+      plugins:{ tooltip:{enabled:false}, legend:{display:false}, datalabels:{display:false} }
+    },
+    plugins:[{
+      id:'gaugeNeedle',
+      afterDatasetsDraw(chart){
+        const arc = chart.getDatasetMeta(0).data[0];
+        if(!arc) return;
+        const { x, y, outerRadius, innerRadius, startAngle } = arc;
+        const angle = startAngle + pct * Math.PI; // varredura total do gauge = 180° (Math.PI rad)
+        const raio = (outerRadius + innerRadius) / 2;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(-raio * 0.18, 0);
+        ctx.lineTo(raio * 0.92, 0);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#1b2440';
+        ctx.stroke();
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#1b2440';
+        ctx.fill();
+      }
+    }]
   });
   document.getElementById('gaugeTitulo').textContent = '% Atendimento no prazo (SLA ' + slaAtivo + ')';
   document.getElementById('gaugeValue').textContent = (pct*100).toFixed(1) + '%';
