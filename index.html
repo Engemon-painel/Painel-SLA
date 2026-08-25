@@ -422,11 +422,6 @@ function renderHeadcount(){
   if(!kpiRow) return;
 
   // ---- Filtro por Contrato ----
-  // Filtro por Contrato: usa o campo c.contrato (valores CLT/LOCALIZAR/ROUBADA
-  // vindos da coluna Contrato_2 da aba Organograma).
-  // Só popula o <select> uma vez (mesma lógica usada no filtro de
-  // Supervisor: reconstruir dentro do próprio "change" perde a seleção
-  // em alguns navegadores).
   const selectContrato = document.getElementById('contratoFiltro');
   if(selectContrato && !hcContratoPopulado){
     const contratos = Array.from(new Set(COLABORADORES.map(c => canonContratoHc(c.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -437,9 +432,6 @@ function renderHeadcount(){
   }
 
   // ---- Filtro por Status ----
-  // O dados.json não traz uma coluna "Status" com texto (ex.: Férias,
-  // Afastado) — só o booleano c.ativo. Então o filtro usa "Ativo"/"Inativo"
-  // derivados desse booleano, pré-selecionado em "Ativo" por padrão.
   const selectStatusHc = document.getElementById('hcStatusFiltro');
   if(selectStatusHc && !hcStatusPopulado){
     selectStatusHc.innerHTML = '<option value="">Todos</option><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option>';
@@ -458,7 +450,6 @@ function renderHeadcount(){
   const ativos = colabFiltrados.filter(c => hcStatusFiltroAtual ? true : c.ativo);
   const hcTotal = ativos.length;
 
-  // ---- HC's por contrato ----
   const porContrato = {};
   ativos.forEach(c => {
     const k = canonContratoHc(c.contrato) || 'Sem contrato';
@@ -472,7 +463,6 @@ function renderHeadcount(){
     return `<div class="kpi"><div class="label">${k}</div><div class="value">${qtd}</div><div class="delta">${pct}%</div></div>`;
   }).join('') + `<div class="kpi"><div class="label">HC Total</div><div class="value" style="color:${cor.accent}">${hcTotal}</div></div>`;
 
-  // ---- Departamentos (Área Técnica) ----
   const porArea = {};
   ativos.forEach(c => {
     const k = normHc(c.areaTecnica) || 'Sem área';
@@ -481,8 +471,6 @@ function renderHeadcount(){
   const areasOrdenadas = Object.keys(porArea).sort((a,b)=> porArea[b]-porArea[a]);
   const departamentosRow = document.getElementById('departamentosRow');
   if(departamentosRow){
-    // Paleta cíclica: cada departamento recebe uma cor de fundo/borda/texto,
-    // repetindo a partir do 9º item caso existam mais áreas que cores.
     const paletaDept = [
       { bg:'rgba(37,99,235,.10)',  border:'rgba(37,99,235,.35)',  text:'#1d4ed8' },
       { bg:'rgba(5,150,105,.10)',  border:'rgba(5,150,105,.35)',  text:'#047857' },
@@ -504,7 +492,6 @@ function renderHeadcount(){
     }).join('');
   }
 
-  // ---- Admitidos x Demitidos (últimos 8 meses) ----
   const meses8 = ultimosNMesesHc(8);
   const admPorMes = meses8.map(()=>0);
   const demPorMes = meses8.map(()=>0);
@@ -550,9 +537,8 @@ function renderHeadcount(){
     });
   }
 
-  // ---- Evolução da Equipe (headcount ativo ao final de cada mês) ----
   const evolucaoDados = meses8.map(m => {
-    const fimDoMes = new Date(m.ano, m.mes + 1, 0); // último dia do mês
+    const fimDoMes = new Date(m.ano, m.mes + 1, 0);
     const fimIso = fimDoMes.getFullYear() + '-' + pad2hc(fimDoMes.getMonth()+1) + '-' + pad2hc(fimDoMes.getDate());
     return colabFiltrados.filter(c => {
       if(!c.dataAdmis || c.dataAdmis > fimIso) return false;
@@ -586,7 +572,6 @@ function renderHeadcount(){
     });
   }
 
-  // ---- Técnicos Ativos Únicos por Supervisor ----
   const tecnicosAtivos = ativos.filter(c => semAcentoHc(c.areaTecnica) === 'tecnico');
   const porSupervisor = {};
   tecnicosAtivos.forEach(c => {
@@ -598,9 +583,6 @@ function renderHeadcount(){
   const tecnicosCanvas = document.getElementById('tecnicosSupervisorChart');
   if(tecnicosCanvas){
     if(tecnicosSupChartInst) tecnicosSupChartInst.destroy();
-    // Altura do canvas cresce com o número de supervisores (28px por barra,
-    // com um mínimo), para caber dentro do wrapper com rolagem em vez de
-    // esmagar/estourar o layout da página.
     const alturaPorBarra = 28;
     const alturaMinima = 260;
     const alturaCalculada = Math.max(alturaMinima, supervisoresOrdenados.length * alturaPorBarra);
@@ -628,6 +610,175 @@ function renderHeadcount(){
         }
       }
     });
+  }
+}
+
+function exportarFcaPreenchidoCsv(){
+  try {
+    if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
+      alert('Os dados do painel ainda não foram carregados.');
+      return;
+    }
+
+    if (!Array.isArray(PENDENTES_FCA)) {
+      alert('A base de FCA não foi carregada corretamente.');
+      return;
+    }
+
+    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+
+    const mesObj = DADOS.meses[mesAtualIdx];
+    if (!mesObj || !mesObj.mes) {
+      alert('Não foi possível identificar o mês selecionado.');
+      return;
+    }
+
+    const partesMes = String(mesObj.mes).split('/');
+    const nomeMes = partesMes[0];
+    const anoCurto = partesMes[1];
+    const mm = NOME_MES[nomeMes];
+
+    if (!mm || !anoCurto) {
+      alert('Formato de mês inválido: ' + mesObj.mes);
+      return;
+    }
+
+    const mesOrdAtual = '20' + anoCurto + '-' + mm;
+
+    const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
+
+    function estaPendente(p) {
+      const valor = p ? p.pendente : false;
+
+      if (valor === true || valor === 1) return true;
+
+      if (typeof valor === 'string') {
+        const v = valor.trim().toLowerCase();
+        return v === 'true' || v === '1' || v === 'sim';
+      }
+
+      return false;
+    }
+
+    const todosDoMes = PENDENTES_FCA.filter(p => {
+      if (!p) return false;
+
+      if (!areasDoMes.includes(norm(p.area))) return false;
+
+      if (norm(p.mesOrd) !== mesOrdAtual) return false;
+
+      if (
+        supervisorFiltroAtual &&
+        norm(p.supervisor) !== norm(supervisorFiltroAtual)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const preenchidos = todosDoMes.filter(p => !estaPendente(p));
+
+    if (!preenchidos.length) {
+      console.log('--- EXPORTAÇÃO FCA ---');
+      console.log('Mês selecionado:', mesObj.mes);
+      console.log('Mês esperado:', mesOrdAtual);
+      console.log('Áreas:', areasDoMes);
+      console.log('Total PENDENTES_FCA:', PENDENTES_FCA.length);
+      console.log('Total do mês:', todosDoMes.length);
+      console.log('Supervisor:', supervisorFiltroAtual || 'Todos');
+
+      alert(
+        'Nenhum incidente preenchido para exportar.\n\n' +
+        'Mês: ' + mesObj.mes +
+        (supervisorFiltroAtual
+          ? '\nSupervisor: ' + supervisorFiltroAtual
+          : '')
+      );
+      return;
+    }
+
+    const colunas = [
+      'Supervisor',
+      'Área',
+      'Site',
+      'Incidente',
+      'Causa',
+      'Ação',
+      'Reported',
+      'Submit',
+      'Clear',
+      'Resolved'
+    ];
+
+    function csvEsc(v) {
+      const s = String(v ?? '');
+
+      if (/[",;\n\r]/.test(s)) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+
+      return s;
+    }
+
+    const linhasCsv = [];
+    linhasCsv.push(colunas.map(csvEsc).join(';'));
+
+    preenchidos.forEach(p => {
+      linhasCsv.push([
+        p.supervisor || '',
+        p.area || '',
+        p.site || '',
+        p.incidente || '',
+        p.causa || '',
+        p.acao || '',
+        p.reported || '',
+        p.submit || '',
+        p.clear || '',
+        p.resolved || ''
+      ].map(csvEsc).join(';'));
+    });
+
+    const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
+
+    const blob = new Blob(
+      [csvContent],
+      { type: 'text/csv;charset=utf-8;' }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const nomeArquivo =
+      'FCA_Preenchidos_' +
+      mesObj.mes.replace('/', '-') +
+      '.csv';
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    a.style.display = 'none';
+    a.setAttribute('download', nomeArquivo);
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    console.log(
+      'CSV FCA exportado com sucesso:',
+      nomeArquivo,
+      'Registros:',
+      preenchidos.length
+    );
+
+  } catch (erro) {
+    console.error('Erro ao exportar FCA:', erro);
+
+    alert(
+      'Ocorreu um erro ao exportar o CSV.\n\n' +
+      (erro && erro.message ? erro.message : erro)
+    );
   }
 }
 
@@ -662,7 +813,6 @@ function renderSignal(pct){
 let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart;
 
 function renderDailyWeekly(){
-  // Filtra o diário pelo mês atualmente selecionado nos chips.
   const diarioFiltrado = diarioDoMesAtual();
 
   if(dailyChart) dailyChart.destroy();
@@ -748,7 +898,6 @@ function render(){
   const t = totais(mesObj);
   renderSignal(t.pct);
 
-  // KPIs
   const prevIdx = mesAtualIdx - 1;
   const prevPct = prevIdx >= 0 ? totais(DADOS.meses[prevIdx]).pct : null;
   const deltaPP = prevPct !== null ? (t.pct - prevPct) * 100 : null;
@@ -763,8 +912,6 @@ function render(){
     </div>
   `;
 
-  // ---- Area chart: barras lado a lado (não empilhadas) + linha de % dentro do prazo + valores visíveis ----
-  // Considera apenas SPC1, SPC2, SPC3 e SPC4 — áreas vazias/"Outras" ficam de fora do total e do gráfico.
   const areasFiltradas = areasValidas(mesObj.areas);
   const areaNames = Object.keys(areasFiltradas);
   const dentroArr = areaNames.map(a=>areasFiltradas[a].dentro);
@@ -822,7 +969,6 @@ function render(){
     }
   });
 
-  // Gauge (doughnut hack)
   const pct = t.pct;
   if(gaugeChart) gaugeChart.destroy();
   gaugeChart = new Chart(document.getElementById('gaugeChart'), {
@@ -836,7 +982,6 @@ function render(){
   const diffPP = (pct - DADOS.meta)*100;
   document.getElementById('gaugeDiff').textContent = `Meta 85% · ${diffPP>=0?'+':''}${diffPP.toFixed(1)} p.p.`;
 
-  // Trend
   if(trendChart) trendChart.destroy();
   trendChart = new Chart(document.getElementById('trendChart'), {
     type:'line',
@@ -851,7 +996,6 @@ function render(){
       scales:{ x:{ ticks:{color:cor.muted}, grid:{display:false} }, y:{ ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{color:cor.line} } } }
   });
 
-  // Table
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = areaNames.map(a=>{
     const d = mesObj.areas[a];
@@ -867,10 +1011,8 @@ function render(){
     </tr>`;
   }).join('');
 
-  // Redesenha os gráficos diário e semanal para refletir o mês recém-selecionado.
   renderDailyWeekly();
 
-  // Pendências de FCA
   renderPendenciasFca();
 }
 
@@ -890,216 +1032,7 @@ function montarLinkForms(p){
   return FORMS_BASE_URL + params.map(([k,v]) => '&' + k + '=' + v).join('');
 }
 
-// ---- Exportar CSV: incidentes FCA com status "Preenchido" ----
-// Usa a mesma base do mês/SLA selecionados; respeita o filtro de
-// Supervisor se estiver ativo, e sempre restringe a pendente === false
-// (ou seja, "Preenchido"), independente do filtro de Status na tela.
-function exportarFcaPreenchidoCsv(){
-  try {
-    // --------------------------------------------------
-    // Validações básicas
-    // --------------------------------------------------
-    if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
-      alert('Os dados do painel ainda não foram carregados.');
-      return;
-    }
 
-    if (!Array.isArray(PENDENTES_FCA)) {
-      alert('A base de FCA não foi carregada corretamente.');
-      return;
-    }
-
-    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
-
-    const mesObj = DADOS.meses[mesAtualIdx];
-    if (!mesObj || !mesObj.mes) {
-      alert('Não foi possível identificar o mês selecionado.');
-      return;
-    }
-
-    // --------------------------------------------------
-    // Identifica o mês selecionado: Ago/26 -> 2026-08
-    // --------------------------------------------------
-    const partesMes = String(mesObj.mes).split('/');
-    const nomeMes = partesMes[0];
-    const anoCurto = partesMes[1];
-    const mm = NOME_MES[nomeMes];
-
-    if (!mm || !anoCurto) {
-      alert('Formato de mês inválido: ' + mesObj.mes);
-      return;
-    }
-
-    const mesOrdAtual = '20' + anoCurto + '-' + mm;
-
-    // --------------------------------------------------
-    // Áreas válidas do mês
-    // --------------------------------------------------
-    const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
-
-    // --------------------------------------------------
-    // Trata corretamente booleano, texto e número.
-    // Assim, false e "false" = preenchido.
-    // true, "true", 1 e "1" = pendente.
-    // --------------------------------------------------
-    function estaPendente(p) {
-      const valor = p ? p.pendente : false;
-
-      if (valor === true || valor === 1) return true;
-
-      if (typeof valor === 'string') {
-        const v = valor.trim().toLowerCase();
-        return v === 'true' || v === '1' || v === 'sim';
-      }
-
-      return false;
-    }
-
-    // --------------------------------------------------
-    // Filtra os registros do mês/área e supervisor.
-    // O filtro de Status da tela NÃO interfere na exportação:
-    // sempre exporta todos os registros preenchidos.
-    // --------------------------------------------------
-    const todosDoMes = PENDENTES_FCA.filter(p => {
-      if (!p) return false;
-
-      if (!areasDoMes.includes(norm(p.area))) return false;
-
-      if (norm(p.mesOrd) !== mesOrdAtual) return false;
-
-      if (
-        supervisorFiltroAtual &&
-        norm(p.supervisor) !== norm(supervisorFiltroAtual)
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-
-    const preenchidos = todosDoMes.filter(p => !estaPendente(p));
-
-    // --------------------------------------------------
-    // Diagnóstico se não houver registros
-    // --------------------------------------------------
-    if (!preenchidos.length) {
-      console.log('--- EXPORTAÇÃO FCA ---');
-      console.log('Mês selecionado:', mesObj.mes);
-      console.log('Mês esperado:', mesOrdAtual);
-      console.log('Áreas:', areasDoMes);
-      console.log('Total PENDENTES_FCA:', PENDENTES_FCA.length);
-      console.log('Total do mês:', todosDoMes.length);
-      console.log('Supervisor:', supervisorFiltroAtual || 'Todos');
-
-      alert(
-        'Nenhum incidente preenchido para exportar.\n\n' +
-        'Mês: ' + mesObj.mes +
-        (supervisorFiltroAtual
-          ? '\nSupervisor: ' + supervisorFiltroAtual
-          : '')
-      );
-      return;
-    }
-
-    // --------------------------------------------------
-    // Colunas do CSV
-    // --------------------------------------------------
-    const colunas = [
-      'Supervisor',
-      'Área',
-      'Site',
-      'Incidente',
-      'Causa',
-      'Ação',
-      'Reported',
-      'Submit',
-      'Clear',
-      'Resolved'
-    ];
-
-    // --------------------------------------------------
-    // Escapa corretamente campos do CSV
-    // --------------------------------------------------
-    function csvEsc(v) {
-      const s = String(v ?? '');
-
-      if (/[",;\n\r]/.test(s)) {
-        return '"' + s.replace(/"/g, '""') + '"';
-      }
-
-      return s;
-    }
-
-    // --------------------------------------------------
-    // Monta as linhas
-    // --------------------------------------------------
-    const linhasCsv = [];
-    linhasCsv.push(colunas.map(csvEsc).join(';'));
-
-    preenchidos.forEach(p => {
-      linhasCsv.push([
-        p.supervisor || '',
-        p.area || '',
-        p.site || '',
-        p.incidente || '',
-        p.causa || '',
-        p.acao || '',
-        p.reported || '',
-        p.submit || '',
-        p.clear || '',
-        p.resolved || ''
-      ].map(csvEsc).join(';'));
-    });
-
-    // --------------------------------------------------
-    // UTF-8 com BOM para abrir corretamente no Excel
-    // --------------------------------------------------
-    const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
-
-    const blob = new Blob(
-      [csvContent],
-      { type: 'text/csv;charset=utf-8;' }
-    );
-
-    const url = URL.createObjectURL(blob);
-
-    const nomeArquivo =
-      'FCA_Preenchidos_' +
-      mesObj.mes.replace('/', '-') +
-      '.csv';
-
-    // --------------------------------------------------
-    // Download compatível com Chrome/Edge
-    // --------------------------------------------------
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomeArquivo;
-    a.style.display = 'none';
-    a.setAttribute('download', nomeArquivo);
-
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    // Não revoga imediatamente a URL.
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
-
-    console.log(
-      'CSV FCA exportado com sucesso:',
-      nomeArquivo,
-      'Registros:',
-      preenchidos.length
-    );
-
-  } catch (erro) {
-    console.error('Erro ao exportar FCA:', erro);
-
-    alert(
-      'Ocorreu um erro ao exportar o CSV.\n\n' +
-      (erro && erro.message ? erro.message : erro)
-    );
-  }
-}
 
 function renderPendenciasFca(){
   const tbody = document.getElementById('pendenciasBody');
@@ -1114,8 +1047,6 @@ function renderPendenciasFca(){
   const todosDoMes = PENDENTES_FCA.filter(p => areasDoMes.indexOf(p.area) !== -1 && p.mesOrd === mesOrdAtual);
   const pendentesDoMes = todosDoMes.filter(p => p.pendente);
 
-  // Todo o restante do painel (KPIs, gráficos de Causa/Ação e tabela) reflete
-  // o supervisor E o status selecionados — não só a tabela.
   const itensFiltrados = todosDoMes.filter(p => {
     if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return false;
     if(statusFiltroAtual === 'pendente' && !p.pendente) return false;
@@ -1127,7 +1058,6 @@ function renderPendenciasFca(){
   const badge = document.getElementById('fcaCount');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
 
-  // ---- KPIs ----
   const total = itensFiltrados.length;
   const qtdJustificado = justificadosDoMes.length;
   const pctJustificado = total > 0 ? (qtdJustificado / total * 100) : 0;
@@ -1140,7 +1070,6 @@ function renderPendenciasFca(){
     `;
   }
 
-  // ---- Gráfico de Causa (top causas entre os já justificados) ----
   const causaCounts = {};
   justificadosDoMes.forEach(p => {
     const c = p.causa || 'Não informado';
@@ -1173,7 +1102,6 @@ function renderPendenciasFca(){
     });
   }
 
-  // ---- Gráfico de Ação tomada ----
   const acaoCounts = {};
   justificadosDoMes.forEach(p => {
     const a = p.acao || 'Não informado';
@@ -1206,14 +1134,9 @@ function renderPendenciasFca(){
     });
   }
 
-  // ---- Filtro por Supervisor ----
-  // Só reconstrói as <option> quando o mês muda de fato — reconstruir o
-  // <select> de dentro do seu próprio evento "change" faz alguns navegadores
-  // (Safari/Chrome no macOS) perderem a seleção logo em seguida.
   const selectSupervisor = document.getElementById('supervisorFiltro');
   if(selectSupervisor && mesPopuladoFiltro !== mesAtualIdx){
     const supervisores = Array.from(new Set(todosDoMes.map(p => norm(p.supervisor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    // Se o supervisor selecionado não existir mais na lista do mês atual, volta para "Todos".
     if(supervisorFiltroAtual && supervisores.indexOf(supervisorFiltroAtual) === -1){
       supervisorFiltroAtual = '';
     }
@@ -1225,7 +1148,6 @@ function renderPendenciasFca(){
     mesPopuladoFiltro = mesAtualIdx;
   }
 
-  // ---- Tabela ----
   if(itensFiltrados.length === 0){
     const msg = (supervisorFiltroAtual || statusFiltroAtual)
       ? 'Nenhum incidente para os filtros selecionados neste mês.'
