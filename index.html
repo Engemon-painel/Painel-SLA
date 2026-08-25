@@ -213,6 +213,7 @@
       <option value="pendente">A preencher</option>
       <option value="preenchido">Preenchido</option>
     </select>
+    <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
   </div>
   <table>
     <thead>
@@ -887,6 +888,57 @@ function montarLinkForms(p){
     ['r135a04b2690b4d1f9188fd657b0e0027', encodeURIComponent(p.submit || '')],
   ];
   return FORMS_BASE_URL + params.map(([k,v]) => '&' + k + '=' + v).join('');
+}
+
+// ---- Exportar CSV: incidentes FCA com status "Preenchido" ----
+// Usa a mesma base do mês/SLA selecionados; respeita o filtro de
+// Supervisor se estiver ativo, e sempre restringe a pendente === false
+// (ou seja, "Preenchido"), independente do filtro de Status na tela.
+function exportarFcaPreenchidoCsv(){
+  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const areasDoMes = Object.keys(areasValidas(mesObj.areas));
+  const nomeMes = mesObj.mes.split('/')[0];
+  const mm = NOME_MES[nomeMes];
+  const anoCurto = mesObj.mes.split('/')[1];
+  const mesOrdAtual = '20' + anoCurto + '-' + mm;
+
+  const preenchidos = PENDENTES_FCA.filter(p => {
+    if(areasDoMes.indexOf(p.area) === -1) return false;
+    if(p.mesOrd !== mesOrdAtual) return false;
+    if(p.pendente) return false;
+    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return false;
+    return true;
+  });
+
+  if(preenchidos.length === 0){
+    alert('Nenhum incidente preenchido para exportar neste mês' + (supervisorFiltroAtual ? ' / supervisor selecionado.' : '.'));
+    return;
+  }
+
+  const colunas = ['Supervisor','Área','Site','Incidente','Causa','Ação','Reported','Submit','Clear','Resolved'];
+  function csvEsc(v){
+    const s = String(v ?? '');
+    return /[",;\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  const linhasCsv = [colunas.join(';')];
+  preenchidos.forEach(p => {
+    linhasCsv.push([
+      p.supervisor || '', p.area || '', p.site || '', p.incidente || '',
+      p.causa || '', p.acao || '', p.reported || '', p.submit || '', p.clear || '', p.resolved || ''
+    ].map(csvEsc).join(';'));
+  });
+
+  const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'fca_preenchidos_' + mesObj.mes.replace('/','-') + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function renderPendenciasFca(){
