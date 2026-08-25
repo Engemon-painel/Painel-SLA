@@ -393,6 +393,9 @@ const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out',
 
 function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
 function normHc(s){ return (s || '').replace(/\s+/g, ' ').trim(); }
+// Unifica variações de maiúsculas/minúsculas do mesmo contrato (ex.: "Claro"
+// e "CLARO" vindos de abas diferentes) num único valor em maiúsculas.
+function canonContratoHc(s){ const n = normHc(s); return n ? n.toUpperCase() : n; }
 function semAcentoHc(s){ return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 
 function ultimosNMesesHc(n){
@@ -421,7 +424,7 @@ function renderHeadcount(){
   // em alguns navegadores).
   const selectContrato = document.getElementById('contratoFiltro');
   if(selectContrato && !hcContratoPopulado){
-    const contratos = Array.from(new Set(COLABORADORES.map(c => normHc(c.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const contratos = Array.from(new Set(COLABORADORES.map(c => canonContratoHc(c.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     selectContrato.innerHTML = '<option value="">Todos</option>' +
       contratos.map(c => `<option value="${c}">${c}</option>`).join('');
     selectContrato.value = contratoFiltroAtual;
@@ -441,7 +444,7 @@ function renderHeadcount(){
   }
 
   const colabFiltrados = COLABORADORES.filter(c => {
-    if(contratoFiltroAtual && normHc(c.contrato) !== contratoFiltroAtual) return false;
+    if(contratoFiltroAtual && canonContratoHc(c.contrato) !== contratoFiltroAtual) return false;
     if(hcStatusFiltroAtual === 'Ativo' && !c.ativo) return false;
     if(hcStatusFiltroAtual === 'Inativo' && c.ativo) return false;
     return true;
@@ -453,7 +456,7 @@ function renderHeadcount(){
   // ---- HC's por contrato ----
   const porContrato = {};
   ativos.forEach(c => {
-    const k = normHc(c.contrato) || 'Sem contrato';
+    const k = canonContratoHc(c.contrato) || 'Sem contrato';
     porContrato[k] = (porContrato[k] || 0) + 1;
   });
   const contratosOrdenados = Object.keys(porContrato).sort((a,b)=> porContrato[b]-porContrato[a]);
