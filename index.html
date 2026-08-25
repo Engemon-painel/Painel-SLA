@@ -227,6 +227,10 @@
     <select id="contratoFiltro" class="mono" onchange="filtrarPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
       <option value="">Todos</option>
     </select>
+    <label for="hcStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
+    <select id="hcStatusFiltro" class="mono" onchange="filtrarPorStatusHc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+      <option value="">Todos</option>
+    </select>
   </div>
 
   <div class="kpi-row" id="hcKpiRow" style="margin-bottom:20px;"></div>
@@ -253,7 +257,9 @@
   <div class="panel" style="margin-top:16px;">
     <h2>Técnicos Ativos Únicos por Supervisor</h2>
     <div class="hint">Área técnica = Técnico, colaboradores ativos.</div>
-    <canvas id="tecnicosSupervisorChart" height="260"></canvas>
+    <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto;">
+      <canvas id="tecnicosSupervisorChart"></canvas>
+    </div>
   </div>
 </div>
 
@@ -287,6 +293,12 @@ function filtrarPorStatus(valor){
 
 function filtrarPorContrato(valor){
   contratoFiltroAtual = valor;
+  renderHeadcount();
+}
+
+let hcStatusFiltroAtual = '';
+function filtrarPorStatusHc(valor){
+  hcStatusFiltroAtual = valor;
   renderHeadcount();
 }
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
@@ -375,6 +387,7 @@ function diarioDoMesAtual(){
 // ======================================================
 
 let hcContratoPopulado = false;
+let hcStatusPopulado = false;
 let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
 const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -401,29 +414,50 @@ function renderHeadcount(){
   if(!kpiRow) return;
 
   // ---- Filtro por Contrato ----
+  // Usa a coluna Contrato_2 (c.contrato2) como fonte do filtro.
   // Só popula o <select> uma vez (mesma lógica usada no filtro de
   // Supervisor: reconstruir dentro do próprio "change" perde a seleção
   // em alguns navegadores).
   const selectContrato = document.getElementById('contratoFiltro');
   if(selectContrato && !hcContratoPopulado){
-    const contratos = Array.from(new Set(COLABORADORES.map(c => normHc(c.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const contratos = Array.from(new Set(COLABORADORES.map(c => normHc(c.contrato2)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     selectContrato.innerHTML = '<option value="">Todos</option>' +
       contratos.map(c => `<option value="${c}">${c}</option>`).join('');
     selectContrato.value = contratoFiltroAtual;
     hcContratoPopulado = true;
   }
 
-  const colabFiltrados = contratoFiltroAtual
-    ? COLABORADORES.filter(c => normHc(c.contrato) === contratoFiltroAtual)
-    : COLABORADORES;
+  // ---- Filtro por Status ----
+  // Fonte: coluna Status da aba Organograma (c.status). Na primeira
+  // montagem, se existir a opção "Ativo" ela já vem pré-selecionada,
+  // mantendo o comportamento padrão de só mostrar quem está ativo.
+  const selectStatusHc = document.getElementById('hcStatusFiltro');
+  if(selectStatusHc && !hcStatusPopulado){
+    const statusValores = Array.from(new Set(COLABORADORES.map(c => normHc(c.status)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    selectStatusHc.innerHTML = '<option value="">Todos</option>' +
+      statusValores.map(s => `<option value="${s}">${s}</option>`).join('');
+    const statusAtivo = statusValores.find(s => semAcentoHc(s) === 'ativo');
+    if(!hcStatusFiltroAtual && statusAtivo) hcStatusFiltroAtual = statusAtivo;
+    selectStatusHc.value = hcStatusFiltroAtual;
+    hcStatusPopulado = true;
+  }
 
-  const ativos = colabFiltrados.filter(c => c.ativo);
+  const colabFiltrados = COLABORADORES.filter(c => {
+    if(contratoFiltroAtual && normHc(c.contrato2) !== contratoFiltroAtual) return false;
+    if(hcStatusFiltroAtual && normHc(c.status) !== hcStatusFiltroAtual) return false;
+    return true;
+  });
+
+  // Quando o filtro de Status está definido, o próprio filtro já garante
+  // o recorte desejado (Ativo, Inativo, Férias etc.); sem filtro, cai no
+  // comportamento antigo de considerar apenas c.ativo.
+  const ativos = hcStatusFiltroAtual ? colabFiltrados : colabFiltrados.filter(c => c.ativo);
   const hcTotal = ativos.length;
 
   // ---- HC's por contrato ----
   const porContrato = {};
   ativos.forEach(c => {
-    const k = normHc(c.contrato) || 'Sem contrato';
+    const k = normHc(c.contrato2) || 'Sem contrato';
     porContrato[k] = (porContrato[k] || 0) + 1;
   });
   const contratosOrdenados = Object.keys(porContrato).sort((a,b)=> porContrato[b]-porContrato[a]);
@@ -443,9 +477,27 @@ function renderHeadcount(){
   const areasOrdenadas = Object.keys(porArea).sort((a,b)=> porArea[b]-porArea[a]);
   const departamentosRow = document.getElementById('departamentosRow');
   if(departamentosRow){
-    departamentosRow.innerHTML = areasOrdenadas.map(k =>
-      `<div class="kpi"><div class="label">${k}</div><div class="value">${porArea[k]}</div></div>`
-    ).join('');
+    // Paleta cíclica: cada departamento recebe uma cor de fundo/borda/texto,
+    // repetindo a partir do 9º item caso existam mais áreas que cores.
+    const paletaDept = [
+      { bg:'rgba(37,99,235,.10)',  border:'rgba(37,99,235,.35)',  text:'#1d4ed8' },
+      { bg:'rgba(5,150,105,.10)',  border:'rgba(5,150,105,.35)',  text:'#047857' },
+      { bg:'rgba(217,119,6,.10)',  border:'rgba(217,119,6,.35)',  text:'#b45309' },
+      { bg:'rgba(220,38,38,.10)',  border:'rgba(220,38,38,.35)',  text:'#b91c1c' },
+      { bg:'rgba(94,52,181,.10)',  border:'rgba(94,52,181,.35)',  text:'#5e34b5' },
+      { bg:'rgba(14,124,134,.10)', border:'rgba(14,124,134,.35)', text:'#0e7c86' },
+      { bg:'rgba(219,39,119,.10)', border:'rgba(219,39,119,.35)', text:'#be185d' },
+      { bg:'rgba(202,138,4,.10)',  border:'rgba(202,138,4,.35)',  text:'#a16207' },
+      { bg:'rgba(8,145,178,.10)',  border:'rgba(8,145,178,.35)',  text:'#0e7490' },
+      { bg:'rgba(101,163,13,.10)', border:'rgba(101,163,13,.35)', text:'#4d7c0f' },
+    ];
+    departamentosRow.innerHTML = areasOrdenadas.map((k, i) => {
+      const c = paletaDept[i % paletaDept.length];
+      return `<div class="kpi" style="background:${c.bg}; border-color:${c.border};">
+        <div class="label" style="color:${c.text};">${k}</div>
+        <div class="value" style="color:${c.text};">${porArea[k]}</div>
+      </div>`;
+    }).join('');
   }
 
   // ---- Admitidos x Demitidos (últimos 8 meses) ----
@@ -542,6 +594,13 @@ function renderHeadcount(){
   const tecnicosCanvas = document.getElementById('tecnicosSupervisorChart');
   if(tecnicosCanvas){
     if(tecnicosSupChartInst) tecnicosSupChartInst.destroy();
+    // Altura do canvas cresce com o número de supervisores (28px por barra,
+    // com um mínimo), para caber dentro do wrapper com rolagem em vez de
+    // esmagar/estourar o layout da página.
+    const alturaPorBarra = 28;
+    const alturaMinima = 260;
+    const alturaCalculada = Math.max(alturaMinima, supervisoresOrdenados.length * alturaPorBarra);
+    tecnicosCanvas.parentElement.style.height = alturaCalculada + 'px';
     tecnicosSupChartInst = new Chart(tecnicosCanvas, {
       type: 'bar',
       data: {
@@ -556,6 +615,8 @@ function renderHeadcount(){
       options: {
         indexAxis: 'y',
         responsive: true,
+        maintainAspectRatio: false,
+        maxBarThickness: 20,
         plugins: { legend: { display:false }, datalabels: { display:true } },
         scales: {
           x: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true },
