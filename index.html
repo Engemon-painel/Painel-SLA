@@ -101,11 +101,14 @@
 
   .link-base{
     display:inline-flex; align-items:center; gap:6px;
-    font-family:'JetBrains Mono', monospace; font-size:11px; padding:7px 12px;
-    border-radius:999px; border:1px solid var(--line); color:var(--accent);
-    background:var(--panel); text-decoration:none; transition:.15s;
+    font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:600; padding:8px 14px;
+    border-radius:999px; border:1px solid var(--accent); color:#ffffff;
+    background:var(--accent); text-decoration:none; transition:.15s;
+    box-shadow: 0 2px 6px rgba(14,124,134,.25);
   }
-  .link-base:hover{ border-color:var(--accent); background:rgba(45,212,191,.08); }
+  .link-base:hover{ background:#0a5f66; border-color:#0a5f66; transform:translateY(-1px); }
+  .link-base.link-alt{ background:#5e34b5; border-color:#5e34b5; box-shadow: 0 2px 6px rgba(94,52,181,.25); }
+  .link-base.link-alt:hover{ background:#4a2891; border-color:#4a2891; }
 
   footer{ margin-top:30px; color:var(--muted); font-size:11px; text-align:center; font-family:'JetBrains Mono', monospace; }
 </style>
@@ -123,7 +126,8 @@
     <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
     <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
     <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
-    <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Organograma</a>
+    <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Organograma (Excel)</a>
+    <a class="link-base link-alt" href="#headcountSecao" onclick="document.getElementById('headcountSecao').scrollIntoView({behavior:'smooth'}); return false;">↓ Ir para Organograma</a>
     <a class="link-base" href="#pendenciasFca" onclick="document.getElementById('pendenciasFca').scrollIntoView({behavior:'smooth'}); return false;">⚠ FCA<span id="fcaCount" style="margin-left:4px;"></span></a>
   </div>
 </header>
