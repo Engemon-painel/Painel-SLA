@@ -895,50 +895,210 @@ function montarLinkForms(p){
 // Supervisor se estiver ativo, e sempre restringe a pendente === false
 // (ou seja, "Preenchido"), independente do filtro de Status na tela.
 function exportarFcaPreenchidoCsv(){
-  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
-  const mesObj = DADOS.meses[mesAtualIdx];
-  const areasDoMes = Object.keys(areasValidas(mesObj.areas));
-  const nomeMes = mesObj.mes.split('/')[0];
-  const mm = NOME_MES[nomeMes];
-  const anoCurto = mesObj.mes.split('/')[1];
-  const mesOrdAtual = '20' + anoCurto + '-' + mm;
+  try {
+    // --------------------------------------------------
+    // Validações básicas
+    // --------------------------------------------------
+    if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
+      alert('Os dados do painel ainda não foram carregados.');
+      return;
+    }
 
-  const preenchidos = PENDENTES_FCA.filter(p => {
-    if(areasDoMes.indexOf(p.area) === -1) return false;
-    if(p.mesOrd !== mesOrdAtual) return false;
-    if(p.pendente) return false;
-    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return false;
-    return true;
-  });
+    if (!Array.isArray(PENDENTES_FCA)) {
+      alert('A base de FCA não foi carregada corretamente.');
+      return;
+    }
 
-  if(preenchidos.length === 0){
-    alert('Nenhum incidente preenchido para exportar neste mês' + (supervisorFiltroAtual ? ' / supervisor selecionado.' : '.'));
-    return;
+    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+
+    const mesObj = DADOS.meses[mesAtualIdx];
+    if (!mesObj || !mesObj.mes) {
+      alert('Não foi possível identificar o mês selecionado.');
+      return;
+    }
+
+    // --------------------------------------------------
+    // Identifica o mês selecionado: Ago/26 -> 2026-08
+    // --------------------------------------------------
+    const partesMes = String(mesObj.mes).split('/');
+    const nomeMes = partesMes[0];
+    const anoCurto = partesMes[1];
+    const mm = NOME_MES[nomeMes];
+
+    if (!mm || !anoCurto) {
+      alert('Formato de mês inválido: ' + mesObj.mes);
+      return;
+    }
+
+    const mesOrdAtual = '20' + anoCurto + '-' + mm;
+
+    // --------------------------------------------------
+    // Áreas válidas do mês
+    // --------------------------------------------------
+    const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
+
+    // --------------------------------------------------
+    // Trata corretamente booleano, texto e número.
+    // Assim, false e "false" = preenchido.
+    // true, "true", 1 e "1" = pendente.
+    // --------------------------------------------------
+    function estaPendente(p) {
+      const valor = p ? p.pendente : false;
+
+      if (valor === true || valor === 1) return true;
+
+      if (typeof valor === 'string') {
+        const v = valor.trim().toLowerCase();
+        return v === 'true' || v === '1' || v === 'sim';
+      }
+
+      return false;
+    }
+
+    // --------------------------------------------------
+    // Filtra os registros do mês/área e supervisor.
+    // O filtro de Status da tela NÃO interfere na exportação:
+    // sempre exporta todos os registros preenchidos.
+    // --------------------------------------------------
+    const todosDoMes = PENDENTES_FCA.filter(p => {
+      if (!p) return false;
+
+      if (!areasDoMes.includes(norm(p.area))) return false;
+
+      if (norm(p.mesOrd) !== mesOrdAtual) return false;
+
+      if (
+        supervisorFiltroAtual &&
+        norm(p.supervisor) !== norm(supervisorFiltroAtual)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const preenchidos = todosDoMes.filter(p => !estaPendente(p));
+
+    // --------------------------------------------------
+    // Diagnóstico se não houver registros
+    // --------------------------------------------------
+    if (!preenchidos.length) {
+      console.log('--- EXPORTAÇÃO FCA ---');
+      console.log('Mês selecionado:', mesObj.mes);
+      console.log('Mês esperado:', mesOrdAtual);
+      console.log('Áreas:', areasDoMes);
+      console.log('Total PENDENTES_FCA:', PENDENTES_FCA.length);
+      console.log('Total do mês:', todosDoMes.length);
+      console.log('Supervisor:', supervisorFiltroAtual || 'Todos');
+
+      alert(
+        'Nenhum incidente preenchido para exportar.\n\n' +
+        'Mês: ' + mesObj.mes +
+        (supervisorFiltroAtual
+          ? '\nSupervisor: ' + supervisorFiltroAtual
+          : '')
+      );
+      return;
+    }
+
+    // --------------------------------------------------
+    // Colunas do CSV
+    // --------------------------------------------------
+    const colunas = [
+      'Supervisor',
+      'Área',
+      'Site',
+      'Incidente',
+      'Causa',
+      'Ação',
+      'Reported',
+      'Submit',
+      'Clear',
+      'Resolved'
+    ];
+
+    // --------------------------------------------------
+    // Escapa corretamente campos do CSV
+    // --------------------------------------------------
+    function csvEsc(v) {
+      const s = String(v ?? '');
+
+      if (/[",;\n\r]/.test(s)) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+
+      return s;
+    }
+
+    // --------------------------------------------------
+    // Monta as linhas
+    // --------------------------------------------------
+    const linhasCsv = [];
+    linhasCsv.push(colunas.map(csvEsc).join(';'));
+
+    preenchidos.forEach(p => {
+      linhasCsv.push([
+        p.supervisor || '',
+        p.area || '',
+        p.site || '',
+        p.incidente || '',
+        p.causa || '',
+        p.acao || '',
+        p.reported || '',
+        p.submit || '',
+        p.clear || '',
+        p.resolved || ''
+      ].map(csvEsc).join(';'));
+    });
+
+    // --------------------------------------------------
+    // UTF-8 com BOM para abrir corretamente no Excel
+    // --------------------------------------------------
+    const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
+
+    const blob = new Blob(
+      [csvContent],
+      { type: 'text/csv;charset=utf-8;' }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const nomeArquivo =
+      'FCA_Preenchidos_' +
+      mesObj.mes.replace('/', '-') +
+      '.csv';
+
+    // --------------------------------------------------
+    // Download compatível com Chrome/Edge
+    // --------------------------------------------------
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    a.style.display = 'none';
+    a.setAttribute('download', nomeArquivo);
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Não revoga imediatamente a URL.
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    console.log(
+      'CSV FCA exportado com sucesso:',
+      nomeArquivo,
+      'Registros:',
+      preenchidos.length
+    );
+
+  } catch (erro) {
+    console.error('Erro ao exportar FCA:', erro);
+
+    alert(
+      'Ocorreu um erro ao exportar o CSV.\n\n' +
+      (erro && erro.message ? erro.message : erro)
+    );
   }
-
-  const colunas = ['Supervisor','Área','Site','Incidente','Causa','Ação','Reported','Submit','Clear','Resolved'];
-  function csvEsc(v){
-    const s = String(v ?? '');
-    return /[",;\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
-  }
-  const linhasCsv = [colunas.join(';')];
-  preenchidos.forEach(p => {
-    linhasCsv.push([
-      p.supervisor || '', p.area || '', p.site || '', p.incidente || '',
-      p.causa || '', p.acao || '', p.reported || '', p.submit || '', p.clear || '', p.resolved || ''
-    ].map(csvEsc).join(';'));
-  });
-
-  const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'fca_preenchidos_' + mesObj.mes.replace('/','-') + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 function renderPendenciasFca(){
