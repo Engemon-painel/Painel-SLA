@@ -220,6 +220,12 @@
     </table>
   </div>
 
+  <div class="panel" style="margin-bottom:16px;">
+    <h2>Fora do Prazo por Horário</h2>
+    <div class="hint">Quantidade de incidentes fora do prazo por hora do CLEAR_DATE · mês selecionado. Mostra em qual horário do dia mais se perde o prazo.</div>
+    <canvas id="horaForaChart" height="130"></canvas>
+  </div>
+
   <div class="grid">
     <div class="panel">
       <h2>Causa</h2>
@@ -898,7 +904,7 @@ function renderSignal(pct){
   }
 }
 
-let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart;
+let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaChart;
 
 function renderDailyWeekly(){
   const diarioFiltrado = diarioDoMesAtual();
@@ -1199,6 +1205,48 @@ function renderPendenciasFca(){
 
   const badge = document.getElementById('fcaCount');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
+
+  // ---- Fora do Prazo por Horário (mês atual, com base em mesObj.horasFora) ----
+  // horasFora vem do Office Script: hora (0-23) do CLEAR_DATE de cada
+  // incidente "Fora" do mês, já considerando o SLA ativo (4h/6h).
+  const horaForaCanvas = document.getElementById('horaForaChart');
+  if(horaForaCanvas){
+    const horasFora = Array.isArray(mesObj.horasFora) ? mesObj.horasFora : [];
+    const contagemPorHora = new Array(24).fill(0);
+    horasFora.forEach(h => {
+      const hn = Number(h);
+      if(hn >= 0 && hn <= 23) contagemPorHora[hn]++;
+    });
+    const horaLabels = contagemPorHora.map((_, h) => String(h).padStart(2,'0') + 'h');
+    const picoIdx = contagemPorHora.reduce((melhor, v, i) => v > contagemPorHora[melhor] ? i : melhor, 0);
+    const corBarra = contagemPorHora.map((_, i) => i === picoIdx && contagemPorHora[picoIdx] > 0 ? cor.bad : 'rgba(37,99,235,.6)');
+
+    if(horaForaChart) horaForaChart.destroy();
+    horaForaChart = new Chart(horaForaCanvas, {
+      type: 'bar',
+      data: {
+        labels: horaLabels,
+        datasets: [{
+          label: 'Fora do prazo', data: contagemPorHora,
+          backgroundColor: corBarra, borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v > 0 ? v : '' }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display:false },
+          datalabels: { display:true },
+          tooltip: { callbacks: { title: (items) => 'Horário ' + items[0].label } }
+        },
+        scales: {
+          x: { ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
 
   // ---- Resumo por Supervisor (mês atual, sem aplicar os filtros de Supervisor/Status da tela) ----
   const resumoSupervisorBody = document.getElementById('resumoSupervisorBody');
