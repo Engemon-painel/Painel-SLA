@@ -187,6 +187,17 @@
 
   <div class="kpi-row" id="fcaKpiRow" style="margin-bottom:20px;"></div>
 
+  <div class="panel" style="margin-bottom:16px;">
+    <h2>Resumo por Supervisor</h2>
+    <div class="hint">Fora do prazo, quantidade já preenchida (Fato/Causa) e % preenchido · mês selecionado. Não é afetado pelos filtros de Supervisor/Status abaixo.</div>
+    <table>
+      <thead>
+        <tr><th>Supervisor</th><th class="num">Fora do Prazo</th><th class="num">Preenchido</th><th class="num">% Preenchido</th></tr>
+      </thead>
+      <tbody id="resumoSupervisorBody"></tbody>
+    </table>
+  </div>
+
   <div class="grid">
     <div class="panel">
       <h2>Causa</h2>
@@ -1057,6 +1068,34 @@ function renderPendenciasFca(){
 
   const badge = document.getElementById('fcaCount');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
+
+  // ---- Resumo por Supervisor (mês atual, sem aplicar os filtros de Supervisor/Status da tela) ----
+  const resumoSupervisorBody = document.getElementById('resumoSupervisorBody');
+  if(resumoSupervisorBody){
+    const porSupervisorResumo = {};
+    todosDoMes.forEach(p => {
+      const k = norm(p.supervisor) || 'Sem supervisor';
+      if(!porSupervisorResumo[k]) porSupervisorResumo[k] = { total: 0, preenchido: 0 };
+      porSupervisorResumo[k].total++;
+      if(!p.pendente) porSupervisorResumo[k].preenchido++;
+    });
+    const supervisoresResumo = Object.keys(porSupervisorResumo).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(supervisoresResumo.length === 0){
+      resumoSupervisorBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:${cor.muted};">Nenhum incidente fora do prazo neste mês</td></tr>`;
+    } else {
+      resumoSupervisorBody.innerHTML = supervisoresResumo.map(k => {
+        const r = porSupervisorResumo[k];
+        const pct = r.total > 0 ? (r.preenchido / r.total * 100) : 0;
+        const cls = pct >= 85 ? 'good' : (pct >= 60 ? 'warn' : 'bad');
+        return `<tr>
+          <td>${k}</td>
+          <td class="num">${r.total}</td>
+          <td class="num">${r.preenchido}</td>
+          <td class="num"><span class="pill ${cls}">${pct.toFixed(1)}%</span></td>
+        </tr>`;
+      }).join('');
+    }
+  }
 
   const total = itensFiltrados.length;
   const qtdJustificado = justificadosDoMes.length;
