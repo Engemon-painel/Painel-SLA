@@ -414,13 +414,14 @@ function renderHeadcount(){
   if(!kpiRow) return;
 
   // ---- Filtro por Contrato ----
-  // Usa a coluna Contrato_2 (c.contrato2) como fonte do filtro.
+  // Filtro por Contrato: usa o campo c.contrato (valores CLT/LOCALIZAR/ROUBADA
+  // vindos da coluna Contrato_2 da aba Organograma).
   // Só popula o <select> uma vez (mesma lógica usada no filtro de
   // Supervisor: reconstruir dentro do próprio "change" perde a seleção
   // em alguns navegadores).
   const selectContrato = document.getElementById('contratoFiltro');
   if(selectContrato && !hcContratoPopulado){
-    const contratos = Array.from(new Set(COLABORADORES.map(c => normHc(c.contrato2)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const contratos = Array.from(new Set(COLABORADORES.map(c => normHc(c.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     selectContrato.innerHTML = '<option value="">Todos</option>' +
       contratos.map(c => `<option value="${c}">${c}</option>`).join('');
     selectContrato.value = contratoFiltroAtual;
@@ -428,36 +429,31 @@ function renderHeadcount(){
   }
 
   // ---- Filtro por Status ----
-  // Fonte: coluna Status da aba Organograma (c.status). Na primeira
-  // montagem, se existir a opção "Ativo" ela já vem pré-selecionada,
-  // mantendo o comportamento padrão de só mostrar quem está ativo.
+  // O dados.json não traz uma coluna "Status" com texto (ex.: Férias,
+  // Afastado) — só o booleano c.ativo. Então o filtro usa "Ativo"/"Inativo"
+  // derivados desse booleano, pré-selecionado em "Ativo" por padrão.
   const selectStatusHc = document.getElementById('hcStatusFiltro');
   if(selectStatusHc && !hcStatusPopulado){
-    const statusValores = Array.from(new Set(COLABORADORES.map(c => normHc(c.status)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    selectStatusHc.innerHTML = '<option value="">Todos</option>' +
-      statusValores.map(s => `<option value="${s}">${s}</option>`).join('');
-    const statusAtivo = statusValores.find(s => semAcentoHc(s) === 'ativo');
-    if(!hcStatusFiltroAtual && statusAtivo) hcStatusFiltroAtual = statusAtivo;
+    selectStatusHc.innerHTML = '<option value="">Todos</option><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option>';
+    if(!hcStatusFiltroAtual) hcStatusFiltroAtual = 'Ativo';
     selectStatusHc.value = hcStatusFiltroAtual;
     hcStatusPopulado = true;
   }
 
   const colabFiltrados = COLABORADORES.filter(c => {
-    if(contratoFiltroAtual && normHc(c.contrato2) !== contratoFiltroAtual) return false;
-    if(hcStatusFiltroAtual && normHc(c.status) !== hcStatusFiltroAtual) return false;
+    if(contratoFiltroAtual && normHc(c.contrato) !== contratoFiltroAtual) return false;
+    if(hcStatusFiltroAtual === 'Ativo' && !c.ativo) return false;
+    if(hcStatusFiltroAtual === 'Inativo' && c.ativo) return false;
     return true;
   });
 
-  // Quando o filtro de Status está definido, o próprio filtro já garante
-  // o recorte desejado (Ativo, Inativo, Férias etc.); sem filtro, cai no
-  // comportamento antigo de considerar apenas c.ativo.
-  const ativos = hcStatusFiltroAtual ? colabFiltrados : colabFiltrados.filter(c => c.ativo);
+  const ativos = colabFiltrados.filter(c => hcStatusFiltroAtual ? true : c.ativo);
   const hcTotal = ativos.length;
 
   // ---- HC's por contrato ----
   const porContrato = {};
   ativos.forEach(c => {
-    const k = normHc(c.contrato2) || 'Sem contrato';
+    const k = normHc(c.contrato) || 'Sem contrato';
     porContrato[k] = (porContrato[k] || 0) + 1;
   });
   const contratosOrdenados = Object.keys(porContrato).sort((a,b)=> porContrato[b]-porContrato[a]);
