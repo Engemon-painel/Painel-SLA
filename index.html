@@ -427,6 +427,28 @@ function diasNoMesSelecionado(){
   return new Date(anoFull, Number(mm), 0).getDate();
 }
 
+// MTTR médio do mês selecionado (coluna MTTR da base, em segundos).
+// Espera mesObj.mttrValores = [3598, 16806, ...] (um valor por incidente do mês);
+// células vazias/"-" na planilha devem virar null/undefined no dados.json e são
+// ignoradas no cálculo da média (não contam como 0).
+function mttrMedioDoMes(mesObj){
+  const valores = Array.isArray(mesObj.mttrValores)
+    ? mesObj.mttrValores.filter(v => typeof v === 'number' && !isNaN(v))
+    : [];
+  if(!valores.length) return null;
+  const soma = valores.reduce((a,b) => a+b, 0);
+  return soma / valores.length;
+}
+
+// Formata segundos como "Xh YYmin" (ou só "YYmin" se < 1h).
+function formatarMttr(segundos){
+  if(segundos === null || segundos === undefined || isNaN(segundos)) return '—';
+  const totalMin = Math.round(segundos / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${String(m).padStart(2,'0')}min` : `${m}min`;
+}
+
 // Dias corridos (D-1) e dias restantes com base no ÚLTIMO dia com dado na base
 // (DIARIO) para o mês selecionado — não usa a data real do sistema, só a base.
 function renderDiasRow(diarioFiltrado){
@@ -972,12 +994,20 @@ function render(){
   const diasComDado = diarioMesAtual.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
   const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
   const diasRestantes = Math.max(0, diasNoMesSelecionado() - diasCorridos);
+  const mttrTexto = formatarMttr(mttrMedioDoMes(mesObj));
 
   const kpiRow = document.getElementById('kpiRow');
   kpiRow.innerHTML = `
     <div class="kpi"><div class="label">Total Indisponibilidade</div><div class="value">${t.total.toLocaleString('pt-BR')}</div></div>
     <div class="kpi"><div class="label">Dentro do Prazo</div><div class="value" style="color:${cor.good}">${t.dentro.toLocaleString('pt-BR')}</div></div>
-    <div class="kpi"><div class="label">Fora do Prazo</div><div class="value" style="color:${cor.bad}">${t.fora.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi">
+      <div class="label">Fora do Prazo</div>
+      <div class="value" style="display:flex; gap:10px; align-items:baseline; justify-content:center;">
+        <span style="color:${cor.bad}">${t.fora.toLocaleString('pt-BR')}</span>
+        <span style="color:${cor.line};">|</span>
+        <span style="font-size:16px; color:${cor.muted};">MTTR <span class="mono" style="color:${cor.text}; font-size:16px; font-weight:600;">${mttrTexto}</span></span>
+      </div>
+    </div>
     <div class="kpi">
       <div class="label">Dias do Mês (D-1)</div>
       <div class="value" style="display:flex; gap:10px; justify-content:center; align-items:baseline;">
