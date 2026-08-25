@@ -93,10 +93,12 @@
   .gauge-legend span{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
   .gauge-legend i{ width:9px; height:9px; border-radius:50%; display:inline-block; }
 
-  .dias-row{ display:flex; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
+  .dias-row{ display:flex; gap:14px; margin-bottom:22px; flex-wrap:wrap; }
   .mini-card{
-    flex:1; min-width:150px; background: var(--panel-2); border:1px solid var(--line); border-radius:14px;
+    flex:1; min-width:150px; background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    border:1px solid var(--line); border-radius:12px;
     padding:16px 14px; text-align:center;
+    box-shadow: 0 2px 8px rgba(27,36,64,.06);
   }
   .mini-icon{
     width:26px; height:26px; margin:0 auto 8px; border-radius:50%; background:rgba(27,36,64,.08);
@@ -176,7 +178,6 @@
 <div class="panel" style="margin-bottom:16px;">
   <h2>Visão diarizada</h2>
   <div class="hint">Dentro / fora do prazo por dia · mês selecionado.</div>
-  <div class="dias-row" id="diasRow"></div>
   <canvas id="dailyChart" height="110"></canvas>
 </div>
 
@@ -879,7 +880,6 @@ let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acao
 
 function renderDailyWeekly(){
   const diarioFiltrado = diarioDoMesAtual();
-  renderDiasRow(diarioFiltrado);
 
   if(dailyChart) dailyChart.destroy();
   dailyChart = new Chart(document.getElementById('dailyChart'), {
@@ -968,11 +968,24 @@ function render(){
   const prevPct = prevIdx >= 0 ? totais(DADOS.meses[prevIdx]).pct : null;
   const deltaPP = prevPct !== null ? (t.pct - prevPct) * 100 : null;
 
+  const diarioMesAtual = diarioDoMesAtual();
+  const diasComDado = diarioMesAtual.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  const diasRestantes = Math.max(0, diasNoMesSelecionado() - diasCorridos);
+
   const kpiRow = document.getElementById('kpiRow');
   kpiRow.innerHTML = `
     <div class="kpi"><div class="label">Total Indisponibilidade</div><div class="value">${t.total.toLocaleString('pt-BR')}</div></div>
     <div class="kpi"><div class="label">Dentro do Prazo</div><div class="value" style="color:${cor.good}">${t.dentro.toLocaleString('pt-BR')}</div></div>
     <div class="kpi"><div class="label">Fora do Prazo</div><div class="value" style="color:${cor.bad}">${t.fora.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi">
+      <div class="label">Dias do Mês (D-1)</div>
+      <div class="value" style="display:flex; gap:10px; justify-content:center; align-items:baseline;">
+        <span>${diasCorridos}<span style="font-family:'Inter',sans-serif; font-size:10px; font-weight:600; color:${cor.muted}; text-transform:uppercase; margin-left:4px;">corridos</span></span>
+        <span style="color:${cor.muted};">/</span>
+        <span>${diasRestantes}<span style="font-family:'Inter',sans-serif; font-size:10px; font-weight:600; color:${cor.muted}; text-transform:uppercase; margin-left:4px;">restantes</span></span>
+      </div>
+    </div>
     <div class="kpi"><div class="label">% Atendimento</div><div class="value" style="color:${statusColor(t.pct)}">${(t.pct*100).toFixed(1)}%</div>
       ${deltaPP!==null ? `<div class="delta ${deltaPP>=0?'up':'down'}">${deltaPP>=0?'▲ +':'▼ '}${deltaPP.toFixed(1)} p.p. vs mês anterior</div>` : ''}
     </div>
