@@ -93,6 +93,18 @@
   .gauge-legend span{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
   .gauge-legend i{ width:9px; height:9px; border-radius:50%; display:inline-block; }
 
+  .dias-row{ display:flex; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
+  .mini-card{
+    flex:1; min-width:150px; background: var(--panel-2); border:1px solid var(--line); border-radius:14px;
+    padding:16px 14px; text-align:center;
+  }
+  .mini-icon{
+    width:26px; height:26px; margin:0 auto 8px; border-radius:50%; background:rgba(27,36,64,.08);
+    display:flex; align-items:center; justify-content:center; font-size:13px;
+  }
+  .mini-value{ font-family:'JetBrains Mono', monospace; font-size:26px; font-weight:700; color:var(--text); }
+  .mini-label{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:6px; font-weight:600; }
+
   table{ width:100%; border-collapse:collapse; font-size:13px; }
   th{ text-align:left; color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:8px 6px; border-bottom:1px solid var(--line);}
   td{ padding:10px 6px; border-bottom:1px solid var(--line); }
@@ -164,6 +176,7 @@
 <div class="panel" style="margin-bottom:16px;">
   <h2>Visão diarizada</h2>
   <div class="hint">Dentro / fora do prazo por dia · mês selecionado.</div>
+  <div class="dias-row" id="diasRow"></div>
   <canvas id="dailyChart" height="110"></canvas>
 </div>
 
@@ -401,6 +414,39 @@ function diarioDoMesAtual(){
   const nomeMes = mesObj.mes.split('/')[0]; // "Ago/26" -> "Ago"
   const mm = NOME_MES[nomeMes];
   return (DIARIO || []).filter(d => d.data.split('/')[1] === mm);
+}
+
+// Quantidade de dias do mês selecionado no chip (ex.: "Ago/26" -> 31).
+function diasNoMesSelecionado(){
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const nomeMes = mesObj.mes.split('/')[0];
+  const mm = NOME_MES[nomeMes];
+  const anoCurto = mesObj.mes.split('/')[1];
+  const anoFull = 2000 + Number(anoCurto);
+  return new Date(anoFull, Number(mm), 0).getDate();
+}
+
+// Dias corridos (D-1) e dias restantes com base no ÚLTIMO dia com dado na base
+// (DIARIO) para o mês selecionado — não usa a data real do sistema, só a base.
+function renderDiasRow(diarioFiltrado){
+  const diasRow = document.getElementById('diasRow');
+  if(!diasRow) return;
+  const diasComDado = diarioFiltrado.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  const totalDiasMes = diasNoMesSelecionado();
+  const diasRestantes = Math.max(0, totalDiasMes - diasCorridos);
+  diasRow.innerHTML = `
+    <div class="mini-card">
+      <div class="mini-icon">📅</div>
+      <div class="mini-value">${diasCorridos}</div>
+      <div class="mini-label">Dias corridos (D-1)</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-icon">❗</div>
+      <div class="mini-value">${diasRestantes}</div>
+      <div class="mini-label">Dias restantes</div>
+    </div>
+  `;
 }
 
 // ======================================================
@@ -833,6 +879,7 @@ let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acao
 
 function renderDailyWeekly(){
   const diarioFiltrado = diarioDoMesAtual();
+  renderDiasRow(diarioFiltrado);
 
   if(dailyChart) dailyChart.destroy();
   dailyChart = new Chart(document.getElementById('dailyChart'), {
