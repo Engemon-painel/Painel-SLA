@@ -191,7 +191,7 @@
       <div class="grid">
         <div class="panel">
           <h2>Visão mensal</h2>
-          <div class="hint">Dentro / fora do prazo por mês. A última barra (com contorno tracejado) é a projeção até o fim do mês atual.</div>
+          <div class="hint">Dentro / fora do prazo por mês, com a linha de % mostrando a tendência de um mês pro outro.</div>
           <canvas id="monthlyChart" height="90"></canvas>
         </div>
         <div class="panel">
@@ -1264,42 +1264,13 @@ function render(){
   const diffPP = (pct - DADOS.meta)*100;
   document.getElementById('gaugeDiff').textContent = `Meta 85% · ${diffPP>=0?'+':''}${diffPP.toFixed(1)} p.p.`;
 
-  // Visão mensal (barras Dentro/Fora + % + Meta, igual diário/semanal) +
-  // projeção do mês corrente (último mês da lista) como uma barra extra,
-  // usando calcularProjecaoMes() (ritmo dos últimos 7 dias com dado).
-  const ultimoMesIdx = DADOS.meses.length - 1;
-  const projecaoUltimoMes = calcularProjecaoMes(DADOS.meses[ultimoMesIdx]);
-
-  let monthlyLabels = DADOS.meses.map(m=>m.mes);
+  // Visão mensal: barras Dentro/Fora (cinza/vermelho) + linha de % dentro
+  // do prazo mostrando a tendência de um mês pro outro + linha de Meta.
+  const monthlyLabels = DADOS.meses.map(m=>m.mes);
   const monthlyDentro = DADOS.meses.map(m=>totais(m).dentro);
   const monthlyFora = DADOS.meses.map(m=>totais(m).fora);
   const monthlyPct = DADOS.meses.map(m=>totais(m).pct*100);
-  let monthlyMeta = DADOS.meses.map(()=>DADOS.meta*100);
-
-  // Cor de cada barra: cinza/vermelho para meses reais, um tom mais claro
-  // (com contorno tracejado) só na barra do mês projetado, pra diferenciar
-  // visualmente dado real de estimativa.
-  const corDentroReal = 'rgba(107,117,144,.6)';
-  const corForaReal = cor.bad;
-  const corDentroProj = 'rgba(107,117,144,.28)';
-  const corForaProj = 'rgba(220,38,38,.35)';
-
-  let dentroBackgroundColors = monthlyDentro.map(()=>corDentroReal);
-  let foraBackgroundColors = monthlyFora.map(()=>corForaReal);
-  let dentroBorderColors = monthlyDentro.map(()=>corDentroReal);
-  let foraBorderColors = monthlyFora.map(()=>corForaReal);
-
-  if(projecaoUltimoMes){
-    monthlyLabels = monthlyLabels.concat([DADOS.meses[ultimoMesIdx].mes + ' (proj.)']);
-    monthlyMeta = monthlyMeta.concat([DADOS.meta*100]);
-    monthlyDentro.push(projecaoUltimoMes.dentroFinal);
-    monthlyFora.push(projecaoUltimoMes.foraFinal);
-    monthlyPct.push(projecaoUltimoMes.pctFinal*100);
-    dentroBackgroundColors = dentroBackgroundColors.concat([corDentroProj]);
-    foraBackgroundColors = foraBackgroundColors.concat([corForaProj]);
-    dentroBorderColors = dentroBorderColors.concat([cor.muted]);
-    foraBorderColors = foraBorderColors.concat([cor.bad]);
-  }
+  const monthlyMeta = DADOS.meses.map(()=>DADOS.meta*100);
 
   if(monthlyChart) monthlyChart.destroy();
   monthlyChart = new Chart(document.getElementById('monthlyChart'), {
@@ -1308,23 +1279,18 @@ function render(){
       datasets:[
         {
           type:'bar', label:'Dentro', data: monthlyDentro,
-          backgroundColor: dentroBackgroundColors, borderColor: dentroBorderColors,
-          borderWidth: projecaoUltimoMes ? monthlyDentro.map((_,i)=> i===monthlyDentro.length-1 ? 2 : 0) : 0,
-          borderDash: [5,3], borderRadius:5, order:2,
+          backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2,
           datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
         },
         {
           type:'bar', label:'Fora', data: monthlyFora,
-          backgroundColor: foraBackgroundColors, borderColor: foraBorderColors,
-          borderWidth: projecaoUltimoMes ? monthlyFora.map((_,i)=> i===monthlyFora.length-1 ? 2 : 0) : 0,
-          borderDash: [5,3], borderRadius:5, order:2,
+          backgroundColor: cor.bad, borderRadius:5, order:2,
           datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
         },
         {
           type:'line', label:'% Dentro', data: monthlyPct,
           borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
-          tension:.3, pointRadius: projecaoUltimoMes ? monthlyPct.map((_,i)=> i===monthlyPct.length-1 ? 5 : 4) : 4,
-          yAxisID:'y1', order:1,
+          tension:.3, pointRadius:4, yAxisID:'y1', order:1,
           datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
         },
         {
@@ -1338,21 +1304,7 @@ function render(){
     options:{ responsive:true,
       plugins:{
         legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } },
-        datalabels:{ display:true },
-        tooltip: {
-          callbacks: {
-            afterBody: (items) => {
-              if(!projecaoUltimoMes) return [];
-              const idx = items[0].dataIndex;
-              if(idx !== monthlyLabels.length-1) return [];
-              return [
-                'Faltam ' + projecaoUltimoMes.diasRestantes + ' dia(s) no mês',
-                '~' + projecaoUltimoMes.entrantesProjetados + ' incidentes previstos',
-                'Taxa de fora (últ. 7 dias): ' + (projecaoUltimoMes.taxaFora7*100).toFixed(1) + '%'
-              ];
-            }
-          }
-        }
+        datalabels:{ display:true }
       },
       scales:{
         x:{ stacked:false, ticks:{color:cor.muted}, grid:{display:false} },
