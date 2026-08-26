@@ -188,25 +188,26 @@
 
       <div class="kpi-row" id="kpiRow"></div>
 
-      <div class="panel">
-        <h2 id="gaugeTitulo">% Atendimento no prazo</h2>
-        <div class="hint">Meta: 85%</div>
-        <div class="gauge-wrap">
-          <canvas id="gaugeChart" width="220" height="130"></canvas>
-          <div class="gauge-value" id="gaugeValue">—</div>
-          <div class="gauge-target" id="gaugeDiff">—</div>
-          <div class="gauge-legend">
-            <span><i style="background:var(--bad)"></i>Ruim</span>
-            <span><i style="background:var(--warn)"></i>Regular</span>
-            <span><i style="background:var(--good)"></i>Ótimo</span>
+      <div class="grid">
+        <div class="panel">
+          <h2>Visão mensal</h2>
+          <div class="hint">Dentro / fora do prazo por mês. A última barra (com contorno tracejado) é a projeção até o fim do mês atual.</div>
+          <canvas id="monthlyChart" height="90"></canvas>
+        </div>
+        <div class="panel">
+          <h2 id="gaugeTitulo">% Atendimento no prazo</h2>
+          <div class="hint">Meta: 85%</div>
+          <div class="gauge-wrap">
+            <canvas id="gaugeChart" width="220" height="130"></canvas>
+            <div class="gauge-value" id="gaugeValue">—</div>
+            <div class="gauge-target" id="gaugeDiff">—</div>
+            <div class="gauge-legend">
+              <span><i style="background:var(--bad)"></i>Ruim</span>
+              <span><i style="background:var(--warn)"></i>Regular</span>
+              <span><i style="background:var(--good)"></i>Ótimo</span>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="panel">
-        <h2>Visão mensal</h2>
-        <div class="hint">Dentro / fora do prazo por mês. A última barra (com contorno tracejado) é a projeção até o fim do mês atual.</div>
-        <canvas id="monthlyChart" height="90"></canvas>
       </div>
     </div>
 
