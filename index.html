@@ -457,12 +457,11 @@ function diasNoMesSelecionado(){
   return diasNoMes(DADOS.meses[mesAtualIdx]);
 }
 
-// Projeção de fechamento do mês: pega o ritmo médio diário de incidentes
-// que já entraram esse mês e projeta pros dias que faltam (dias restantes),
-// e usa a taxa de fora do prazo dos últimos 7 dias com dado (D-1 pra trás,
-// podendo cruzar pro mês anterior) pra estimar quantos desses incidentes
-// futuros vão furar o prazo. Retorna null se o mês já fechou (sem dias
-// restantes) ou não tem dado nenhum ainda.
+// Projeção de fechamento do mês: usa SEMPRE a janela dos últimos 7 dias
+// com dado (D-1 pra trás, podendo cruzar pro mês anterior) — tanto pro
+// ritmo diário de entrantes (volume) quanto pra taxa de fora do prazo —
+// e projeta isso pros dias que faltam no mês (dias restantes). Retorna
+// null se o mês já fechou (sem dias restantes) ou não tem dado nenhum.
 function calcularProjecaoMes(mesObj){
   const diarioMes = diarioDoMes(mesObj);
   const diasComDado = diarioMes.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
@@ -473,15 +472,18 @@ function calcularProjecaoMes(mesObj){
   if(diasCorridos <= 0 || diasRestantes <= 0) return null;
 
   const t = totais(mesObj);
-  const mediaDiaria = t.total / diasCorridos;
-  const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
 
-  // Taxa de fora do prazo dos últimos 7 dias com dado, na base global
-  // (DIARIO já vem ordenado cronologicamente do Office Script).
+  // Últimos 7 dias com dado, na base global (DIARIO já vem ordenado
+  // cronologicamente do Office Script) — usados tanto pro ritmo de
+  // entrantes quanto pra taxa de fora do prazo.
   const ultimos7 = (DIARIO || []).slice(-7);
   let dentro7 = 0, fora7 = 0;
   ultimos7.forEach(d => { dentro7 += d.dentro; fora7 += d.fora; });
   const total7 = dentro7 + fora7;
+
+  const mediaDiaria = ultimos7.length > 0 ? (total7 / ultimos7.length) : (t.total / diasCorridos);
+  const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
+
   const taxaFora7 = total7 > 0 ? (fora7/total7) : (t.total > 0 ? t.fora/t.total : 0);
 
   const foraProjetado = Math.round(entrantesProjetados * taxaFora7);
@@ -493,7 +495,7 @@ function calcularProjecaoMes(mesObj){
   const pctFinal = totalFinal > 0 ? (dentroFinal/totalFinal) : t.pct;
 
   return {
-    diasCorridos, diasRestantes, entrantesProjetados,
+    diasCorridos, diasRestantes, entrantesProjetados, mediaDiaria,
     foraProjetado, dentroProjetado,
     totalFinal, dentroFinal, foraFinal, pctFinal, taxaFora7
   };
