@@ -222,7 +222,7 @@
 
   <div class="panel" style="margin-bottom:16px;">
     <h2>Fora do Prazo por Horário</h2>
-    <div class="hint">Quantidade de incidentes fora do prazo por hora do CLEAR_DATE · mês selecionado. Mostra em qual horário do dia mais se perde o prazo.</div>
+    <div class="hint">Quantidade de incidentes fora do prazo por hora do SUBMIT_DATE · mês selecionado. Mostra em qual horário do dia mais se perde o prazo.</div>
     <canvas id="horaForaChart" height="130"></canvas>
   </div>
 
@@ -1207,7 +1207,7 @@ function renderPendenciasFca(){
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
 
   // ---- Fora do Prazo por Horário (mês atual, com base em mesObj.horasFora) ----
-  // horasFora vem do Office Script: hora (0-23) do CLEAR_DATE de cada
+  // horasFora vem do Office Script: hora (0-23) do SUBMIT_DATE de cada
   // incidente "Fora" do mês, já considerando o SLA ativo (4h/6h).
   const horaForaCanvas = document.getElementById('horaForaChart');
   if(horaForaCanvas){
