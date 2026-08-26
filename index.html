@@ -223,12 +223,12 @@
   <div class="grid">
     <div class="panel">
       <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
-      <div class="hint">Hora em que o incidente foi submetido · mês selecionado.</div>
+      <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do SUBMIT_DATE · mês selecionado.</div>
       <canvas id="horaForaSubmitChart" height="150"></canvas>
     </div>
     <div class="panel">
       <h2>Fora do Prazo por Horário — CLEAR_DATE</h2>
-      <div class="hint">Hora em que o incidente foi resolvido · mês selecionado.</div>
+      <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do CLEAR_DATE · mês selecionado.</div>
       <canvas id="horaForaClearChart" height="150"></canvas>
     </div>
   </div>
@@ -1213,40 +1213,56 @@ function renderPendenciasFca(){
   const badge = document.getElementById('fcaCount');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
 
-  // ---- Fora do Prazo por Horário (mês atual) — compara SUBMIT_DATE x CLEAR_DATE ----
-  // mesObj.horasForaSubmit / horasForaClear vêm do Office Script: hora
-  // (0-23) de cada incidente "Fora" do mês, já considerando o SLA ativo.
-  function renderHoraForaChart(canvasId, horasArray, chartRefSetter, chartAtual){
+  // ---- Total x Fora do Prazo por Horário (mês atual) — compara SUBMIT_DATE x CLEAR_DATE ----
+  // mesObj.horasSubmit / horasClear vêm do Office Script: array de 24
+  // posições ({hora, total, fora}) já considerando o SLA ativo (4h/6h).
+  function renderHoraForaChart(canvasId, statsArray, chartAtual){
     const canvasEl = document.getElementById(canvasId);
     if(!canvasEl) return chartAtual;
-    const horas = Array.isArray(horasArray) ? horasArray : [];
-    const contagemPorHora = new Array(24).fill(0);
-    horas.forEach(h => {
-      const hn = Number(h);
-      if(hn >= 0 && hn <= 23) contagemPorHora[hn]++;
-    });
-    const horaLabels = contagemPorHora.map((_, h) => String(h).padStart(2,'0') + 'h');
-    const picoIdx = contagemPorHora.reduce((melhor, v, i) => v > contagemPorHora[melhor] ? i : melhor, 0);
-    const corBarra = contagemPorHora.map((_, i) => i === picoIdx && contagemPorHora[picoIdx] > 0 ? cor.bad : 'rgba(37,99,235,.6)');
+    const stats = (Array.isArray(statsArray) && statsArray.length === 24)
+      ? statsArray
+      : Array.from({length:24}, (_, h) => ({ hora: String(h).padStart(2,'0'), total: 0, fora: 0 }));
+
+    const horaLabels = stats.map(s => s.hora + 'h');
+    const totalArr = stats.map(s => s.total);
+    const foraArr = stats.map(s => s.fora);
 
     if(chartAtual) chartAtual.destroy();
     const novoChart = new Chart(canvasEl, {
       type: 'bar',
       data: {
         labels: horaLabels,
-        datasets: [{
-          label: 'Fora do prazo', data: contagemPorHora,
-          backgroundColor: corBarra, borderRadius: 4,
-          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v > 0 ? v : '' }
-        }]
+        datasets: [
+          {
+            label: 'Total de incidentes', data: totalArr,
+            backgroundColor: 'rgba(107,117,144,.35)', borderRadius: 4,
+            datalabels: { display:false }
+          },
+          {
+            label: 'Fora do prazo', data: foraArr,
+            backgroundColor: cor.bad, borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v > 0 ? v : '' }
+          }
+        ]
       },
       plugins: [ChartDataLabels],
       options: {
         responsive: true,
         plugins: {
-          legend: { display:false },
+          legend: { labels: { color: cor.muted, font:{family:'Inter', size:10} } },
           datalabels: { display:true },
-          tooltip: { callbacks: { title: (items) => 'Horário ' + items[0].label } }
+          tooltip: {
+            callbacks: {
+              title: (items) => 'Horário ' + items[0].label,
+              afterBody: (items) => {
+                const idx = items[0].dataIndex;
+                const total = totalArr[idx];
+                const fora = foraArr[idx];
+                const pct = total > 0 ? (fora/total*100).toFixed(0) : 0;
+                return total > 0 ? [fora + ' de ' + total + ' fora do prazo (' + pct + '%)'] : [];
+              }
+            }
+          }
         },
         scales: {
           x: { ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
@@ -1254,12 +1270,11 @@ function renderPendenciasFca(){
         }
       }
     });
-    if(chartRefSetter) chartRefSetter(novoChart);
     return novoChart;
   }
 
-  horaForaSubmitChart = renderHoraForaChart('horaForaSubmitChart', mesObj.horasForaSubmit, null, horaForaSubmitChart);
-  horaForaClearChart = renderHoraForaChart('horaForaClearChart', mesObj.horasForaClear, null, horaForaClearChart);
+  horaForaSubmitChart = renderHoraForaChart('horaForaSubmitChart', mesObj.horasSubmit, horaForaSubmitChart);
+  horaForaClearChart = renderHoraForaChart('horaForaClearChart', mesObj.horasClear, horaForaClearChart);
 
   // ---- Resumo por Supervisor (mês atual, sem aplicar os filtros de Supervisor/Status da tela) ----
   const resumoSupervisorBody = document.getElementById('resumoSupervisorBody');
