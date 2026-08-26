@@ -1291,11 +1291,11 @@ function render(){
           type:'line', label:'% Dentro', data: monthlyPct,
           borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
           tension:.3, pointRadius:4, yAxisID:'y1', order:1,
-          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(1)+'%' }
         },
         {
           type:'line', label:'Meta 85%', data: monthlyMeta,
-          borderColor: cor.warn, borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1,
+          borderColor: '#000000', borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1,
           datalabels:{ display:false }
         },
       ]
