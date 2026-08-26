@@ -220,10 +220,17 @@
     </table>
   </div>
 
-  <div class="panel" style="margin-bottom:16px;">
-    <h2>Fora do Prazo por Horário</h2>
-    <div class="hint">Quantidade de incidentes fora do prazo por hora do SUBMIT_DATE · mês selecionado. Mostra em qual horário do dia mais se perde o prazo.</div>
-    <canvas id="horaForaChart" height="130"></canvas>
+  <div class="grid">
+    <div class="panel">
+      <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
+      <div class="hint">Hora em que o incidente foi submetido · mês selecionado.</div>
+      <canvas id="horaForaSubmitChart" height="150"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Fora do Prazo por Horário — CLEAR_DATE</h2>
+      <div class="hint">Hora em que o incidente foi resolvido · mês selecionado.</div>
+      <canvas id="horaForaClearChart" height="150"></canvas>
+    </div>
   </div>
 
   <div class="grid">
@@ -904,7 +911,7 @@ function renderSignal(pct){
   }
 }
 
-let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaChart;
+let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart;
 
 function renderDailyWeekly(){
   const diarioFiltrado = diarioDoMesAtual();
@@ -1206,14 +1213,15 @@ function renderPendenciasFca(){
   const badge = document.getElementById('fcaCount');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
 
-  // ---- Fora do Prazo por Horário (mês atual, com base em mesObj.horasFora) ----
-  // horasFora vem do Office Script: hora (0-23) do SUBMIT_DATE de cada
-  // incidente "Fora" do mês, já considerando o SLA ativo (4h/6h).
-  const horaForaCanvas = document.getElementById('horaForaChart');
-  if(horaForaCanvas){
-    const horasFora = Array.isArray(mesObj.horasFora) ? mesObj.horasFora : [];
+  // ---- Fora do Prazo por Horário (mês atual) — compara SUBMIT_DATE x CLEAR_DATE ----
+  // mesObj.horasForaSubmit / horasForaClear vêm do Office Script: hora
+  // (0-23) de cada incidente "Fora" do mês, já considerando o SLA ativo.
+  function renderHoraForaChart(canvasId, horasArray, chartRefSetter, chartAtual){
+    const canvasEl = document.getElementById(canvasId);
+    if(!canvasEl) return chartAtual;
+    const horas = Array.isArray(horasArray) ? horasArray : [];
     const contagemPorHora = new Array(24).fill(0);
-    horasFora.forEach(h => {
+    horas.forEach(h => {
       const hn = Number(h);
       if(hn >= 0 && hn <= 23) contagemPorHora[hn]++;
     });
@@ -1221,8 +1229,8 @@ function renderPendenciasFca(){
     const picoIdx = contagemPorHora.reduce((melhor, v, i) => v > contagemPorHora[melhor] ? i : melhor, 0);
     const corBarra = contagemPorHora.map((_, i) => i === picoIdx && contagemPorHora[picoIdx] > 0 ? cor.bad : 'rgba(37,99,235,.6)');
 
-    if(horaForaChart) horaForaChart.destroy();
-    horaForaChart = new Chart(horaForaCanvas, {
+    if(chartAtual) chartAtual.destroy();
+    const novoChart = new Chart(canvasEl, {
       type: 'bar',
       data: {
         labels: horaLabels,
@@ -1246,7 +1254,12 @@ function renderPendenciasFca(){
         }
       }
     });
+    if(chartRefSetter) chartRefSetter(novoChart);
+    return novoChart;
   }
+
+  horaForaSubmitChart = renderHoraForaChart('horaForaSubmitChart', mesObj.horasForaSubmit, null, horaForaSubmitChart);
+  horaForaClearChart = renderHoraForaChart('horaForaClearChart', mesObj.horasForaClear, null, horaForaClearChart);
 
   // ---- Resumo por Supervisor (mês atual, sem aplicar os filtros de Supervisor/Status da tela) ----
   const resumoSupervisorBody = document.getElementById('resumoSupervisorBody');
