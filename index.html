@@ -187,10 +187,19 @@
   <canvas id="weeklyChart" height="110"></canvas>
 </div>
 
-<div class="panel" style="margin-bottom:16px;">
-  <h2>Tendência mensal</h2>
-  <div class="hint">% dentro do prazo ao longo dos meses.</div>
-  <canvas id="trendChart" height="90"></canvas>
+<div class="grid" style="margin-bottom:16px;">
+  <div class="panel">
+    <h2>Tendência mensal</h2>
+    <div class="hint">% dentro do prazo ao longo dos meses. A parte tracejada é uma projeção até o fim do mês atual.</div>
+    <canvas id="trendChart" height="90"></canvas>
+  </div>
+  <div class="panel">
+    <h2>Top 15 Sites</h2>
+    <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
+    <div id="topSitesChartWrap" style="position:relative; height:340px;">
+      <canvas id="topSitesChart"></canvas>
+    </div>
+  </div>
 </div>
 
 <div class="panel">
@@ -421,23 +430,73 @@ function statusColor(pct){
   return cor.bad;
 }
 
-// Retorna apenas os itens de DIARIO cujo mês (segunda parte de "dd/mm")
-// bate com o mês do chip selecionado (primeira parte de "Mes/aa", ex.: "Ago/26" -> "08").
-function diarioDoMesAtual(){
-  const mesObj = DADOS.meses[mesAtualIdx];
+// Retorna os itens de DIARIO cujo mês (segunda parte de "dd/mm") bate com
+// o mês de um objeto de mês qualquer (ex.: "Ago/26" -> "08").
+function diarioDoMes(mesObj){
   const nomeMes = mesObj.mes.split('/')[0]; // "Ago/26" -> "Ago"
   const mm = NOME_MES[nomeMes];
   return (DIARIO || []).filter(d => d.data.split('/')[1] === mm);
 }
 
-// Quantidade de dias do mês selecionado no chip (ex.: "Ago/26" -> 31).
-function diasNoMesSelecionado(){
-  const mesObj = DADOS.meses[mesAtualIdx];
+// Igual acima, mas pro mês atualmente selecionado nos chips.
+function diarioDoMesAtual(){
+  return diarioDoMes(DADOS.meses[mesAtualIdx]);
+}
+
+// Quantidade de dias de um mês qualquer (ex.: "Ago/26" -> 31).
+function diasNoMes(mesObj){
   const nomeMes = mesObj.mes.split('/')[0];
   const mm = NOME_MES[nomeMes];
   const anoCurto = mesObj.mes.split('/')[1];
   const anoFull = 2000 + Number(anoCurto);
   return new Date(anoFull, Number(mm), 0).getDate();
+}
+
+// Igual acima, mas pro mês atualmente selecionado nos chips.
+function diasNoMesSelecionado(){
+  return diasNoMes(DADOS.meses[mesAtualIdx]);
+}
+
+// Projeção de fechamento do mês: pega o ritmo médio diário de incidentes
+// que já entraram esse mês e projeta pros dias que faltam (dias restantes),
+// e usa a taxa de fora do prazo dos últimos 7 dias com dado (D-1 pra trás,
+// podendo cruzar pro mês anterior) pra estimar quantos desses incidentes
+// futuros vão furar o prazo. Retorna null se o mês já fechou (sem dias
+// restantes) ou não tem dado nenhum ainda.
+function calcularProjecaoMes(mesObj){
+  const diarioMes = diarioDoMes(mesObj);
+  const diasComDado = diarioMes.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  const totalDiasMes = diasNoMes(mesObj);
+  const diasRestantes = Math.max(0, totalDiasMes - diasCorridos);
+
+  if(diasCorridos <= 0 || diasRestantes <= 0) return null;
+
+  const t = totais(mesObj);
+  const mediaDiaria = t.total / diasCorridos;
+  const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
+
+  // Taxa de fora do prazo dos últimos 7 dias com dado, na base global
+  // (DIARIO já vem ordenado cronologicamente do Office Script).
+  const ultimos7 = (DIARIO || []).slice(-7);
+  let dentro7 = 0, fora7 = 0;
+  ultimos7.forEach(d => { dentro7 += d.dentro; fora7 += d.fora; });
+  const total7 = dentro7 + fora7;
+  const taxaFora7 = total7 > 0 ? (fora7/total7) : (t.total > 0 ? t.fora/t.total : 0);
+
+  const foraProjetado = Math.round(entrantesProjetados * taxaFora7);
+  const dentroProjetado = entrantesProjetados - foraProjetado;
+
+  const totalFinal = t.total + entrantesProjetados;
+  const dentroFinal = t.dentro + dentroProjetado;
+  const foraFinal = t.fora + foraProjetado;
+  const pctFinal = totalFinal > 0 ? (dentroFinal/totalFinal) : t.pct;
+
+  return {
+    diasCorridos, diasRestantes, entrantesProjetados,
+    foraProjetado, dentroProjetado,
+    totalFinal, dentroFinal, foraFinal, pctFinal, taxaFora7
+  };
 }
 
 // MTTR médio do mês selecionado (coluna MTTR da base, em segundos).
@@ -911,7 +970,7 @@ function renderSignal(pct){
   }
 }
 
-let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart;
+let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart;
 
 function renderDailyWeekly(){
   const diarioFiltrado = diarioDoMesAtual();
@@ -1137,19 +1196,114 @@ function render(){
   const diffPP = (pct - DADOS.meta)*100;
   document.getElementById('gaugeDiff').textContent = `Meta 85% · ${diffPP>=0?'+':''}${diffPP.toFixed(1)} p.p.`;
 
+  // Tendência mensal + projeção do mês corrente (último mês da lista) até
+  // o fim do mês, usando calcularProjecaoMes() (ritmo diário de entrantes
+  // + taxa de fora dos últimos 7 dias com dado).
+  const ultimoMesIdx = DADOS.meses.length - 1;
+  const projecaoUltimoMes = calcularProjecaoMes(DADOS.meses[ultimoMesIdx]);
+
+  let trendLabels = DADOS.meses.map(m=>m.mes);
+  const trendPctReal = DADOS.meses.map(m=>totais(m).pct*100);
+  let trendPontoCores = DADOS.meses.map((m,i)=> i===mesAtualIdx ? cor.accent : cor.muted);
+  let trendPctRealComGap = trendPctReal.slice();
+  let trendMetaData = DADOS.meses.map(()=>DADOS.meta*100);
+  let datasetProjecao = null;
+
+  if(projecaoUltimoMes){
+    trendLabels = trendLabels.concat([DADOS.meses[ultimoMesIdx].mes + ' (proj.)']);
+    trendMetaData = trendMetaData.concat([DADOS.meta*100]);
+    trendPctRealComGap = trendPctRealComGap.concat([null]);
+    trendPontoCores = trendPontoCores.concat([cor.muted]);
+
+    const projData = new Array(trendLabels.length).fill(null);
+    projData[ultimoMesIdx] = trendPctReal[ultimoMesIdx];
+    projData[ultimoMesIdx + 1] = projecaoUltimoMes.pctFinal * 100;
+
+    datasetProjecao = {
+      label: 'Projeção fim de mês', data: projData,
+      borderColor: cor.warn, backgroundColor: cor.warn, borderDash:[6,4], tension:0, fill:false, spanGaps:true,
+      pointRadius: (ctx) => ctx.dataIndex === ultimoMesIdx + 1 ? 5 : 0,
+      pointBackgroundColor: cor.warn,
+      datalabels: {
+        display: (ctx) => ctx.dataIndex === ultimoMesIdx + 1,
+        color: cor.warn, align:'top', offset:8, font:{size:10, family:'JetBrains Mono', weight:'600'},
+        formatter: v => v.toFixed(1) + '%'
+      }
+    };
+  }
+
+  const trendDatasets = [
+    {
+      label:'% dentro do prazo', data: trendPctRealComGap,
+      borderColor: cor.accent, backgroundColor:'rgba(45,212,191,.12)', fill:true, tension:.35, pointRadius:4,
+      pointBackgroundColor: trendPontoCores, spanGaps:false,
+      datalabels:{ display:false }
+    },
+    {
+      label:'Meta', data: trendMetaData, borderColor: cor.warn, borderDash:[5,5], pointRadius:0,
+      datalabels:{ display:false }
+    }
+  ];
+  if(datasetProjecao) trendDatasets.push(datasetProjecao);
+
   if(trendChart) trendChart.destroy();
   trendChart = new Chart(document.getElementById('trendChart'), {
     type:'line',
-    data:{ labels: DADOS.meses.map(m=>m.mes), datasets:[{
-      label:'% dentro do prazo', data: DADOS.meses.map(m=>totais(m).pct*100),
-      borderColor: cor.accent, backgroundColor:'rgba(45,212,191,.12)', fill:true, tension:.35, pointRadius:4,
-      pointBackgroundColor: DADOS.meses.map((m,i)=> i===mesAtualIdx ? cor.accent : cor.muted)
-    },{
-      label:'Meta', data: DADOS.meses.map(()=>DADOS.meta*100), borderColor: cor.warn, borderDash:[5,5], pointRadius:0
-    }]},
-    options:{ responsive:true, plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{display:false} },
+    data:{ labels: trendLabels, datasets: trendDatasets },
+    plugins:[ChartDataLabels],
+    options:{ responsive:true,
+      plugins:{
+        legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } },
+        datalabels:{ display:true },
+        tooltip: {
+          callbacks: {
+            afterBody: (items) => {
+              if(!projecaoUltimoMes) return [];
+              const idx = items[0].dataIndex;
+              if(idx !== ultimoMesIdx + 1) return [];
+              return [
+                'Faltam ' + projecaoUltimoMes.diasRestantes + ' dia(s) no mês',
+                '~' + projecaoUltimoMes.entrantesProjetados + ' incidentes previstos',
+                'Taxa de fora (últ. 7 dias): ' + (projecaoUltimoMes.taxaFora7*100).toFixed(1) + '%'
+              ];
+            }
+          }
+        }
+      },
       scales:{ x:{ ticks:{color:cor.muted}, grid:{display:false} }, y:{ ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{color:cor.line} } } }
   });
+
+  // ---- Top 15 Sites (SITE_CI) com mais incidentes — mês selecionado ----
+  const topSitesCanvas = document.getElementById('topSitesChart');
+  if(topSitesCanvas){
+    const topSites = Array.isArray(mesObj.topSites) ? mesObj.topSites : [];
+    const alturaPorBarra = 24;
+    const alturaMinima = 260;
+    const wrap = document.getElementById('topSitesChartWrap');
+    if(wrap) wrap.style.height = Math.max(alturaMinima, topSites.length * alturaPorBarra) + 'px';
+
+    if(topSitesChart) topSitesChart.destroy();
+    topSitesChart = new Chart(topSitesCanvas, {
+      type: 'bar',
+      data: {
+        labels: topSites.map(s => s.site),
+        datasets: [{
+          label: 'Incidentes', data: topSites.map(s => s.total),
+          backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = areaNames.map(a=>{
