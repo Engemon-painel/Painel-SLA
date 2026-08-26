@@ -188,24 +188,17 @@
 
       <div class="kpi-row" id="kpiRow"></div>
 
-      <div class="grid">
-        <div class="panel">
-          <h2>Dentro vs. Fora do prazo — por Área</h2>
-          <div class="hint">Incidentes de indisponibilidade agrupados por área, mês selecionado.</div>
-          <canvas id="areaChart" height="230"></canvas>
-        </div>
-        <div class="panel">
-          <h2 id="gaugeTitulo">% Atendimento no prazo</h2>
-          <div class="hint">Meta: 85%</div>
-          <div class="gauge-wrap">
-            <canvas id="gaugeChart" width="220" height="130"></canvas>
-            <div class="gauge-value" id="gaugeValue">—</div>
-            <div class="gauge-target" id="gaugeDiff">—</div>
-            <div class="gauge-legend">
-              <span><i style="background:var(--bad)"></i>Ruim</span>
-              <span><i style="background:var(--warn)"></i>Regular</span>
-              <span><i style="background:var(--good)"></i>Ótimo</span>
-            </div>
+      <div class="panel">
+        <h2 id="gaugeTitulo">% Atendimento no prazo</h2>
+        <div class="hint">Meta: 85%</div>
+        <div class="gauge-wrap">
+          <canvas id="gaugeChart" width="220" height="130"></canvas>
+          <div class="gauge-value" id="gaugeValue">—</div>
+          <div class="gauge-target" id="gaugeDiff">—</div>
+          <div class="gauge-legend">
+            <span><i style="background:var(--bad)"></i>Ruim</span>
+            <span><i style="background:var(--warn)"></i>Regular</span>
+            <span><i style="background:var(--good)"></i>Ótimo</span>
           </div>
         </div>
       </div>
@@ -232,6 +225,12 @@
     </div>
 
     <div class="pagina" id="pagina-area" style="display:none;">
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Dentro vs. Fora do prazo — por Área</h2>
+        <div class="hint">Incidentes de indisponibilidade agrupados por área, mês selecionado.</div>
+        <canvas id="areaChart" height="230"></canvas>
+      </div>
+
       <div class="panel">
         <h2>Detalhe por Área — mês selecionado</h2>
         <table>
@@ -421,15 +420,11 @@ function mostrarPagina(nome){
     if(navEl) navEl.classList.toggle('active', p === nome);
   });
   // Gráficos criados enquanto a página estava com display:none nascem com
-  // largura 0; forçamos um resize logo que a página vira visível pra eles
-  // ocuparem o espaço certo.
-  setTimeout(() => {
-    [
-      areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart,
-      causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart,
-      topSitesChart, admDemChartInst, evolucaoChartInst, tecnicosSupChartInst
-    ].forEach(c => { if(c && typeof c.resize === 'function') c.resize(); });
-  }, 0);
+  // largura 0, e um simples .resize() nem sempre "recupera" o canvas.
+  // Mais garantido: recriar os gráficos de vez, do mesmo jeito que já
+  // acontece ao trocar de mês/SLA — agora com a página certa visível.
+  if(typeof render === 'function') render();
+  if(nome === 'organograma' && typeof renderHeadcount === 'function') renderHeadcount();
 }
 
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
@@ -1180,7 +1175,7 @@ function render(){
     data:{ labels: areaNames, datasets:[
       {
         type:'bar', label:'Dentro do prazo', data:dentroArr,
-        backgroundColor: 'rgba(37,99,235,.75)', borderRadius:5, order:2, yAxisID:'y',
+        backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2, yAxisID:'y',
         datalabels:{
           color: cor.text, anchor:'end', align:'top',
           font:{ size:10, family:'JetBrains Mono', weight:'600' }
