@@ -46,6 +46,28 @@
   .subtitle{ color: var(--muted); font-size: 13px; margin-top:4px;}
 
   .month-strip{ display:flex; gap:6px; flex-wrap:wrap; }
+  .header-side{ display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+
+  .app-shell{ display:flex; gap:20px; align-items:flex-start; }
+  .sidebar{
+    width:200px; flex:0 0 200px; background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:10px; position:sticky; top:20px;
+    box-shadow: 0 2px 8px rgba(27,36,64,.06);
+  }
+  .nav-item{
+    display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:8px; margin-bottom:4px;
+    font-size:13px; font-weight:600; color:var(--text); cursor:pointer; background:var(--panel-2);
+    transition:.15s;
+  }
+  .nav-item:hover{ background:rgba(14,124,134,.10); }
+  .nav-item.active{ background:rgba(14,124,134,.14); color:var(--accent); }
+  .nav-item .nav-icon{ font-size:15px; width:18px; text-align:center; flex-shrink:0; }
+  .main-content{ flex:1; min-width:0; }
+  @media (max-width: 860px){
+    .app-shell{ flex-direction:column; }
+    .sidebar{ width:100%; position:static; display:flex; flex-wrap:wrap; gap:6px; }
+    .nav-item{ margin-bottom:0; }
+  }
   .chip{
     font-family:'JetBrains Mono', monospace; font-size:11px; padding:7px 12px;
     border-radius:999px; border:1px solid var(--line); color:var(--muted);
@@ -138,189 +160,215 @@
     <h1>Painel do ESER</h1>
     <div class="subtitle mono" id="loadStatus" style="margin-top:4px;">Carregando dados...</div>
   </div>
-  <div class="month-strip" id="monthStrip"></div>
-  <div class="month-strip" style="margin-top:8px;">
-    <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
-    <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
-    <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
-    <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Organograma (Excel)</a>
-    <a class="link-base link-alt" href="#headcountSecao" onclick="document.getElementById('headcountSecao').scrollIntoView({behavior:'smooth'}); return false;">↓ Ir para Organograma</a>
-    <a class="link-base" href="#pendenciasFca" onclick="document.getElementById('pendenciasFca').scrollIntoView({behavior:'smooth'}); return false;">⚠ FCA<span id="fcaCount" style="margin-left:4px;"></span></a>
+  <div class="header-side">
+    <div class="month-strip" id="monthStrip"></div>
+    <div class="month-strip">
+      <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
+      <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
+      <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
+      <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Organograma (Excel)</a>
+    </div>
   </div>
 </header>
 
-<div class="signal-strip" id="signalStrip"></div>
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="nav-item active" id="nav-consolidado" onclick="mostrarPagina('consolidado')"><span class="nav-icon">📊</span> Consolidado</div>
+    <div class="nav-item" id="nav-diario" onclick="mostrarPagina('diario')"><span class="nav-icon">📅</span> Diário / Semanal</div>
+    <div class="nav-item" id="nav-area" onclick="mostrarPagina('area')"><span class="nav-icon">🗺️</span> Por Área</div>
+    <div class="nav-item" id="nav-site" onclick="mostrarPagina('site')"><span class="nav-icon">📡</span> Por Site</div>
+    <div class="nav-item" id="nav-fca" onclick="mostrarPagina('fca')"><span class="nav-icon">⚠️</span> FCA<span id="fcaCountNav" style="margin-left:4px;"></span></div>
+    <div class="nav-item" id="nav-organograma" onclick="mostrarPagina('organograma')"><span class="nav-icon">👥</span> Organograma</div>
+  </nav>
 
-<div class="kpi-row" id="kpiRow"></div>
+  <main class="main-content">
 
-<div class="grid">
-  <div class="panel">
-    <h2>Dentro vs. Fora do prazo — por Área</h2>
-    <div class="hint">Incidentes de indisponibilidade agrupados por área, mês selecionado.</div>
-    <canvas id="areaChart" height="230"></canvas>
-  </div>
-  <div class="panel">
-    <h2 id="gaugeTitulo">% Atendimento no prazo</h2>
-    <div class="hint">Meta: 85%</div>
-    <div class="gauge-wrap">
-      <canvas id="gaugeChart" width="220" height="130"></canvas>
-      <div class="gauge-value" id="gaugeValue">—</div>
-      <div class="gauge-target" id="gaugeDiff">—</div>
-      <div class="gauge-legend">
-        <span><i style="background:var(--bad)"></i>Ruim</span>
-        <span><i style="background:var(--warn)"></i>Regular</span>
-        <span><i style="background:var(--good)"></i>Ótimo</span>
+    <div class="pagina" id="pagina-consolidado">
+      <div class="signal-strip" id="signalStrip"></div>
+
+      <div class="kpi-row" id="kpiRow"></div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Dentro vs. Fora do prazo — por Área</h2>
+          <div class="hint">Incidentes de indisponibilidade agrupados por área, mês selecionado.</div>
+          <canvas id="areaChart" height="230"></canvas>
+        </div>
+        <div class="panel">
+          <h2 id="gaugeTitulo">% Atendimento no prazo</h2>
+          <div class="hint">Meta: 85%</div>
+          <div class="gauge-wrap">
+            <canvas id="gaugeChart" width="220" height="130"></canvas>
+            <div class="gauge-value" id="gaugeValue">—</div>
+            <div class="gauge-target" id="gaugeDiff">—</div>
+            <div class="gauge-legend">
+              <span><i style="background:var(--bad)"></i>Ruim</span>
+              <span><i style="background:var(--warn)"></i>Regular</span>
+              <span><i style="background:var(--good)"></i>Ótimo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Visão mensal</h2>
+        <div class="hint">Dentro / fora do prazo por mês. A última barra (com contorno tracejado) é a projeção até o fim do mês atual.</div>
+        <canvas id="monthlyChart" height="90"></canvas>
       </div>
     </div>
-  </div>
-</div>
 
-<div class="panel" style="margin-bottom:16px;">
-  <h2>Visão diarizada</h2>
-  <div class="hint">Dentro / fora do prazo por dia · mês selecionado.</div>
-  <canvas id="dailyChart" height="110"></canvas>
-</div>
+    <div class="pagina" id="pagina-diario" style="display:none;">
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Visão diarizada</h2>
+        <div class="hint">Dentro / fora do prazo por dia · mês selecionado.</div>
+        <canvas id="dailyChart" height="110"></canvas>
+      </div>
 
-<div class="panel" style="margin-bottom:16px;">
-  <h2>Visão semanal</h2>
-  <div class="hint">Dentro / fora do prazo por semana · últimas 8 semanas.</div>
-  <canvas id="weeklyChart" height="110"></canvas>
-</div>
-
-<div class="grid" style="margin-bottom:16px;">
-  <div class="panel">
-    <h2>Tendência mensal</h2>
-    <div class="hint">% dentro do prazo ao longo dos meses. A parte tracejada é uma projeção até o fim do mês atual.</div>
-    <canvas id="trendChart" height="90"></canvas>
-  </div>
-  <div class="panel">
-    <h2>Top 15 Sites</h2>
-    <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
-    <div id="topSitesChartWrap" style="position:relative; height:340px;">
-      <canvas id="topSitesChart"></canvas>
+      <div class="panel">
+        <h2>Visão semanal</h2>
+        <div class="hint">Dentro / fora do prazo por semana · últimas 8 semanas.</div>
+        <canvas id="weeklyChart" height="110"></canvas>
+      </div>
     </div>
-  </div>
-</div>
 
-<div class="panel">
-  <h2>Detalhe por Área — mês selecionado</h2>
-  <table>
-    <thead>
-      <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th></tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
-  </table>
-</div>
-
-<div class="panel" style="margin-top:16px;" id="pendenciasFca">
-  <h2>Fora do Prazo — Justificativas (FCA)</h2>
-  <div class="hint">Incidentes fora do SLA de 4h, mês selecionado.</div>
-
-  <div class="kpi-row" id="fcaKpiRow" style="margin-bottom:20px;"></div>
-
-  <div class="panel" style="margin-bottom:16px;">
-    <h2>Resumo por Supervisor</h2>
-    <div class="hint">Fora do prazo, quantidade já preenchida (Fato/Causa) e % preenchido · mês selecionado. Não é afetado pelos filtros de Supervisor/Status abaixo.</div>
-    <table>
-      <thead>
-        <tr><th>Supervisor</th><th class="num">Fora do Prazo</th><th class="num">Preenchido</th><th class="num">% Preenchido</th></tr>
-      </thead>
-      <tbody id="resumoSupervisorBody"></tbody>
-    </table>
-  </div>
-
-  <div class="grid">
-    <div class="panel">
-      <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
-      <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do SUBMIT_DATE · mês selecionado.</div>
-      <canvas id="horaForaSubmitChart" height="150"></canvas>
+    <div class="pagina" id="pagina-area" style="display:none;">
+      <div class="panel">
+        <h2>Detalhe por Área — mês selecionado</h2>
+        <table>
+          <thead>
+            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
     </div>
-    <div class="panel">
-      <h2>Fora do Prazo por Horário — CLEAR_DATE</h2>
-      <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do CLEAR_DATE · mês selecionado.</div>
-      <canvas id="horaForaClearChart" height="150"></canvas>
+
+    <div class="pagina" id="pagina-site" style="display:none;">
+      <div class="panel">
+        <h2>Top 15 Sites</h2>
+        <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
+        <div id="topSitesChartWrap" style="position:relative; height:460px;">
+          <canvas id="topSitesChart"></canvas>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <div class="grid">
-    <div class="panel">
-      <h2>Causa</h2>
-      <div class="hint">Motivos mais frequentes entre os já justificados.</div>
-      <canvas id="causaChart" height="180"></canvas>
+    <div class="pagina" id="pagina-fca" style="display:none;">
+      <div class="panel" id="pendenciasFca">
+        <h2>Fora do Prazo — Justificativas (FCA)</h2>
+        <div class="hint">Incidentes fora do SLA de 4h, mês selecionado.</div>
+
+        <div class="kpi-row" id="fcaKpiRow" style="margin-bottom:20px;"></div>
+
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Resumo por Supervisor</h2>
+          <div class="hint">Fora do prazo, quantidade já preenchida (Fato/Causa) e % preenchido · mês selecionado. Não é afetado pelos filtros de Supervisor/Status abaixo.</div>
+          <table>
+            <thead>
+              <tr><th>Supervisor</th><th class="num">Fora do Prazo</th><th class="num">Preenchido</th><th class="num">% Preenchido</th></tr>
+            </thead>
+            <tbody id="resumoSupervisorBody"></tbody>
+          </table>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
+            <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do SUBMIT_DATE · mês selecionado.</div>
+            <canvas id="horaForaSubmitChart" height="150"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Fora do Prazo por Horário — CLEAR_DATE</h2>
+            <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do CLEAR_DATE · mês selecionado.</div>
+            <canvas id="horaForaClearChart" height="150"></canvas>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h2>Causa</h2>
+            <div class="hint">Motivos mais frequentes entre os já justificados.</div>
+            <canvas id="causaChart" height="180"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Ação tomada</h2>
+            <div class="hint">Tipo de ação registrada entre os já justificados.</div>
+            <canvas id="acaoChart" height="180"></canvas>
+          </div>
+        </div>
+
+        <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
+        <div class="hint">Incidentes fora do prazo. Use os filtros para ver por supervisor e/ou por status de preenchimento do Fato/Causa. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
+        <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
+          <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="statusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
+          <select id="statusFiltro" class="mono" onchange="filtrarPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+            <option value="pendente">A preencher</option>
+            <option value="preenchido">Preenchido</option>
+          </select>
+          <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Status</th><th>Causa</th><th>Ação</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
+          </thead>
+          <tbody id="pendenciasBody"></tbody>
+        </table>
+      </div>
     </div>
-    <div class="panel">
-      <h2>Ação tomada</h2>
-      <div class="hint">Tipo de ação registrada entre os já justificados.</div>
-      <canvas id="acaoChart" height="180"></canvas>
+
+    <div class="pagina" id="pagina-organograma" style="display:none;">
+      <div class="panel" id="headcountSecao">
+        <h2>Headcount — Organograma</h2>
+        <div class="hint">Dados da aba Organograma, mesma base do painel de SLA.</div>
+
+        <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="contratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
+          <select id="contratoFiltro" class="mono" onchange="filtrarPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="hcStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
+          <select id="hcStatusFiltro" class="mono" onchange="filtrarPorStatusHc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <div class="kpi-row" id="hcKpiRow" style="margin-bottom:20px;"></div>
+
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Departamentos</h2>
+          <div class="hint">Colaboradores ativos por área técnica.</div>
+          <div class="kpi-row" id="departamentosRow"></div>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h2>Admitidos x Demitidos</h2>
+            <div class="hint">Últimos 8 meses.</div>
+            <canvas id="admDemChart" height="160"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Evolução da Equipe</h2>
+            <div class="hint">Headcount ativo ao final de cada mês.</div>
+            <canvas id="evolucaoChart" height="160"></canvas>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <h2>Técnicos Ativos Únicos por Supervisor</h2>
+          <div class="hint">Área técnica = Técnico, colaboradores ativos.</div>
+          <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto;">
+            <canvas id="tecnicosSupervisorChart"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
-  <div class="hint">Incidentes fora do prazo. Use os filtros para ver por supervisor e/ou por status de preenchimento do Fato/Causa. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
-  <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
-    <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
-      <option value="">Todos</option>
-    </select>
-    <label for="statusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
-    <select id="statusFiltro" class="mono" onchange="filtrarPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
-      <option value="">Todos</option>
-      <option value="pendente">A preencher</option>
-      <option value="preenchido">Preenchido</option>
-    </select>
-    <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
-  </div>
-  <table>
-    <thead>
-      <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Status</th><th>Causa</th><th>Ação</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
-    </thead>
-    <tbody id="pendenciasBody"></tbody>
-  </table>
-</div>
-
-<div class="panel" style="margin-top:16px;" id="headcountSecao">
-  <h2>Headcount — Organograma</h2>
-  <div class="hint">Dados da aba Organograma, mesma base do painel de SLA.</div>
-
-  <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <label for="contratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
-    <select id="contratoFiltro" class="mono" onchange="filtrarPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
-      <option value="">Todos</option>
-    </select>
-    <label for="hcStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
-    <select id="hcStatusFiltro" class="mono" onchange="filtrarPorStatusHc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
-      <option value="">Todos</option>
-    </select>
-  </div>
-
-  <div class="kpi-row" id="hcKpiRow" style="margin-bottom:20px;"></div>
-
-  <div class="panel" style="margin-bottom:16px;">
-    <h2>Departamentos</h2>
-    <div class="hint">Colaboradores ativos por área técnica.</div>
-    <div class="kpi-row" id="departamentosRow"></div>
-  </div>
-
-  <div class="grid">
-    <div class="panel">
-      <h2>Admitidos x Demitidos</h2>
-      <div class="hint">Últimos 8 meses.</div>
-      <canvas id="admDemChart" height="160"></canvas>
-    </div>
-    <div class="panel">
-      <h2>Evolução da Equipe</h2>
-      <div class="hint">Headcount ativo ao final de cada mês.</div>
-      <canvas id="evolucaoChart" height="160"></canvas>
-    </div>
-  </div>
-
-  <div class="panel" style="margin-top:16px;">
-    <h2>Técnicos Ativos Únicos por Supervisor</h2>
-    <div class="hint">Área técnica = Técnico, colaboradores ativos.</div>
-    <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto;">
-      <canvas id="tecnicosSupervisorChart"></canvas>
-    </div>
-  </div>
+  </main>
 </div>
 
 <footer>gerado localmente · sem conexão com o Power BI · dados de exemplo</footer>
@@ -361,6 +409,29 @@ function filtrarPorStatusHc(valor){
   hcStatusFiltroAtual = valor;
   renderHeadcount();
 }
+
+// ---- Navegação por páginas (menu lateral) ----
+const PAGINAS = ['consolidado', 'diario', 'area', 'site', 'fca', 'organograma'];
+
+function mostrarPagina(nome){
+  PAGINAS.forEach(p => {
+    const secao = document.getElementById('pagina-' + p);
+    if(secao) secao.style.display = (p === nome) ? '' : 'none';
+    const navEl = document.getElementById('nav-' + p);
+    if(navEl) navEl.classList.toggle('active', p === nome);
+  });
+  // Gráficos criados enquanto a página estava com display:none nascem com
+  // largura 0; forçamos um resize logo que a página vira visível pra eles
+  // ocuparem o espaço certo.
+  setTimeout(() => {
+    [
+      areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart,
+      causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart,
+      topSitesChart, admDemChartInst, evolucaoChartInst, tecnicosSupChartInst
+    ].forEach(c => { if(c && typeof c.resize === 'function') c.resize(); });
+  }, 0);
+}
+
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
 
 // Mapa de nome de mês (abreviação em pt-BR) -> número do mês com 2 dígitos.
@@ -556,6 +627,7 @@ function renderDiasRow(diarioFiltrado){
 let hcContratoPopulado = false;
 let hcStatusPopulado = false;
 let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
+let areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart;
 const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
@@ -972,8 +1044,6 @@ function renderSignal(pct){
   }
 }
 
-let areaChart, gaugeChart, trendChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart;
-
 function renderDailyWeekly(){
   const diarioFiltrado = diarioDoMesAtual();
 
@@ -984,7 +1054,7 @@ function renderDailyWeekly(){
       datasets:[
         {
           type:'bar', label:'Dentro', data: diarioFiltrado.map(d=>d.dentro),
-          backgroundColor:'rgba(37,99,235,.75)', borderRadius:4, order:2,
+          backgroundColor:'rgba(107,117,144,.6)', borderRadius:4, order:2,
           datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
         },
         {
@@ -1018,7 +1088,7 @@ function renderDailyWeekly(){
       datasets:[
         {
           type:'bar', label:'Dentro', data: SEMANAL.map(d=>d.dentro),
-          backgroundColor:'rgba(37,99,235,.75)', borderRadius:5, order:2,
+          backgroundColor:'rgba(107,117,144,.6)', borderRadius:5, order:2,
           datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
         },
         {
@@ -1198,60 +1268,76 @@ function render(){
   const diffPP = (pct - DADOS.meta)*100;
   document.getElementById('gaugeDiff').textContent = `Meta 85% · ${diffPP>=0?'+':''}${diffPP.toFixed(1)} p.p.`;
 
-  // Tendência mensal + projeção do mês corrente (último mês da lista) até
-  // o fim do mês, usando calcularProjecaoMes() (ritmo diário de entrantes
-  // + taxa de fora dos últimos 7 dias com dado).
+  // Visão mensal (barras Dentro/Fora + % + Meta, igual diário/semanal) +
+  // projeção do mês corrente (último mês da lista) como uma barra extra,
+  // usando calcularProjecaoMes() (ritmo dos últimos 7 dias com dado).
   const ultimoMesIdx = DADOS.meses.length - 1;
   const projecaoUltimoMes = calcularProjecaoMes(DADOS.meses[ultimoMesIdx]);
 
-  let trendLabels = DADOS.meses.map(m=>m.mes);
-  const trendPctReal = DADOS.meses.map(m=>totais(m).pct*100);
-  let trendPontoCores = DADOS.meses.map((m,i)=> i===mesAtualIdx ? cor.accent : cor.muted);
-  let trendPctRealComGap = trendPctReal.slice();
-  let trendMetaData = DADOS.meses.map(()=>DADOS.meta*100);
-  let datasetProjecao = null;
+  let monthlyLabels = DADOS.meses.map(m=>m.mes);
+  const monthlyDentro = DADOS.meses.map(m=>totais(m).dentro);
+  const monthlyFora = DADOS.meses.map(m=>totais(m).fora);
+  const monthlyPct = DADOS.meses.map(m=>totais(m).pct*100);
+  let monthlyMeta = DADOS.meses.map(()=>DADOS.meta*100);
+
+  // Cor de cada barra: cinza/vermelho para meses reais, um tom mais claro
+  // (com contorno tracejado) só na barra do mês projetado, pra diferenciar
+  // visualmente dado real de estimativa.
+  const corDentroReal = 'rgba(107,117,144,.6)';
+  const corForaReal = cor.bad;
+  const corDentroProj = 'rgba(107,117,144,.28)';
+  const corForaProj = 'rgba(220,38,38,.35)';
+
+  let dentroBackgroundColors = monthlyDentro.map(()=>corDentroReal);
+  let foraBackgroundColors = monthlyFora.map(()=>corForaReal);
+  let dentroBorderColors = monthlyDentro.map(()=>corDentroReal);
+  let foraBorderColors = monthlyFora.map(()=>corForaReal);
 
   if(projecaoUltimoMes){
-    trendLabels = trendLabels.concat([DADOS.meses[ultimoMesIdx].mes + ' (proj.)']);
-    trendMetaData = trendMetaData.concat([DADOS.meta*100]);
-    trendPctRealComGap = trendPctRealComGap.concat([null]);
-    trendPontoCores = trendPontoCores.concat([cor.muted]);
-
-    const projData = new Array(trendLabels.length).fill(null);
-    projData[ultimoMesIdx] = trendPctReal[ultimoMesIdx];
-    projData[ultimoMesIdx + 1] = projecaoUltimoMes.pctFinal * 100;
-
-    datasetProjecao = {
-      label: 'Projeção fim de mês', data: projData,
-      borderColor: cor.warn, backgroundColor: cor.warn, borderDash:[6,4], tension:0, fill:false, spanGaps:true,
-      pointRadius: (ctx) => ctx.dataIndex === ultimoMesIdx + 1 ? 5 : 0,
-      pointBackgroundColor: cor.warn,
-      datalabels: {
-        display: (ctx) => ctx.dataIndex === ultimoMesIdx + 1,
-        color: cor.warn, align:'top', offset:8, font:{size:10, family:'JetBrains Mono', weight:'600'},
-        formatter: v => v.toFixed(1) + '%'
-      }
-    };
+    monthlyLabels = monthlyLabels.concat([DADOS.meses[ultimoMesIdx].mes + ' (proj.)']);
+    monthlyMeta = monthlyMeta.concat([DADOS.meta*100]);
+    monthlyDentro.push(projecaoUltimoMes.dentroFinal);
+    monthlyFora.push(projecaoUltimoMes.foraFinal);
+    monthlyPct.push(projecaoUltimoMes.pctFinal*100);
+    dentroBackgroundColors = dentroBackgroundColors.concat([corDentroProj]);
+    foraBackgroundColors = foraBackgroundColors.concat([corForaProj]);
+    dentroBorderColors = dentroBorderColors.concat([cor.muted]);
+    foraBorderColors = foraBorderColors.concat([cor.bad]);
   }
 
-  const trendDatasets = [
-    {
-      label:'% dentro do prazo', data: trendPctRealComGap,
-      borderColor: cor.accent, backgroundColor:'rgba(45,212,191,.12)', fill:true, tension:.35, pointRadius:4,
-      pointBackgroundColor: trendPontoCores, spanGaps:false,
-      datalabels:{ display:false }
+  if(monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+    data:{
+      labels: monthlyLabels,
+      datasets:[
+        {
+          type:'bar', label:'Dentro', data: monthlyDentro,
+          backgroundColor: dentroBackgroundColors, borderColor: dentroBorderColors,
+          borderWidth: projecaoUltimoMes ? monthlyDentro.map((_,i)=> i===monthlyDentro.length-1 ? 2 : 0) : 0,
+          borderDash: [5,3], borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: monthlyFora,
+          backgroundColor: foraBackgroundColors, borderColor: foraBorderColors,
+          borderWidth: projecaoUltimoMes ? monthlyFora.map((_,i)=> i===monthlyFora.length-1 ? 2 : 0) : 0,
+          borderDash: [5,3], borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: monthlyPct,
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius: projecaoUltimoMes ? monthlyPct.map((_,i)=> i===monthlyPct.length-1 ? 5 : 4) : 4,
+          yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
+        },
+        {
+          type:'line', label:'Meta 85%', data: monthlyMeta,
+          borderColor: cor.warn, borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1,
+          datalabels:{ display:false }
+        },
+      ]
     },
-    {
-      label:'Meta', data: trendMetaData, borderColor: cor.warn, borderDash:[5,5], pointRadius:0,
-      datalabels:{ display:false }
-    }
-  ];
-  if(datasetProjecao) trendDatasets.push(datasetProjecao);
-
-  if(trendChart) trendChart.destroy();
-  trendChart = new Chart(document.getElementById('trendChart'), {
-    type:'line',
-    data:{ labels: trendLabels, datasets: trendDatasets },
     plugins:[ChartDataLabels],
     options:{ responsive:true,
       plugins:{
@@ -1262,7 +1348,7 @@ function render(){
             afterBody: (items) => {
               if(!projecaoUltimoMes) return [];
               const idx = items[0].dataIndex;
-              if(idx !== ultimoMesIdx + 1) return [];
+              if(idx !== monthlyLabels.length-1) return [];
               return [
                 'Faltam ' + projecaoUltimoMes.diasRestantes + ' dia(s) no mês',
                 '~' + projecaoUltimoMes.entrantesProjetados + ' incidentes previstos',
@@ -1272,7 +1358,12 @@ function render(){
           }
         }
       },
-      scales:{ x:{ ticks:{color:cor.muted}, grid:{display:false} }, y:{ ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{color:cor.line} } } }
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
   });
 
   // ---- Top 15 Sites (SITE_CI) com mais incidentes — mês selecionado ----
@@ -1366,7 +1457,7 @@ function renderPendenciasFca(){
   });
   const justificadosDoMes = itensFiltrados.filter(p => !p.pendente);
 
-  const badge = document.getElementById('fcaCount');
+  const badge = document.getElementById('fcaCountNav');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
 
   // ---- Total x Fora do Prazo por Horário (mês atual) — compara SUBMIT_DATE x CLEAR_DATE ----
