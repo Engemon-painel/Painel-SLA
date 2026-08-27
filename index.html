@@ -274,12 +274,12 @@
       <div class="grid">
         <div class="panel">
           <h2>Tier 2 (Top 10)</h2>
-          <div class="hint">Motivos mais frequentes (CATEGORIZATION_TIER_3 / GENERIC_CATEGORIZATION_TIER_3) · total geral.</div>
+          <div class="hint">Motivos mais frequentes (CATEGORIZATION_TIER_3 / GENERIC_CATEGORIZATION_TIER_3) · mês selecionado.</div>
           <canvas id="tier2Chart" height="200"></canvas>
         </div>
         <div class="panel">
           <h2>Resolução (Top 10)</h2>
-          <div class="hint">Ações de resolução mais frequentes (GENERIC_CATEGORIZATION_TIER_2) · total geral.</div>
+          <div class="hint">Ações de resolução mais frequentes (RESOLUTION_CATEGORY_TIER_1) · mês selecionado.</div>
           <canvas id="resolucaoChart" height="200"></canvas>
         </div>
       </div>
@@ -420,8 +420,6 @@ let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
 let COLABORADORES = [];
-let TIER2_TOP10 = [];
-let RESOLUCAO_TOP10 = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
@@ -503,8 +501,6 @@ async function carregarDados(){
     DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
     PENDENTES_FCA = data.pendentesFca || [];
     COLABORADORES = data.colaboradores || [];
-    TIER2_TOP10 = data.tier2Top10 || [];
-    RESOLUCAO_TOP10 = data.resolucaoTop10 || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
@@ -1429,11 +1425,11 @@ function render(){
     });
   }
 
-  // ---- Tier 2 (Top 10) e Resolução (Top 10) — total geral (não filtrado por mês) ----
-  // Vêm de TIER2_TOP10 e RESOLUCAO_TOP10, carregados direto da raiz do dados.json:
-  // [{ nome: 'FALHA ENERGIA', total: 504 }, ...], já ordenados e limitados a 10,
+  // ---- Tier 2 (Top 10) e Resolução (Top 10) — mês selecionado ----
+  // Vêm de mesObj.tier2Top10 e mesObj.resolucaoTop10 (gerados pelo Office
+  // Script por mês, igual o topSites): [{ nome: 'FALHA ENERGIA', total: 504 }, ...],
   // vindos de CATEGORIZATION_TIER_3/GENERIC_CATEGORIZATION_TIER_3 (Tier 2) e
-  // GENERIC_CATEGORIZATION_TIER_2 (Resolução) na base de origem.
+  // RESOLUTION_CATEGORY_TIER_1 (Resolução) na base de origem.
   function renderTopBarChart(canvasId, chartAtual, dados, paletaCores){
     const canvasEl = document.getElementById(canvasId);
     if(!canvasEl) return chartAtual;
@@ -1465,8 +1461,8 @@ function render(){
 
   const paletaTier2 = ['#dc2626','#0e7c86','#d97706','#7f1d1d','#9ca3af','#fca5a5','#6ee7b7','#a8a29e','#a8a29e','#7f1d1d'];
   const paletaResolucao = ['#f59e0b'];
-  tier2Chart = renderTopBarChart('tier2Chart', tier2Chart, TIER2_TOP10, paletaTier2);
-  resolucaoChart = renderTopBarChart('resolucaoChart', resolucaoChart, RESOLUCAO_TOP10, paletaResolucao);
+  tier2Chart = renderTopBarChart('tier2Chart', tier2Chart, mesObj.tier2Top10, paletaTier2);
+  resolucaoChart = renderTopBarChart('resolucaoChart', resolucaoChart, mesObj.resolucaoTop10, paletaResolucao);
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = areaNames.map(a=>{
