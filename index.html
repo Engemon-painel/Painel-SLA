@@ -271,17 +271,22 @@
         </div>
       </div>
 
-      <div class="grid">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
         <div class="panel">
           <h2>Tier 2 (Top 10)</h2>
-          <div class="hint">Motivos mais frequentes (CATEGORIZATION_TIER_3 / GENERIC_CATEGORIZATION_TIER_3) · mês selecionado.</div>
-          <canvas id="tier2Chart" height="200"></canvas>
+          <div class="hint">GENERIC_CATEGORIZATION_TIER_2 · mês selecionado.</div>
+          <canvas id="genericTier2Chart" height="200"></canvas>
         </div>
         <div class="panel">
-          <h2>Resolução (Top 10)</h2>
-          <div class="hint">Ações de resolução mais frequentes (RESOLUTION_CATEGORY_TIER_1) · mês selecionado.</div>
-          <canvas id="resolucaoChart" height="200"></canvas>
+          <h2>Tier 3 (Top 10)</h2>
+          <div class="hint">GENERIC_CATEGORIZATION_TIER_3 · mês selecionado.</div>
+          <canvas id="genericTier3Chart" height="200"></canvas>
         </div>
+      </div>
+      <div class="panel">
+        <h2>Resolução (Top 10)</h2>
+        <div class="hint">Ações de resolução mais frequentes (RESOLUTION_CATEGORY_TIER_1) · mês selecionado.</div>
+        <canvas id="resolucaoChart" height="200"></canvas>
       </div>
     </div>
 
@@ -661,7 +666,7 @@ function renderDiasRow(diarioFiltrado){
 let hcContratoPopulado = false;
 let hcStatusPopulado = false;
 let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
-let areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, tier2Chart, resolucaoChart;
+let areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, genericTier2Chart, genericTier3Chart, resolucaoChart;
 const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
@@ -1425,11 +1430,13 @@ function render(){
     });
   }
 
-  // ---- Tier 2 (Top 10) e Resolução (Top 10) — mês selecionado ----
-  // Vêm de mesObj.tier2Top10 e mesObj.resolucaoTop10 (gerados pelo Office
-  // Script por mês, igual o topSites): [{ nome: 'FALHA ENERGIA', total: 504 }, ...],
-  // vindos de CATEGORIZATION_TIER_3/GENERIC_CATEGORIZATION_TIER_3 (Tier 2) e
-  // RESOLUTION_CATEGORY_TIER_1 (Resolução) na base de origem.
+  // ---- Tier 2 / Tier 3 / Resolução (Top 10) — mês selecionado ----
+  // Vêm de mesObj.genericTier2Top10, mesObj.genericTier3Top10 e
+  // mesObj.resolucaoTop10 (gerados pelo Office Script por mês, igual o
+  // topSites): [{ nome: 'FALHA ENERGIA', total: 504 }, ...], vindos de
+  // GENERIC_CATEGORIZATION_TIER_2, GENERIC_CATEGORIZATION_TIER_3 e
+  // RESOLUTION_CATEGORY_TIER_1 na base de origem — cada um separado,
+  // sem fallback entre colunas.
   function renderTopBarChart(canvasId, chartAtual, dados, paletaCores){
     const canvasEl = document.getElementById(canvasId);
     if(!canvasEl) return chartAtual;
@@ -1460,8 +1467,10 @@ function render(){
   }
 
   const paletaTier2 = ['#dc2626','#0e7c86','#d97706','#7f1d1d','#9ca3af','#fca5a5','#6ee7b7','#a8a29e','#a8a29e','#7f1d1d'];
+  const paletaTier3 = ['#2563eb','#5e34b5','#0e7490','#7c3aed','#94a3b8','#93c5fd','#a5b4fc','#94a3b8','#94a3b8','#7c3aed'];
   const paletaResolucao = ['#f59e0b'];
-  tier2Chart = renderTopBarChart('tier2Chart', tier2Chart, mesObj.tier2Top10, paletaTier2);
+  genericTier2Chart = renderTopBarChart('genericTier2Chart', genericTier2Chart, mesObj.genericTier2Top10, paletaTier2);
+  genericTier3Chart = renderTopBarChart('genericTier3Chart', genericTier3Chart, mesObj.genericTier3Top10, paletaTier3);
   resolucaoChart = renderTopBarChart('resolucaoChart', resolucaoChart, mesObj.resolucaoTop10, paletaResolucao);
 
   const tbody = document.getElementById('tableBody');
