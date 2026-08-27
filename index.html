@@ -263,6 +263,14 @@
     </div>
 
     <div class="pagina" id="pagina-site" style="display:none;">
+      <div style="max-width:180px; margin-bottom:16px;">
+        <div class="mini-card">
+          <div class="mini-icon" style="background:rgba(217,119,6,.12); font-size:16px;">📡</div>
+          <div class="mini-value" id="totalSitesValue" style="color:#d97706;">—</div>
+          <div class="mini-label">Sites</div>
+        </div>
+      </div>
+
       <div class="panel" style="margin-bottom:16px;">
         <h2>Top 15 Sites</h2>
         <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
@@ -1414,6 +1422,15 @@ function render(){
       }
     }
   });
+
+  // ---- Total de sites únicos com incidente de indisponibilidade — mês selecionado ----
+  const totalSitesValueEl = document.getElementById('totalSitesValue');
+  if(totalSitesValueEl){
+    const totalSitesUnicos = typeof mesObj.totalSitesUnicos === 'number'
+      ? mesObj.totalSitesUnicos
+      : (Array.isArray(mesObj.topSites) ? mesObj.topSites.length : 0);
+    totalSitesValueEl.textContent = totalSitesUnicos.toLocaleString('pt-BR');
+  }
 
   // ---- Top 15 Sites (SITE_CI) com mais incidentes — mês selecionado ----
   const topSitesCanvas = document.getElementById('topSitesChart');
