@@ -1,5 +1,4 @@
-# Let's inspect the provided HTML code and see where the organograma page is defined.
-html_code = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -170,6 +169,1625 @@ html_code = """<!DOCTYPE html>
 </style>
 </head>
 <body>
-...
-"""
-print("Loaded snippet successfully")
+
+<header>
+  <div class="brand-title">
+    <img src="data:image/png;base64,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" alt="Engemon Opservices" class="brand-logo">
+    <div>
+      <div class="brand-eyebrow">OPS · Monitoramento de Indisponibilidade</div>
+      <h1>Painel do ESER</h1>
+      <div class="subtitle mono" id="loadStatus" style="margin-top:4px;">Carregando dados...</div>
+    </div>
+  </div>
+  <div class="header-side">
+    <div class="month-strip" id="monthStrip"></div>
+    <div class="month-strip">
+      <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
+      <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
+      <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
+      <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Organograma (Excel)</a>
+    </div>
+  </div>
+</header>
+
+<div class="app-shell">
+  <nav class="sidebar">
+    <div class="nav-item active" id="nav-consolidado" onclick="mostrarPagina('consolidado')"><span class="nav-icon">📊</span> Consolidado</div>
+    <div class="nav-item" id="nav-diario" onclick="mostrarPagina('diario')"><span class="nav-icon">📅</span> Diário / Semanal</div>
+    <div class="nav-item" id="nav-area" onclick="mostrarPagina('area')"><span class="nav-icon">🗺️</span> Por Área</div>
+    <div class="nav-item" id="nav-site" onclick="mostrarPagina('site')"><span class="nav-icon">📡</span> Por Site</div>
+    <div class="nav-item" id="nav-fca" onclick="mostrarPagina('fca')"><span class="nav-icon">⚠️</span> FCA<span id="fcaCountNav" style="margin-left:4px;"></span></div>
+    <div class="nav-item" id="nav-organograma" onclick="mostrarPagina('organograma')"><span class="nav-icon">👥</span> Organograma</div>
+  </nav>
+
+  <main class="main-content">
+
+    <div class="pagina" id="pagina-consolidado">
+      <div class="signal-strip" id="signalStrip"></div>
+
+      <div class="kpi-row" id="kpiRow"></div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Visão mensal</h2>
+          <div class="hint">Dentro / fora do prazo por mês, com a linha de % mostrando a tendência de um mês pro outro.</div>
+          <canvas id="monthlyChart" height="90"></canvas>
+        </div>
+        <div class="panel">
+          <h2 id="gaugeTitulo">% Atendimento no prazo</h2>
+          <div class="hint">Meta: 85%</div>
+          <div class="gauge-wrap">
+            <canvas id="gaugeChart" width="220" height="130"></canvas>
+            <div class="gauge-value" id="gaugeValue">—</div>
+            <div class="gauge-target" id="gaugeDiff">—</div>
+            <div class="gauge-legend">
+              <span><i style="background:var(--bad)"></i>Ruim</span>
+              <span><i style="background:var(--warn)"></i>Regular</span>
+              <span><i style="background:var(--good)"></i>Ótimo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pagina" id="pagina-diario" style="display:none;">
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Visão diarizada</h2>
+        <div class="hint">Dentro / fora do prazo por dia · mês selecionado.</div>
+        <canvas id="dailyChart" height="110"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2>Visão semanal</h2>
+        <div class="hint">Dentro / fora do prazo por semana · últimas 8 semanas.</div>
+        <canvas id="weeklyChart" height="110"></canvas>
+      </div>
+    </div>
+
+    <div class="pagina" id="pagina-area" style="display:none;">
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Dentro vs. Fora do prazo — por Área</h2>
+        <div class="hint">Incidentes de indisponibilidade agrupados por área, mês selecionado.</div>
+        <canvas id="areaChart" height="230"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2>Detalhe por Área — mês selecionado</h2>
+        <table>
+          <thead>
+            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="pagina" id="pagina-site" style="display:none;">
+      <div style="max-width:180px; margin-bottom:16px;">
+        <div class="mini-card">
+          <div class="mini-icon" style="background:rgba(217,119,6,.12); font-size:16px;">📡</div>
+          <div class="mini-value" id="totalSitesValue" style="color:#d97706;">—</div>
+          <div class="mini-label">Sites</div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Top 15 Sites</h2>
+        <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
+        <div id="topSitesChartWrap" style="position:relative; height:460px;">
+          <canvas id="topSitesChart"></canvas>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+        <div class="panel">
+          <h2>Tier 2 (Top 10)</h2>
+          <div class="hint">GENERIC_CATEGORIZATION_TIER_2 · mês selecionado.</div>
+          <canvas id="genericTier2Chart" height="200"></canvas>
+        </div>
+        <div class="panel">
+          <h2>Tier 3 (Top 10)</h2>
+          <div class="hint">GENERIC_CATEGORIZATION_TIER_3 · mês selecionado.</div>
+          <canvas id="genericTier3Chart" height="200"></canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Resolução (Top 10)</h2>
+        <div class="hint">Ações de resolução mais frequentes (RESOLUTION_CATEGORY_TIER_1) · mês selecionado.</div>
+        <canvas id="resolucaoChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <div class="pagina" id="pagina-fca" style="display:none;">
+      <div class="panel" id="pendenciasFca">
+        <h2>Fora do Prazo — Justificativas (FCA)</h2>
+        <div class="hint">Incidentes fora do SLA de 4h, mês selecionado.</div>
+
+        <div class="kpi-row" id="fcaKpiRow" style="margin-bottom:20px;"></div>
+
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Resumo por Supervisor</h2>
+          <div class="hint">Fora do prazo, quantidade já preenchida (Fato/Causa) e % preenchido · mês selecionado. Não é afetado pelos filtros de Supervisor/Status abaixo.</div>
+          <table>
+            <thead>
+              <tr><th>Supervisor</th><th class="num">Fora do Prazo</th><th class="num">Preenchido</th><th class="num">% Preenchido</th></tr>
+            </thead>
+            <tbody id="resumoSupervisorBody"></tbody>
+          </table>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
+            <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do SUBMIT_DATE · mês selecionado.</div>
+            <canvas id="horaForaSubmitChart" height="150"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Fora do Prazo por Horário — CLEAR_DATE</h2>
+            <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do CLEAR_DATE · mês selecionado.</div>
+            <canvas id="horaForaClearChart" height="150"></canvas>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h2>Causa</h2>
+            <div class="hint">Motivos mais frequentes entre os já justificados.</div>
+            <canvas id="causaChart" height="180"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Ação tomada</h2>
+            <div class="hint">Tipo de ação registrada entre os já justificados.</div>
+            <canvas id="acaoChart" height="180"></canvas>
+          </div>
+        </div>
+
+        <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
+        <div class="hint">Incidentes fora do prazo. Use os filtros para ver por supervisor e/ou por status de preenchimento do Fato/Causa. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
+        <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
+          <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="statusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
+          <select id="statusFiltro" class="mono" onchange="filtrarPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+            <option value="pendente">A preencher</option>
+            <option value="preenchido">Preenchido</option>
+          </select>
+          <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Status</th><th>Causa</th><th>Ação</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
+          </thead>
+          <tbody id="pendenciasBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="pagina" id="pagina-organograma" style="display:none;">
+      <div class="panel" id="headcountSecao">
+        <h2>Headcount — Organograma</h2>
+        <div class="hint">Dados da aba Organograma, mesma base do painel de SLA.</div>
+
+        <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="contratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
+          <select id="contratoFiltro" class="mono" onchange="filtrarPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="hcStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
+          <select id="hcStatusFiltro" class="mono" onchange="filtrarPorStatusHc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <div class="kpi-row" id="hcKpiRow" style="margin-bottom:20px;"></div>
+
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Departamentos</h2>
+          <div class="hint">Colaboradores ativos por área técnica.</div>
+          <div class="kpi-row" id="departamentosRow"></div>
+        </div>
+
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Por Unidade de Negócio</h2>
+          <div class="hint">Colaboradores ativos por Unidade de Negócio, com o coordenador responsável.</div>
+          <div class="unb-grid" id="unbGrid"></div>
+        </div>
+
+        <div class="grid">
+          <div class="panel">
+            <h2>Admitidos x Demitidos</h2>
+            <div class="hint">Últimos 8 meses.</div>
+            <canvas id="admDemChart" height="160"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Evolução da Equipe</h2>
+            <div class="hint">Headcount ativo ao final de cada mês.</div>
+            <canvas id="evolucaoChart" height="160"></canvas>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <h2>Técnicos Ativos Únicos por Supervisor</h2>
+          <div class="hint">Área técnica = Técnico, colaboradores ativos.</div>
+          <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto;">
+            <canvas id="tecnicosSupervisorChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<footer>gerado localmente · sem conexão com o Power BI · dados de exemplo</footer>
+
+<script>
+// ======================================================
+// Os dados vêm de dados.json (mesma pasta deste arquivo).
+// Edite/atualize esse JSON — não precisa mexer neste HTML.
+// ======================================================
+let DADOS, DIARIO, SEMANAL, mesAtualIdx;
+let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
+let PENDENTES_FCA = [];
+let COLABORADORES = [];
+let slaAtivo = '4h';
+let supervisorFiltroAtual = '';
+let statusFiltroAtual = '';
+let contratoFiltroAtual = '';
+let mesPopuladoFiltro = null;
+let renderPendenciasFcaRef = null;
+
+function filtrarPorSupervisor(valor){
+  supervisorFiltroAtual = valor;
+  if(renderPendenciasFcaRef) renderPendenciasFcaRef();
+}
+
+function filtrarPorStatus(valor){
+  statusFiltroAtual = valor;
+  if(renderPendenciasFcaRef) renderPendenciasFcaRef();
+}
+
+function filtrarPorContrato(valor){
+  contratoFiltroAtual = valor;
+  renderHeadcount();
+}
+
+let hcStatusFiltroAtual = '';
+function filtrarPorStatusHc(valor){
+  hcStatusFiltroAtual = valor;
+  renderHeadcount();
+}
+
+// ---- Navegação por páginas (menu lateral) ----
+const PAGINAS = ['consolidado', 'diario', 'area', 'site', 'fca', 'organograma'];
+
+function mostrarPagina(nome){
+  PAGINAS.forEach(p => {
+    const secao = document.getElementById('pagina-' + p);
+    if(secao) secao.style.display = (p === nome) ? '' : 'none';
+    const navEl = document.getElementById('nav-' + p);
+    if(navEl) navEl.classList.toggle('active', p === nome);
+  });
+  // Gráficos criados enquanto a página estava com display:none nascem com
+  // largura 0, e um simples .resize() nem sempre "recupera" o canvas.
+  // Mais garantido: recriar os gráficos de vez, do mesmo jeito que já
+  // acontece ao trocar de mês/SLA — agora com a página certa visível.
+  if(typeof render === 'function') render();
+  if(nome === 'organograma' && typeof renderHeadcount === 'function') renderHeadcount();
+}
+
+const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
+
+// Mapa de nome de mês (abreviação em pt-BR) -> número do mês com 2 dígitos.
+// Usado para filtrar o array "diario" (formato "dd/mm") pelo mês selecionado
+// nos chips (formato "Mes/aa", ex.: "Ago/26").
+const NOME_MES = {
+  Jan:'01', Fev:'02', Mar:'03', Abr:'04', Mai:'05', Jun:'06',
+  Jul:'07', Ago:'08', Set:'09', Out:'10', Nov:'11', Dez:'12'
+};
+
+function trocarSla(sla){
+  slaAtivo = sla;
+  document.getElementById('btnSla4h').classList.toggle('active', sla === '4h');
+  document.getElementById('btnSla6h').classList.toggle('active', sla === '6h');
+  DADOS = sla === '4h' ? DADOS_4H : DADOS_6H;
+  SEMANAL = sla === '4h' ? SEMANAL_4H : SEMANAL_6H;
+  DIARIO = sla === '4h' ? DIARIO_4H : DIARIO_6H;
+  if (mesAtualIdx >= DADOS.meses.length) mesAtualIdx = DADOS.meses.length - 1;
+  montarPagina();
+}
+
+async function carregarDados(){
+  const status = document.getElementById('loadStatus');
+  try{
+    const resp = await fetch('dados.json?_=' + Date.now());
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    DADOS_4H = { meta: data.meta, meses: data.meses };
+    DADOS_6H = { meta: data.meta, meses: data.meses6h && data.meses6h.length ? data.meses6h : data.meses };
+    SEMANAL_4H = data.semanal;
+    SEMANAL_6H = data.semanal6h && data.semanal6h.length ? data.semanal6h : data.semanal;
+    DIARIO_4H = data.diario || [];
+    DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
+    PENDENTES_FCA = data.pendentesFca || [];
+    COLABORADORES = data.colaboradores || [];
+    DADOS = DADOS_4H;
+    SEMANAL = SEMANAL_4H;
+    DIARIO = DIARIO_4H;
+    mesAtualIdx = DADOS.meses.length - 1;
+    if(status) status.textContent = data.atualizado_em ? ('Dados atualizados em ' + data.atualizado_em) : '';
+    montarPagina();
+    renderHeadcount();
+  }catch(err){
+    if(status){ status.textContent = 'Não foi possível carregar dados.json (' + err.message + ')'; status.style.color = cor.bad; }
+    console.error(err);
+  }
+}
+
+const AREAS_VALIDAS = ['SPC1','SPC2','SPC3','SPC4'];
+
+function areasValidas(areasObj){
+  const out = {};
+  AREAS_VALIDAS.forEach(k=>{ if(areasObj[k]) out[k] = areasObj[k]; });
+  return out;
+}
+
+function totais(mesObj){
+  const areas = areasValidas(mesObj.areas);
+  let dentro=0, fora=0;
+  Object.values(areas).forEach(a=>{ dentro+=a.dentro; fora+=a.fora; });
+  return { dentro, fora, total: dentro+fora, pct: dentro/(dentro+fora) };
+}
+
+function statusColor(pct){
+  if(pct >= DADOS.meta) return cor.good;
+  if(pct >= DADOS.meta - 0.05) return cor.warn;
+  return cor.bad;
+}
+
+// Retorna os itens de DIARIO cujo mês (segunda parte de "dd/mm") bate com
+// o mês de um objeto de mês qualquer (ex.: "Ago/26" -> "08").
+function diarioDoMes(mesObj){
+  const nomeMes = mesObj.mes.split('/')[0]; // "Ago/26" -> "Ago"
+  const mm = NOME_MES[nomeMes];
+  return (DIARIO || []).filter(d => d.data.split('/')[1] === mm);
+}
+
+// Igual acima, mas pro mês atualmente selecionado nos chips.
+function diarioDoMesAtual(){
+  return diarioDoMes(DADOS.meses[mesAtualIdx]);
+}
+
+// Quantidade de dias de um mês qualquer (ex.: "Ago/26" -> 31).
+function diasNoMes(mesObj){
+  const nomeMes = mesObj.mes.split('/')[0];
+  const mm = NOME_MES[nomeMes];
+  const anoCurto = mesObj.mes.split('/')[1];
+  const anoFull = 2000 + Number(anoCurto);
+  return new Date(anoFull, Number(mm), 0).getDate();
+}
+
+// Igual acima, mas pro mês atualmente selecionado nos chips.
+function diasNoMesSelecionado(){
+  return diasNoMes(DADOS.meses[mesAtualIdx]);
+}
+
+// Projeção de fechamento do mês: usa SEMPRE a janela dos últimos 7 dias
+// com dado (D-1 pra trás, podendo cruzar pro mês anterior) — tanto pro
+// ritmo diário de entrantes (volume) quanto pra taxa de fora do prazo —
+// e projeta isso pros dias que faltam no mês (dias restantes). Retorna
+// null se o mês já fechou (sem dias restantes) ou não tem dado nenhum.
+function calcularProjecaoMes(mesObj){
+  const diarioMes = diarioDoMes(mesObj);
+  const diasComDado = diarioMes.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  const totalDiasMes = diasNoMes(mesObj);
+  const diasRestantes = Math.max(0, totalDiasMes - diasCorridos);
+
+  if(diasCorridos <= 0 || diasRestantes <= 0) return null;
+
+  const t = totais(mesObj);
+
+  // Últimos 7 dias com dado, na base global (DIARIO já vem ordenado
+  // cronologicamente do Office Script) — usados tanto pro ritmo de
+  // entrantes quanto pra taxa de fora do prazo.
+  const ultimos7 = (DIARIO || []).slice(-7);
+  let dentro7 = 0, fora7 = 0;
+  ultimos7.forEach(d => { dentro7 += d.dentro; fora7 += d.fora; });
+  const total7 = dentro7 + fora7;
+
+  const mediaDiaria = ultimos7.length > 0 ? (total7 / ultimos7.length) : (t.total / diasCorridos);
+  const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
+
+  const taxaFora7 = total7 > 0 ? (fora7/total7) : (t.total > 0 ? t.fora/t.total : 0);
+
+  const foraProjetado = Math.round(entrantesProjetados * taxaFora7);
+  const dentroProjetado = entrantesProjetados - foraProjetado;
+
+  const totalFinal = t.total + entrantesProjetados;
+  const dentroFinal = t.dentro + dentroProjetado;
+  const foraFinal = t.fora + foraProjetado;
+  const pctFinal = totalFinal > 0 ? (dentroFinal/totalFinal) : t.pct;
+
+  return {
+    diasCorridos, diasRestantes, entrantesProjetados, mediaDiaria,
+    foraProjetado, dentroProjetado,
+    totalFinal, dentroFinal, foraFinal, pctFinal, taxaFora7
+  };
+}
+
+// MTTR médio do mês selecionado (coluna MTTR da base, em segundos).
+// Espera mesObj.mttrValores = [3598, 16806, ...] (um valor por incidente do mês);
+// células vazias/"-" na planilha devem virar null/undefined no dados.json e são
+// ignoradas no cálculo da média (não contam como 0).
+function mttrMedioDoMes(mesObj){
+  const valores = Array.isArray(mesObj.mttrValores)
+    ? mesObj.mttrValores.filter(v => typeof v === 'number' && !isNaN(v))
+    : [];
+  if(!valores.length) return null;
+  const soma = valores.reduce((a,b) => a+b, 0);
+  return soma / valores.length;
+}
+
+// Formata segundos como "Xh YYmin" (ou só "YYmin" se < 1h).
+function formatarMttr(segundos){
+  if(segundos === null || segundos === undefined || isNaN(segundos)) return '—';
+  const totalMin = Math.round(segundos / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${String(m).padStart(2,'0')}min` : `${m}min`;
+}
+
+// Dias corridos (D-1) e dias restantes com base no ÚLTIMO dia com dado na base
+// (DIARIO) para o mês selecionado — não usa a data real do sistema, só a base.
+function renderDiasRow(diarioFiltrado){
+  const diasRow = document.getElementById('diasRow');
+  if(!diasRow) return;
+  const diasComDado = diarioFiltrado.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  const totalDiasMes = diasNoMesSelecionado();
+  const diasRestantes = Math.max(0, totalDiasMes - diasCorridos);
+  diasRow.innerHTML = `
+    <div class="mini-card">
+      <div class="mini-icon">📅</div>
+      <div class="mini-value">${diasCorridos}</div>
+      <div class="mini-label">Dias corridos (D-1)</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-icon">❗</div>
+      <div class="mini-value">${diasRestantes}</div>
+      <div class="mini-label">Dias restantes</div>
+    </div>
+  `;
+}
+
+// ======================================================
+// HEADCOUNT — ORGANOGRAMA
+// Seção independente do mês/SLA selecionados acima; fica em escopo
+// global (não aninhada em montarPagina) para não repetir o bug de
+// escopo que já tivemos com renderPendenciasFca.
+// ======================================================
+
+let hcContratoPopulado = false;
+let hcStatusPopulado = false;
+let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
+let areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, genericTier2Chart, genericTier3Chart, resolucaoChart;
+const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
+function normHc(s){ return (s || '').replace(/\s+/g, ' ').trim(); }
+// Unifica variações de maiúsculas/minúsculas do mesmo contrato (ex.: "Claro"
+// e "CLARO" vindos de abas diferentes) num único valor em maiúsculas.
+function canonContratoHc(s){ const n = normHc(s); return n ? n.toUpperCase() : n; }
+function semAcentoHc(s){ return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+
+function ultimosNMesesHc(n){
+  const hoje = new Date();
+  const arr = [];
+  for(let i = n - 1; i >= 0; i--){
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    arr.push({
+      ano: d.getFullYear(),
+      mes: d.getMonth(),
+      label: MES_PT_ARR[d.getMonth()] + '/' + pad2hc(d.getFullYear() % 100)
+    });
+  }
+  return arr;
+}
+
+function renderHeadcount(){
+  const kpiRow = document.getElementById('hcKpiRow');
+  if(!kpiRow) return;
+
+  // ---- Filtro por Contrato ----
+  const selectContrato = document.getElementById('contratoFiltro');
+  if(selectContrato && !hcContratoPopulado){
+    const contratos = Array.from(new Set(COLABORADORES.map(c => canonContratoHc(c.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    selectContrato.innerHTML = '<option value="">Todos</option>' +
+      contratos.map(c => `<option value="${c}">${c}</option>`).join('');
+    selectContrato.value = contratoFiltroAtual;
+    hcContratoPopulado = true;
+  }
+
+  // ---- Filtro por Status ----
+  const selectStatusHc = document.getElementById('hcStatusFiltro');
+  if(selectStatusHc && !hcStatusPopulado){
+    selectStatusHc.innerHTML = '<option value="">Todos</option><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option>';
+    if(!hcStatusFiltroAtual) hcStatusFiltroAtual = 'Ativo';
+    selectStatusHc.value = hcStatusFiltroAtual;
+    hcStatusPopulado = true;
+  }
+
+  const colabFiltrados = COLABORADORES.filter(c => {
+    if(contratoFiltroAtual && canonContratoHc(c.contrato) !== contratoFiltroAtual) return false;
+    if(hcStatusFiltroAtual === 'Ativo' && !c.ativo) return false;
+    if(hcStatusFiltroAtual === 'Inativo' && c.ativo) return false;
+    return true;
+  });
+
+  const ativos = colabFiltrados.filter(c => hcStatusFiltroAtual ? true : c.ativo);
+  const hcTotal = ativos.length;
+
+  const porContrato = {};
+  ativos.forEach(c => {
+    const k = canonContratoHc(c.contrato) || 'Sem contrato';
+    porContrato[k] = (porContrato[k] || 0) + 1;
+  });
+  const contratosOrdenados = Object.keys(porContrato).sort((a,b)=> porContrato[b]-porContrato[a]);
+
+  kpiRow.innerHTML = contratosOrdenados.map(k => {
+    const qtd = porContrato[k];
+    const pct = hcTotal > 0 ? (qtd/hcTotal*100).toFixed(0) : 0;
+    return `<div class="kpi"><div class="label">${k}</div><div class="value">${qtd}</div><div class="delta">${pct}%</div></div>`;
+  }).join('') + `<div class="kpi"><div class="label">HC Total</div><div class="value" style="color:${cor.accent}">${hcTotal}</div></div>`;
+
+  const porArea = {};
+  ativos.forEach(c => {
+    const k = normHc(c.areaTecnica) || 'Sem área';
+    porArea[k] = (porArea[k] || 0) + 1;
+  });
+  const areasOrdenadas = Object.keys(porArea).sort((a,b)=> porArea[b]-porArea[a]);
+  const departamentosRow = document.getElementById('departamentosRow');
+  if(departamentosRow){
+    const paletaDept = [
+      { bg:'rgba(37,99,235,.10)',  border:'rgba(37,99,235,.35)',  text:'#1d4ed8' },
+      { bg:'rgba(5,150,105,.10)',  border:'rgba(5,150,105,.35)',  text:'#047857' },
+      { bg:'rgba(217,119,6,.10)',  border:'rgba(217,119,6,.35)',  text:'#b45309' },
+      { bg:'rgba(220,38,38,.10)',  border:'rgba(220,38,38,.35)',  text:'#b91c1c' },
+      { bg:'rgba(94,52,181,.10)',  border:'rgba(94,52,181,.35)',  text:'#5e34b5' },
+      { bg:'rgba(14,124,134,.10)', border:'rgba(14,124,134,.35)', text:'#0e7c86' },
+      { bg:'rgba(219,39,119,.10)', border:'rgba(219,39,119,.35)', text:'#be185d' },
+      { bg:'rgba(202,138,4,.10)',  border:'rgba(202,138,4,.35)',  text:'#a16207' },
+      { bg:'rgba(8,145,178,.10)',  border:'rgba(8,145,178,.35)',  text:'#0e7490' },
+      { bg:'rgba(101,163,13,.10)', border:'rgba(101,163,13,.35)', text:'#4d7c0f' },
+    ];
+    departamentosRow.innerHTML = areasOrdenadas.map((k, i) => {
+      const c = paletaDept[i % paletaDept.length];
+      return `<div class="kpi" style="background:${c.bg}; border-color:${c.border};">
+        <div class="label" style="color:${c.text};">${k}</div>
+        <div class="value" style="color:${c.text};">${porArea[k]}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const unbGrid = document.getElementById('unbGrid');
+  if(unbGrid){
+    // Agrupa por Unidade de Negócio (c.unidadeNegocio). O coordenador exibido
+    // vem direto da coluna Coordenador (c.coordenador) — usa o valor mais
+    // frequente entre os colaboradores ativos daquela unidade (normalmente
+    // é o mesmo pra todos os da unidade, mas caso haja divergência de
+    // preenchimento na planilha, prevalece o mais comum).
+    const porUnidade = {};
+    ativos.forEach(c => {
+      const k = normHc(c.unidadeNegocio);
+      if(!k) return;
+      if(!porUnidade[k]) porUnidade[k] = { total: 0, coordenadores: {} };
+      porUnidade[k].total++;
+      const coordVal = normHc(c.coordenador) || 'Sem coordenador';
+      porUnidade[k].coordenadores[coordVal] = (porUnidade[k].coordenadores[coordVal] || 0) + 1;
+    });
+
+    function iconeUnidade(nomeUnidade){
+      const n = semAcentoHc(nomeUnidade);
+      if(n.includes('diamante') && n.includes('resident')) return { icone:'💎', bg:'#dbeafe' };
+      if(n.includes('diamante') && n.includes('corretiv')) return { icone:'🔥', bg:'#fee2e2' };
+      if(n.includes('diamante') && n.includes('preventiv')) return { icone:'⚙️', bg:'#e5e7eb' };
+      if((n.includes('movel') || n.includes('móvel')) && n.includes('corretiv')) return { icone:'⚡', bg:'#fef3c7' };
+      if((n.includes('movel') || n.includes('móvel')) && n.includes('preventiv')) return { icone:'🔧', bg:'#e5e7eb' };
+      return { icone:'⭐', bg:'#fef9c3' };
+    }
+
+    const unidadesOrdenadas = Object.keys(porUnidade).sort((a,b)=> porUnidade[b].total - porUnidade[a].total);
+    unbGrid.innerHTML = unidadesOrdenadas.map(nomeUnidade => {
+      const info = porUnidade[nomeUnidade];
+      const coordEntries = Object.entries(info.coordenadores).sort((a,b)=> b[1]-a[1]);
+      const coord = coordEntries.length ? coordEntries[0][0] : 'Sem coordenador';
+      const { icone, bg } = iconeUnidade(nomeUnidade);
+      return `<div class="unb-card">
+        <div class="unb-icon" style="background:${bg};">${icone}</div>
+        <div>
+          <div class="unb-title">${nomeUnidade}</div>
+          <div class="unb-coord">Coord: ${coord}</div>
+          <div class="unb-value">${info.total}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const meses8 = ultimosNMesesHc(8);
+  const admPorMes = meses8.map(()=>0);
+  const demPorMes = meses8.map(()=>0);
+
+  function indexDoMesHc(dataIso){
+    if(!dataIso) return -1;
+    const partes = dataIso.split('-');
+    const ano = Number(partes[0]);
+    const mes = Number(partes[1]) - 1;
+    return meses8.findIndex(m => m.ano === ano && m.mes === mes);
+  }
+
+  colabFiltrados.forEach(c => {
+    const iAdm = indexDoMesHc(c.dataAdmis);
+    if(iAdm !== -1) admPorMes[iAdm]++;
+    const iDem = indexDoMesHc(c.dataDemissao);
+    if(iDem !== -1) demPorMes[iDem]++;
+  });
+
+  const admDemCanvas = document.getElementById('admDemChart');
+  if(admDemCanvas){
+    if(admDemChartInst) admDemChartInst.destroy();
+    admDemChartInst = new Chart(admDemCanvas, {
+      type: 'bar',
+      data: {
+        labels: meses8.map(m => m.label),
+        datasets: [
+          { label: 'Admitidos', data: admPorMes, backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} } },
+          { label: 'Demitidos', data: demPorMes, backgroundColor: cor.bad, borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} } }
+        ]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: cor.muted, font: {family:'Inter', size:11} } }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {display:false} },
+          y: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  const evolucaoDados = meses8.map(m => {
+    const fimDoMes = new Date(m.ano, m.mes + 1, 0);
+    const fimIso = fimDoMes.getFullYear() + '-' + pad2hc(fimDoMes.getMonth()+1) + '-' + pad2hc(fimDoMes.getDate());
+    return colabFiltrados.filter(c => {
+      if(!c.dataAdmis || c.dataAdmis > fimIso) return false;
+      if(c.dataDemissao && c.dataDemissao <= fimIso) return false;
+      return true;
+    }).length;
+  });
+
+  const evolucaoCanvas = document.getElementById('evolucaoChart');
+  if(evolucaoCanvas){
+    if(evolucaoChartInst) evolucaoChartInst.destroy();
+    evolucaoChartInst = new Chart(evolucaoCanvas, {
+      type: 'bar',
+      data: {
+        labels: meses8.map(m => m.label),
+        datasets: [{
+          label: 'Headcount', data: evolucaoDados,
+          backgroundColor: 'rgba(107,117,144,.6)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {display:false} },
+          y: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  const tecnicosAtivos = ativos.filter(c => semAcentoHc(c.areaTecnica) === 'tecnico');
+  const porSupervisor = {};
+  tecnicosAtivos.forEach(c => {
+    const k = normHc(c.supervisor) || 'Sem supervisor';
+    porSupervisor[k] = (porSupervisor[k] || 0) + 1;
+  });
+  const supervisoresOrdenados = Object.keys(porSupervisor).sort((a,b)=> porSupervisor[b]-porSupervisor[a]);
+
+  const tecnicosCanvas = document.getElementById('tecnicosSupervisorChart');
+  if(tecnicosCanvas){
+    if(tecnicosSupChartInst) tecnicosSupChartInst.destroy();
+    const alturaPorBarra = 28;
+    const alturaMinima = 260;
+    const alturaCalculada = Math.max(alturaMinima, supervisoresOrdenados.length * alturaPorBarra);
+    tecnicosCanvas.parentElement.style.height = alturaCalculada + 'px';
+    tecnicosSupChartInst = new Chart(tecnicosCanvas, {
+      type: 'bar',
+      data: {
+        labels: supervisoresOrdenados,
+        datasets: [{
+          label: 'Técnicos ativos', data: supervisoresOrdenados.map(k => porSupervisor[k]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        maxBarThickness: 20,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true },
+          y: { ticks: {color: cor.muted, font:{size:11}}, grid: {display:false} }
+        }
+      }
+    });
+  }
+}
+
+function exportarFcaPreenchidoCsv(){
+  try {
+    if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
+      alert('Os dados do painel ainda não foram carregados.');
+      return;
+    }
+
+    if (!Array.isArray(PENDENTES_FCA)) {
+      alert('A base de FCA não foi carregada corretamente.');
+      return;
+    }
+
+    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+
+    const mesObj = DADOS.meses[mesAtualIdx];
+    if (!mesObj || !mesObj.mes) {
+      alert('Não foi possível identificar o mês selecionado.');
+      return;
+    }
+
+    const partesMes = String(mesObj.mes).split('/');
+    const nomeMes = partesMes[0];
+    const anoCurto = partesMes[1];
+    const mm = NOME_MES[nomeMes];
+
+    if (!mm || !anoCurto) {
+      alert('Formato de mês inválido: ' + mesObj.mes);
+      return;
+    }
+
+    const mesOrdAtual = '20' + anoCurto + '-' + mm;
+
+    const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
+
+    function estaPendente(p) {
+      const valor = p ? p.pendente : false;
+
+      if (valor === true || valor === 1) return true;
+
+      if (typeof valor === 'string') {
+        const v = valor.trim().toLowerCase();
+        return v === 'true' || v === '1' || v === 'sim';
+      }
+
+      return false;
+    }
+
+    const todosDoMes = PENDENTES_FCA.filter(p => {
+      if (!p) return false;
+
+      if (!areasDoMes.includes(norm(p.area))) return false;
+
+      if (norm(p.mesOrd) !== mesOrdAtual) return false;
+
+      if (
+        supervisorFiltroAtual &&
+        norm(p.supervisor) !== norm(supervisorFiltroAtual)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const preenchidos = todosDoMes.filter(p => !estaPendente(p));
+
+    if (!preenchidos.length) {
+      console.log('--- EXPORTAÇÃO FCA ---');
+      console.log('Mês selecionado:', mesObj.mes);
+      console.log('Mês esperado:', mesOrdAtual);
+      console.log('Áreas:', areasDoMes);
+      console.log('Total PENDENTES_FCA:', PENDENTES_FCA.length);
+      console.log('Total do mês:', todosDoMes.length);
+      console.log('Supervisor:', supervisorFiltroAtual || 'Todos');
+
+      alert(
+        'Nenhum incidente preenchido para exportar.\n\n' +
+        'Mês: ' + mesObj.mes +
+        (supervisorFiltroAtual
+          ? '\nSupervisor: ' + supervisorFiltroAtual
+          : '')
+      );
+      return;
+    }
+
+    const colunas = [
+      'Supervisor',
+      'Área',
+      'Site',
+      'Incidente',
+      'Causa',
+      'Ação',
+      'Reported',
+      'Submit',
+      'Clear',
+      'Resolved'
+    ];
+
+    function csvEsc(v) {
+      const s = String(v ?? '');
+
+      if (/[",;\n\r]/.test(s)) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+
+      return s;
+    }
+
+    const linhasCsv = [];
+    linhasCsv.push(colunas.map(csvEsc).join(';'));
+
+    preenchidos.forEach(p => {
+      linhasCsv.push([
+        p.supervisor || '',
+        p.area || '',
+        p.site || '',
+        p.incidente || '',
+        p.causa || '',
+        p.acao || '',
+        p.reported || '',
+        p.submit || '',
+        p.clear || '',
+        p.resolved || ''
+      ].map(csvEsc).join(';'));
+    });
+
+    const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
+
+    const blob = new Blob(
+      [csvContent],
+      { type: 'text/csv;charset=utf-8;' }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const nomeArquivo =
+      'FCA_Preenchidos_' +
+      mesObj.mes.replace('/', '-') +
+      '.csv';
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    a.style.display = 'none';
+    a.setAttribute('download', nomeArquivo);
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    console.log(
+      'CSV FCA exportado com sucesso:',
+      nomeArquivo,
+      'Registros:',
+      preenchidos.length
+    );
+
+  } catch (erro) {
+    console.error('Erro ao exportar FCA:', erro);
+
+    alert(
+      'Ocorreu um erro ao exportar o CSV.\n\n' +
+      (erro && erro.message ? erro.message : erro)
+    );
+  }
+}
+
+function montarPagina(){
+
+// ---- Month chips ----
+const monthStrip = document.getElementById('monthStrip');
+monthStrip.innerHTML = '';
+DADOS.meses.forEach((m, i)=>{
+  const chip = document.createElement('div');
+  chip.className = 'chip' + (i===mesAtualIdx ? ' active' : '');
+  chip.textContent = m.mes;
+  chip.onclick = ()=>{ mesAtualIdx = i; render(); };
+  chip.dataset.idx = i;
+  monthStrip.appendChild(chip);
+});
+
+// ---- Signal strip (visão diária simulada a partir do % do mês) ----
+const signalStrip = document.getElementById('signalStrip');
+function renderSignal(pct){
+  signalStrip.innerHTML = '';
+  const blocks = 30;
+  const onCount = Math.round(pct * blocks);
+  for(let i=0;i<blocks;i++){
+    const d = document.createElement('div');
+    const isGood = i < onCount;
+    d.style.background = isGood ? 'rgba(5,150,105,.7)' : 'rgba(220,38,38,.7)';
+    signalStrip.appendChild(d);
+  }
+}
+
+function renderDailyWeekly(){
+  const diarioFiltrado = diarioDoMesAtual();
+
+  if(dailyChart) dailyChart.destroy();
+  dailyChart = new Chart(document.getElementById('dailyChart'), {
+    data:{
+      labels: diarioFiltrado.map(d=>d.data),
+      datasets:[
+        {
+          type:'bar', label:'Dentro', data: diarioFiltrado.map(d=>d.dentro),
+          backgroundColor:'rgba(107,117,144,.6)', borderRadius:4, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: diarioFiltrado.map(d=>d.fora),
+          backgroundColor: cor.bad, borderRadius:4, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: diarioFiltrado.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius:3, yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
+        },
+      ]
+    },
+    plugins:[ChartDataLabels],
+    options:{ responsive:true,
+      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:true } },
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+
+  if(weeklyChart) weeklyChart.destroy();
+  weeklyChart = new Chart(document.getElementById('weeklyChart'), {
+    data:{
+      labels: SEMANAL.map(d=>d.semana),
+      datasets:[
+        {
+          type:'bar', label:'Dentro', data: SEMANAL.map(d=>d.dentro),
+          backgroundColor:'rgba(107,117,144,.6)', borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: SEMANAL.map(d=>d.fora),
+          backgroundColor: cor.bad, borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: SEMANAL.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius:4, yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
+        },
+        {
+          type:'line', label:'Meta 85%', data: SEMANAL.map(()=>85),
+          borderColor:'#a78bfa', borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1,
+          datalabels:{ display:false }
+        },
+      ]
+    },
+    plugins:[ChartDataLabels],
+    options:{ responsive:true,
+      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:true } },
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function render(){
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.classList.toggle('active', Number(c.dataset.idx) === mesAtualIdx);
+  });
+
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const t = totais(mesObj);
+  renderSignal(t.pct);
+
+  const prevIdx = mesAtualIdx - 1;
+  const prevPct = prevIdx >= 0 ? totais(DADOS.meses[prevIdx]).pct : null;
+  const deltaPP = prevPct !== null ? (t.pct - prevPct) * 100 : null;
+
+  const diarioMesAtual = diarioDoMesAtual();
+  const diasComDado = diarioMesAtual.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  let diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  // Se o mês selecionado é o mês corrente (real, do sistema), o dia de hoje
+  // que porventura já entrou na base é sempre parcial (o dia ainda não
+  // fechou) e não pode contar como "corrido". Nesse caso, força D-1: os
+  // dias corridos vão até ontem, não até hoje. Meses já fechados (passados)
+  // continuam usando o último dia presente na base normalmente.
+  const nomeMesSelecionado = mesObj.mes.split('/')[0];
+  const anoCurtoSelecionado = mesObj.mes.split('/')[1];
+  const hoje = new Date();
+  const ehMesAtual =
+    NOME_MES[nomeMesSelecionado] === String(hoje.getMonth() + 1).padStart(2, '0') &&
+    Number(anoCurtoSelecionado) === (hoje.getFullYear() % 100);
+  if (ehMesAtual) {
+    diasCorridos = Math.min(diasCorridos, hoje.getDate() - 1);
+  }
+  const diasRestantes = Math.max(0, diasNoMesSelecionado() - diasCorridos);
+  const mttrTexto = formatarMttr(mttrMedioDoMes(mesObj));
+
+  const kpiRow = document.getElementById('kpiRow');
+  kpiRow.innerHTML = `
+    <div class="kpi"><div class="label">Total Indisponibilidade</div><div class="value">${t.total.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">Dentro do Prazo</div><div class="value" style="color:${cor.good}">${t.dentro.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi">
+      <div class="label">Fora do Prazo</div>
+      <div class="value" style="display:flex; gap:10px; align-items:baseline; justify-content:center;">
+        <span style="color:${cor.bad}">${t.fora.toLocaleString('pt-BR')}</span>
+        <span style="color:${cor.line};">|</span>
+        <span style="font-size:16px; color:${cor.muted};">MTTR <span class="mono" style="color:${cor.text}; font-size:16px; font-weight:600;">${mttrTexto}</span></span>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="label">Dias do Mês (D-1)</div>
+      <div class="value" style="display:flex; gap:10px; justify-content:center; align-items:baseline;">
+        <span>${diasCorridos}<span style="font-family:'Inter',sans-serif; font-size:10px; font-weight:600; color:${cor.muted}; text-transform:uppercase; margin-left:4px;">corridos</span></span>
+        <span style="color:${cor.muted};">/</span>
+        <span>${diasRestantes}<span style="font-family:'Inter',sans-serif; font-size:10px; font-weight:600; color:${cor.muted}; text-transform:uppercase; margin-left:4px;">restantes</span></span>
+      </div>
+    </div>
+    <div class="kpi"><div class="label">% Atendimento</div><div class="value" style="color:${statusColor(t.pct)}">${(t.pct*100).toFixed(1)}%</div>
+      ${deltaPP!==null ? `<div class="delta ${deltaPP>=0?'up':'down'}">${deltaPP>=0?'▲ +':'▼ '}${deltaPP.toFixed(1)} p.p. vs mês anterior</div>` : ''}
+    </div>
+  `;
+
+  const areasFiltradas = areasValidas(mesObj.areas);
+  const areaNames = Object.keys(areasFiltradas);
+  const dentroArr = areaNames.map(a=>areasFiltradas[a].dentro);
+  const foraArr = areaNames.map(a=>areasFiltradas[a].fora);
+  const pctPorArea = areaNames.map(a=>{
+    const d = areasFiltradas[a];
+    const totalArea = d.dentro + d.fora;
+    return totalArea ? (d.dentro/totalArea*100) : 0;
+  });
+
+  if(areaChart) areaChart.destroy();
+  areaChart = new Chart(document.getElementById('areaChart'), {
+    data:{ labels: areaNames, datasets:[
+      {
+        type:'bar', label:'Dentro do prazo', data:dentroArr,
+        backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2, yAxisID:'y',
+        datalabels:{
+          color: cor.text, anchor:'end', align:'top',
+          font:{ size:10, family:'JetBrains Mono', weight:'600' }
+        }
+      },
+      {
+        type:'bar', label:'Fora do prazo', data:foraArr,
+        backgroundColor: cor.bad, borderRadius:5, order:2, yAxisID:'y',
+        datalabels:{
+          color: cor.text, anchor:'end', align:'top',
+          font:{ size:10, family:'JetBrains Mono', weight:'600' }
+        }
+      },
+      {
+        type:'line', label:'% Dentro do prazo', data:pctPorArea,
+        borderColor: cor.warn, backgroundColor: cor.warn,
+        tension:.3, pointRadius:4, pointBackgroundColor: cor.warn,
+        yAxisID:'y1', order:1,
+        datalabels:{
+          color: cor.warn, align:'top', offset:8,
+          font:{ size:10, family:'JetBrains Mono', weight:'600' },
+          formatter: v => v.toFixed(0) + '%'
+        }
+      },
+    ]},
+    plugins:[ChartDataLabels],
+    options:{
+      responsive:true,
+      layout:{ padding:{ top:16 } },
+      plugins:{
+        legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } },
+        datalabels:{ display:true }
+      },
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+
+  const pct = t.pct;
+  if(gaugeChart) gaugeChart.destroy();
+  // Zonas fixas do mostrador: Ruim (vermelho) até meta-5pp, Regular (laranja) até a meta,
+  // Ótimo (verde) da meta até 100% — mesmos limites usados em statusColor()/nas pills das tabelas.
+  const zonaRuim = Math.max(0, DADOS.meta - 0.05);
+  const zonaRegular = 0.05;
+  const zonaOtimo = Math.max(0, 1 - DADOS.meta);
+  gaugeChart = new Chart(document.getElementById('gaugeChart'), {
+    type:'doughnut',
+    data:{ datasets:[{ data:[zonaRuim, zonaRegular, zonaOtimo], backgroundColor:[cor.bad, cor.warn, cor.good], borderWidth:0 }] },
+    options:{
+      rotation:-90, circumference:180, cutout:'75%',
+      plugins:{ tooltip:{enabled:false}, legend:{display:false}, datalabels:{display:false} }
+    },
+    plugins:[{
+      id:'gaugeNeedle',
+      afterDatasetsDraw(chart){
+        const arc = chart.getDatasetMeta(0).data[0];
+        if(!arc) return;
+        const { x, y, outerRadius, innerRadius, startAngle } = arc;
+        const angle = startAngle + pct * Math.PI; // varredura total do gauge = 180° (Math.PI rad)
+        const raio = (outerRadius + innerRadius) / 2;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(-raio * 0.18, 0);
+        ctx.lineTo(raio * 0.92, 0);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#1b2440';
+        ctx.stroke();
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#1b2440';
+        ctx.fill();
+      }
+    }]
+  });
+  document.getElementById('gaugeTitulo').textContent = '% Atendimento no prazo (SLA ' + slaAtivo + ')';
+  document.getElementById('gaugeValue').textContent = (pct*100).toFixed(1) + '%';
+  document.getElementById('gaugeValue').style.color = statusColor(pct);
+  const diffPP = (pct - DADOS.meta)*100;
+  document.getElementById('gaugeDiff').textContent = `Meta 85% · ${diffPP>=0?'+':''}${diffPP.toFixed(1)} p.p.`;
+
+  // Visão mensal: barras Dentro/Fora (cinza/vermelho) + linha de % dentro
+  // do prazo mostrando a tendência de um mês pro outro + linha de Meta.
+  const monthlyLabels = DADOS.meses.map(m=>m.mes);
+  const monthlyDentro = DADOS.meses.map(m=>totais(m).dentro);
+  const monthlyFora = DADOS.meses.map(m=>totais(m).fora);
+  const monthlyPct = DADOS.meses.map(m=>totais(m).pct*100);
+  const monthlyMeta = DADOS.meses.map(()=>DADOS.meta*100);
+
+  if(monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+    data:{
+      labels: monthlyLabels,
+      datasets:[
+        {
+          type:'bar', label:'Dentro', data: monthlyDentro,
+          backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: monthlyFora,
+          backgroundColor: cor.bad, borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: monthlyPct,
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius:4, yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(1)+'%' }
+        },
+        {
+          type:'line', label:'Meta 85%', data: monthlyMeta,
+          borderColor: '#000000', borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1,
+          datalabels:{ display:false }
+        },
+      ]
+    },
+    plugins:[ChartDataLabels],
+    options:{ responsive:true,
+      plugins:{
+        legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } },
+        datalabels:{ display:true }
+      },
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+
+  // ---- Total de sites únicos com incidente de indisponibilidade — mês selecionado ----
+  const totalSitesValueEl = document.getElementById('totalSitesValue');
+  if(totalSitesValueEl){
+    const totalSitesUnicos = typeof mesObj.totalSitesUnicos === 'number'
+      ? mesObj.totalSitesUnicos
+      : (Array.isArray(mesObj.topSites) ? mesObj.topSites.length : 0);
+    totalSitesValueEl.textContent = totalSitesUnicos.toLocaleString('pt-BR');
+  }
+
+  // ---- Top 15 Sites (SITE_CI) com mais incidentes — mês selecionado ----
+  const topSitesCanvas = document.getElementById('topSitesChart');
+  if(topSitesCanvas){
+    const topSites = Array.isArray(mesObj.topSites) ? mesObj.topSites : [];
+    const alturaPorBarra = 24;
+    const alturaMinima = 260;
+    const wrap = document.getElementById('topSitesChartWrap');
+    if(wrap) wrap.style.height = Math.max(alturaMinima, topSites.length * alturaPorBarra) + 'px';
+
+    if(topSitesChart) topSitesChart.destroy();
+    topSitesChart = new Chart(topSitesCanvas, {
+      type: 'bar',
+      data: {
+        labels: topSites.map(s => s.site),
+        datasets: [{
+          label: 'Incidentes', data: topSites.map(s => s.total),
+          backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Tier 2 / Tier 3 / Resolução (Top 10) — mês selecionado ----
+  // Vêm de mesObj.genericTier2Top10, mesObj.genericTier3Top10 e
+  // mesObj.resolucaoTop10 (gerados pelo Office Script por mês, igual o
+  // topSites): [{ nome: 'FALHA ENERGIA', total: 504 }, ...], vindos de
+  // GENERIC_CATEGORIZATION_TIER_2, GENERIC_CATEGORIZATION_TIER_3 e
+  // RESOLUTION_CATEGORY_TIER_1 na base de origem — cada um separado,
+  // sem fallback entre colunas.
+  function renderTopBarChart(canvasId, chartAtual, dados, paletaCores){
+    const canvasEl = document.getElementById(canvasId);
+    if(!canvasEl) return chartAtual;
+    const itens = Array.isArray(dados) ? dados.slice(0, 10) : [];
+    if(chartAtual) chartAtual.destroy();
+    return new Chart(canvasEl, {
+      type: 'bar',
+      data: {
+        labels: itens.map(i => i.nome),
+        datasets: [{
+          label: 'Ocorrências',
+          data: itens.map(i => i.total),
+          backgroundColor: itens.map((_, idx) => paletaCores[idx % paletaCores.length]),
+          borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted, font:{size:9}, maxRotation:60, minRotation:60}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  const paletaTier2 = ['#dc2626','#0e7c86','#d97706','#7f1d1d','#9ca3af','#fca5a5','#6ee7b7','#a8a29e','#a8a29e','#7f1d1d'];
+  const paletaTier3 = ['#2563eb','#5e34b5','#0e7490','#7c3aed','#94a3b8','#93c5fd','#a5b4fc','#94a3b8','#94a3b8','#7c3aed'];
+  const paletaResolucao = ['#f59e0b'];
+  genericTier2Chart = renderTopBarChart('genericTier2Chart', genericTier2Chart, mesObj.genericTier2Top10, paletaTier2);
+  genericTier3Chart = renderTopBarChart('genericTier3Chart', genericTier3Chart, mesObj.genericTier3Top10, paletaTier3);
+  resolucaoChart = renderTopBarChart('resolucaoChart', resolucaoChart, mesObj.resolucaoTop10, paletaResolucao);
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = areaNames.map(a=>{
+    const d = mesObj.areas[a];
+    const total = d.dentro + d.fora;
+    const p = d.dentro/total;
+    const cls = p>=DADOS.meta ? 'good' : (p>=DADOS.meta-0.05 ? 'warn' : 'bad');
+    return `<tr>
+      <td>${a}</td>
+      <td class="num">${total}</td>
+      <td class="num">${d.dentro}</td>
+      <td class="num">${d.fora}</td>
+      <td class="num"><span class="pill ${cls}">${(p*100).toFixed(1)}%</span></td>
+    </tr>`;
+  }).join('');
+
+  renderDailyWeekly();
+
+  renderPendenciasFca();
+}
+
+const FORMS_BASE_URL = 'https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=ihNOxfV5lEKqm7AEz41_9z2zZl5tQQRLpF5gH_pjKXBUNkZWM0REVzVIQ0w0VTA3SExKQlRHWkJHSC4u';
+
+function montarLinkForms(p){
+  const params = [
+    ['rd4af75b8855c4a468cac043c40f222ea', '%22Reclassifica%C3%A7%C3%A3o%22'],
+    ['rd70c550b6fc24c109aafe1ff8e97cc4d', encodeURIComponent(p.supervisor || '')],
+    ['r127daf30934e49e3a3b4d4713c1f5baa', encodeURIComponent(p.incidente || '')],
+    ['r8831081a06f742ffb01171c464ac2d90', encodeURIComponent(p.site || '')],
+    ['r8833ecb62ffe44d1b758d6fc09bdab3f', encodeURIComponent(p.clear || '')],
+    ['r04f7ca84c88d453f87de59e6ee186715', encodeURIComponent(p.resolved || '')],
+    ['rf640f293e2c14ec0bf1525bc18d9091e', encodeURIComponent(p.reported || '')],
+    ['r135a04b2690b4d1f9188fd657b0e0027', encodeURIComponent(p.submit || '')],
+  ];
+  return FORMS_BASE_URL + params.map(([k,v]) => '&' + k + '=' + v).join('');
+}
+
+
+
+function renderPendenciasFca(){
+  const tbody = document.getElementById('pendenciasBody');
+  if(!tbody) return;
+  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const areasDoMes = Object.keys(areasValidas(mesObj.areas));
+  const nomeMes = mesObj.mes.split('/')[0];
+  const mm = NOME_MES[nomeMes];
+  const anoCurto = mesObj.mes.split('/')[1];
+  const mesOrdAtual = '20' + anoCurto + '-' + mm;
+  const todosDoMes = PENDENTES_FCA.filter(p => areasDoMes.indexOf(p.area) !== -1 && p.mesOrd === mesOrdAtual);
+  const pendentesDoMes = todosDoMes.filter(p => p.pendente);
+
+  const itensFiltrados = todosDoMes.filter(p => {
+    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return false;
+    if(statusFiltroAtual === 'pendente' && !p.pendente) return false;
+    if(statusFiltroAtual === 'preenchido' && p.pendente) return false;
+    return true;
+  });
+  const justificadosDoMes = itensFiltrados.filter(p => !p.pendente);
+
+  const badge = document.getElementById('fcaCountNav');
+  if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
+
+  // ---- Total x Fora do Prazo por Horário (mês atual) — compara SUBMIT_DATE x CLEAR_DATE ----
+  // mesObj.horasSubmit / horasClear vêm do Office Script: array de 24
+  // posições ({hora, total, fora}) já considerando o SLA ativo (4h/6h).
+  function renderHoraForaChart(canvasId, statsArray, chartAtual){
+    const canvasEl = document.getElementById(canvasId);
+    if(!canvasEl) return chartAtual;
+    const stats = (Array.isArray(statsArray) && statsArray.length === 24)
+      ? statsArray
+      : Array.from({length:24}, (_, h) => ({ hora: String(h).padStart(2,'0'), total: 0, fora: 0 }));
+
+    const horaLabels = stats.map(s => s.hora + 'h');
+    const totalArr = stats.map(s => s.total);
+    const foraArr = stats.map(s => s.fora);
+
+    if(chartAtual) chartAtual.destroy();
+    const novoChart = new Chart(canvasEl, {
+      type: 'bar',
+      data: {
+        labels: horaLabels,
+        datasets: [
+          {
+            label: 'Total de incidentes', data: totalArr,
+            backgroundColor: 'rgba(107,117,144,.35)', borderRadius: 4,
+            datalabels: { display:false }
+          },
+          {
+            label: 'Fora do prazo', data: foraArr,
+            backgroundColor: cor.bad, borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v > 0 ? v : '' }
+          }
+        ]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: cor.muted, font:{family:'Inter', size:10} } },
+          datalabels: { display:true },
+          tooltip: {
+            callbacks: {
+              title: (items) => 'Horário ' + items[0].label,
+              afterBody: (items) => {
+                const idx = items[0].dataIndex;
+                const total = totalArr[idx];
+                const fora = foraArr[idx];
+                const pct = total > 0 ? (fora/total*100).toFixed(0) : 0;
+                return total > 0 ? [fora + ' de ' + total + ' fora do prazo (' + pct + '%)'] : [];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+    return novoChart;
+  }
+
+  horaForaSubmitChart = renderHoraForaChart('horaForaSubmitChart', mesObj.horasSubmit, horaForaSubmitChart);
+  horaForaClearChart = renderHoraForaChart('horaForaClearChart', mesObj.horasClear, horaForaClearChart);
+
+  // ---- Resumo por Supervisor (mês atual, sem aplicar os filtros de Supervisor/Status da tela) ----
+  const resumoSupervisorBody = document.getElementById('resumoSupervisorBody');
+  if(resumoSupervisorBody){
+    const porSupervisorResumo = {};
+    todosDoMes.forEach(p => {
+      const k = norm(p.supervisor) || 'Sem supervisor';
+      if(!porSupervisorResumo[k]) porSupervisorResumo[k] = { total: 0, preenchido: 0 };
+      porSupervisorResumo[k].total++;
+      if(!p.pendente) porSupervisorResumo[k].preenchido++;
+    });
+    const supervisoresResumo = Object.keys(porSupervisorResumo).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(supervisoresResumo.length === 0){
+      resumoSupervisorBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:${cor.muted};">Nenhum incidente fora do prazo neste mês</td></tr>`;
+    } else {
+      resumoSupervisorBody.innerHTML = supervisoresResumo.map(k => {
+        const r = porSupervisorResumo[k];
+        const pct = r.total > 0 ? (r.preenchido / r.total * 100) : 0;
+        const cls = pct >= 85 ? 'good' : (pct >= 60 ? 'warn' : 'bad');
+        return `<tr>
+          <td>${k}</td>
+          <td class="num">${r.total}</td>
+          <td class="num">${r.preenchido}</td>
+          <td class="num"><span class="pill ${cls}">${pct.toFixed(1)}%</span></td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  const total = itensFiltrados.length;
+  const qtdJustificado = justificadosDoMes.length;
+  const pctJustificado = total > 0 ? (qtdJustificado / total * 100) : 0;
+  const kpiRow = document.getElementById('fcaKpiRow');
+  if(kpiRow){
+    kpiRow.innerHTML = `
+      <div class="kpi"><div class="label">Total Fora do Prazo</div><div class="value">${total.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi"><div class="label">Qtd Justificado</div><div class="value" style="color:${cor.accent}">${qtdJustificado.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi"><div class="label">% Justificado</div><div class="value" style="color:${statusColor(pctJustificado/100)}">${pctJustificado.toFixed(1)}%</div></div>
+    `;
+  }
+
+  const causaCounts = {};
+  justificadosDoMes.forEach(p => {
+    const c = p.causa || 'Não informado';
+    causaCounts[c] = (causaCounts[c] || 0) + 1;
+  });
+  const causaEntries = Object.entries(causaCounts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+
+  if(causaChart) causaChart.destroy();
+  const causaCanvas = document.getElementById('causaChart');
+  if(causaCanvas){
+    causaChart = new Chart(causaCanvas, {
+      type: 'bar',
+      data: {
+        labels: causaEntries.map(e => e[0]),
+        datasets: [{
+          label: 'Ocorrências', data: causaEntries.map(e => e[1]),
+          backgroundColor: 'rgba(94,52,181,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  const acaoCounts = {};
+  justificadosDoMes.forEach(p => {
+    const a = p.acao || 'Não informado';
+    acaoCounts[a] = (acaoCounts[a] || 0) + 1;
+  });
+  const acaoEntries = Object.entries(acaoCounts).sort((a,b) => b[1]-a[1]);
+
+  if(acaoChart) acaoChart.destroy();
+  const acaoCanvas = document.getElementById('acaoChart');
+  if(acaoCanvas){
+    acaoChart = new Chart(acaoCanvas, {
+      type: 'bar',
+      data: {
+        labels: acaoEntries.map(e => e[0]),
+        datasets: [{
+          label: 'Ocorrências', data: acaoEntries.map(e => e[1]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 5,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:11, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  const selectSupervisor = document.getElementById('supervisorFiltro');
+  if(selectSupervisor && mesPopuladoFiltro !== mesAtualIdx){
+    const supervisores = Array.from(new Set(todosDoMes.map(p => norm(p.supervisor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(supervisorFiltroAtual && supervisores.indexOf(supervisorFiltroAtual) === -1){
+      supervisorFiltroAtual = '';
+    }
+    selectSupervisor.innerHTML = '<option value="">Todos</option>' +
+      supervisores.map(s => `<option value="${s}">${s}</option>`).join('');
+    selectSupervisor.value = supervisorFiltroAtual;
+    const selectStatus = document.getElementById('statusFiltro');
+    if(selectStatus) selectStatus.value = statusFiltroAtual;
+    mesPopuladoFiltro = mesAtualIdx;
+  }
+
+  if(itensFiltrados.length === 0){
+    const msg = (supervisorFiltroAtual || statusFiltroAtual)
+      ? 'Nenhum incidente para os filtros selecionados neste mês.'
+      : 'Nenhum incidente fora do prazo neste mês 🎉';
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:${cor.muted};">${msg}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = itensFiltrados.map(p => {
+    const statusPill = p.pendente
+      ? `<span class="pill bad">A preencher</span>`
+      : `<span class="pill good">Preenchido</span>`;
+    const ultimaCol = p.pendente
+      ? `<a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">Preencher</a>`
+      : '-';
+    return `<tr>
+    <td>${p.supervisor || '-'}</td>
+    <td>${p.area || '-'}</td>
+    <td>${p.site || '-'}</td>
+    <td>${p.incidente || '-'}</td>
+    <td>${statusPill}</td>
+    <td>${p.causa || '-'}</td>
+    <td>${p.acao || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.submit || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.clear || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.resolved || '-'}</td>
+    <td>${ultimaCol}</td>
+  </tr>`;
+  }).join('');
+}
+
+renderPendenciasFcaRef = renderPendenciasFca;
+
+render();
+
+} // fim montarPagina
+
+carregarDados();
+</script>
+</body>
+</html>
