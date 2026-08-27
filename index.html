@@ -1216,7 +1216,21 @@ function render(){
 
   const diarioMesAtual = diarioDoMesAtual();
   const diasComDado = diarioMesAtual.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
-  const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  let diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  // Se o mês selecionado é o mês corrente (real, do sistema), o dia de hoje
+  // que porventura já entrou na base é sempre parcial (o dia ainda não
+  // fechou) e não pode contar como "corrido". Nesse caso, força D-1: os
+  // dias corridos vão até ontem, não até hoje. Meses já fechados (passados)
+  // continuam usando o último dia presente na base normalmente.
+  const nomeMesSelecionado = mesObj.mes.split('/')[0];
+  const anoCurtoSelecionado = mesObj.mes.split('/')[1];
+  const hoje = new Date();
+  const ehMesAtual =
+    NOME_MES[nomeMesSelecionado] === String(hoje.getMonth() + 1).padStart(2, '0') &&
+    Number(anoCurtoSelecionado) === (hoje.getFullYear() % 100);
+  if (ehMesAtual) {
+    diasCorridos = Math.min(diasCorridos, hoje.getDate() - 1);
+  }
   const diasRestantes = Math.max(0, diasNoMesSelecionado() - diasCorridos);
   const mttrTexto = formatarMttr(mttrMedioDoMes(mesObj));
 
