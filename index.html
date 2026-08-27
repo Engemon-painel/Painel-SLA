@@ -767,16 +767,19 @@ function renderHeadcount(){
 
   const unbGrid = document.getElementById('unbGrid');
   if(unbGrid){
-    // Agrupa por Unidade de Negócio (c.unidadeNegocio). O coordenador exibido é o
-    // supervisor mais frequente entre os colaboradores ativos daquela unidade.
+    // Agrupa por Unidade de Negócio (c.unidadeNegocio). O coordenador exibido
+    // vem direto da coluna Coordenador (c.coordenador) — usa o valor mais
+    // frequente entre os colaboradores ativos daquela unidade (normalmente
+    // é o mesmo pra todos os da unidade, mas caso haja divergência de
+    // preenchimento na planilha, prevalece o mais comum).
     const porUnidade = {};
     ativos.forEach(c => {
       const k = normHc(c.unidadeNegocio);
       if(!k) return;
-      if(!porUnidade[k]) porUnidade[k] = { total: 0, supervisores: {} };
+      if(!porUnidade[k]) porUnidade[k] = { total: 0, coordenadores: {} };
       porUnidade[k].total++;
-      const sup = normHc(c.supervisor) || 'Sem coordenador';
-      porUnidade[k].supervisores[sup] = (porUnidade[k].supervisores[sup] || 0) + 1;
+      const coordVal = normHc(c.coordenador) || 'Sem coordenador';
+      porUnidade[k].coordenadores[coordVal] = (porUnidade[k].coordenadores[coordVal] || 0) + 1;
     });
 
     function iconeUnidade(nomeUnidade){
@@ -792,7 +795,7 @@ function renderHeadcount(){
     const unidadesOrdenadas = Object.keys(porUnidade).sort((a,b)=> porUnidade[b].total - porUnidade[a].total);
     unbGrid.innerHTML = unidadesOrdenadas.map(nomeUnidade => {
       const info = porUnidade[nomeUnidade];
-      const coordEntries = Object.entries(info.supervisores).sort((a,b)=> b[1]-a[1]);
+      const coordEntries = Object.entries(info.coordenadores).sort((a,b)=> b[1]-a[1]);
       const coord = coordEntries.length ? coordEntries[0][0] : 'Sem coordenador';
       const { icone, bg } = iconeUnidade(nomeUnidade);
       return `<div class="unb-card">
