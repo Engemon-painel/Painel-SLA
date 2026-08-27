@@ -152,6 +152,20 @@
   .link-base.link-alt:hover{ background:#4a2891; border-color:#4a2891; }
 
   footer{ margin-top:30px; color:var(--muted); font-size:11px; text-align:center; font-family:'JetBrains Mono', monospace; }
+
+  .unb-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap:14px; }
+  .unb-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px;
+    display:flex; gap:12px; align-items:flex-start;
+    box-shadow: 0 2px 8px rgba(27,36,64,.06);
+  }
+  .unb-icon{
+    width:40px; height:40px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:18px;
+  }
+  .unb-title{ font-weight:700; font-size:12.5px; text-transform:uppercase; letter-spacing:.02em; line-height:1.3; }
+  .unb-coord{ font-size:11.5px; color: var(--accent); margin-top:3px; font-weight:600; }
+  .unb-value{ font-family:'JetBrains Mono', monospace; font-size:26px; font-weight:700; color:var(--accent); margin-top:6px; }
 </style>
 </head>
 <body>
@@ -249,11 +263,24 @@
     </div>
 
     <div class="pagina" id="pagina-site" style="display:none;">
-      <div class="panel">
+      <div class="panel" style="margin-bottom:16px;">
         <h2>Top 15 Sites</h2>
         <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
         <div id="topSitesChartWrap" style="position:relative; height:460px;">
           <canvas id="topSitesChart"></canvas>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Tier 2 (Top 10)</h2>
+          <div class="hint">Motivos mais frequentes (CATEGORIZATION_TIER_3 / GENERIC_CATEGORIZATION_TIER_3) · total geral.</div>
+          <canvas id="tier2Chart" height="200"></canvas>
+        </div>
+        <div class="panel">
+          <h2>Resolução (Top 10)</h2>
+          <div class="hint">Ações de resolução mais frequentes (GENERIC_CATEGORIZATION_TIER_2) · total geral.</div>
+          <canvas id="resolucaoChart" height="200"></canvas>
         </div>
       </div>
     </div>
@@ -350,6 +377,12 @@
           <div class="kpi-row" id="departamentosRow"></div>
         </div>
 
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Por Unidade de Negócio</h2>
+          <div class="hint">Colaboradores ativos por Unidade de Negócio, com o coordenador responsável.</div>
+          <div class="unb-grid" id="unbGrid"></div>
+        </div>
+
         <div class="grid">
           <div class="panel">
             <h2>Admitidos x Demitidos</h2>
@@ -387,6 +420,8 @@ let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
 let COLABORADORES = [];
+let TIER2_TOP10 = [];
+let RESOLUCAO_TOP10 = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
@@ -468,6 +503,8 @@ async function carregarDados(){
     DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
     PENDENTES_FCA = data.pendentesFca || [];
     COLABORADORES = data.colaboradores || [];
+    TIER2_TOP10 = data.tier2Top10 || [];
+    RESOLUCAO_TOP10 = data.resolucaoTop10 || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
@@ -628,7 +665,7 @@ function renderDiasRow(diarioFiltrado){
 let hcContratoPopulado = false;
 let hcStatusPopulado = false;
 let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
-let areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart;
+let areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, tier2Chart, resolucaoChart;
 const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
@@ -723,6 +760,47 @@ function renderHeadcount(){
       return `<div class="kpi" style="background:${c.bg}; border-color:${c.border};">
         <div class="label" style="color:${c.text};">${k}</div>
         <div class="value" style="color:${c.text};">${porArea[k]}</div>
+      </div>`;
+    }).join('');
+  }
+
+  const unbGrid = document.getElementById('unbGrid');
+  if(unbGrid){
+    // Agrupa por Unidade de Negócio (c.unidadeNegocio). O coordenador exibido é o
+    // supervisor mais frequente entre os colaboradores ativos daquela unidade.
+    const porUnidade = {};
+    ativos.forEach(c => {
+      const k = normHc(c.unidadeNegocio);
+      if(!k) return;
+      if(!porUnidade[k]) porUnidade[k] = { total: 0, supervisores: {} };
+      porUnidade[k].total++;
+      const sup = normHc(c.supervisor) || 'Sem coordenador';
+      porUnidade[k].supervisores[sup] = (porUnidade[k].supervisores[sup] || 0) + 1;
+    });
+
+    function iconeUnidade(nomeUnidade){
+      const n = semAcentoHc(nomeUnidade);
+      if(n.includes('diamante') && n.includes('resident')) return { icone:'💎', bg:'#dbeafe' };
+      if(n.includes('diamante') && n.includes('corretiv')) return { icone:'🔥', bg:'#fee2e2' };
+      if(n.includes('diamante') && n.includes('preventiv')) return { icone:'⚙️', bg:'#e5e7eb' };
+      if((n.includes('movel') || n.includes('móvel')) && n.includes('corretiv')) return { icone:'⚡', bg:'#fef3c7' };
+      if((n.includes('movel') || n.includes('móvel')) && n.includes('preventiv')) return { icone:'🔧', bg:'#e5e7eb' };
+      return { icone:'⭐', bg:'#fef9c3' };
+    }
+
+    const unidadesOrdenadas = Object.keys(porUnidade).sort((a,b)=> porUnidade[b].total - porUnidade[a].total);
+    unbGrid.innerHTML = unidadesOrdenadas.map(nomeUnidade => {
+      const info = porUnidade[nomeUnidade];
+      const coordEntries = Object.entries(info.supervisores).sort((a,b)=> b[1]-a[1]);
+      const coord = coordEntries.length ? coordEntries[0][0] : 'Sem coordenador';
+      const { icone, bg } = iconeUnidade(nomeUnidade);
+      return `<div class="unb-card">
+        <div class="unb-icon" style="background:${bg};">${icone}</div>
+        <div>
+          <div class="unb-title">${nomeUnidade}</div>
+          <div class="unb-coord">Coord: ${coord}</div>
+          <div class="unb-value">${info.total}</div>
+        </div>
       </div>`;
     }).join('');
   }
@@ -1350,6 +1428,45 @@ function render(){
       }
     });
   }
+
+  // ---- Tier 2 (Top 10) e Resolução (Top 10) — total geral (não filtrado por mês) ----
+  // Vêm de TIER2_TOP10 e RESOLUCAO_TOP10, carregados direto da raiz do dados.json:
+  // [{ nome: 'FALHA ENERGIA', total: 504 }, ...], já ordenados e limitados a 10,
+  // vindos de CATEGORIZATION_TIER_3/GENERIC_CATEGORIZATION_TIER_3 (Tier 2) e
+  // GENERIC_CATEGORIZATION_TIER_2 (Resolução) na base de origem.
+  function renderTopBarChart(canvasId, chartAtual, dados, paletaCores){
+    const canvasEl = document.getElementById(canvasId);
+    if(!canvasEl) return chartAtual;
+    const itens = Array.isArray(dados) ? dados.slice(0, 10) : [];
+    if(chartAtual) chartAtual.destroy();
+    return new Chart(canvasEl, {
+      type: 'bar',
+      data: {
+        labels: itens.map(i => i.nome),
+        datasets: [{
+          label: 'Ocorrências',
+          data: itens.map(i => i.total),
+          backgroundColor: itens.map((_, idx) => paletaCores[idx % paletaCores.length]),
+          borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted, font:{size:9}, maxRotation:60, minRotation:60}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  const paletaTier2 = ['#dc2626','#0e7c86','#d97706','#7f1d1d','#9ca3af','#fca5a5','#6ee7b7','#a8a29e','#a8a29e','#7f1d1d'];
+  const paletaResolucao = ['#f59e0b'];
+  tier2Chart = renderTopBarChart('tier2Chart', tier2Chart, TIER2_TOP10, paletaTier2);
+  resolucaoChart = renderTopBarChart('resolucaoChart', resolucaoChart, RESOLUCAO_TOP10, paletaResolucao);
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = areaNames.map(a=>{
