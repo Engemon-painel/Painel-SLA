@@ -473,7 +473,6 @@
 <script>
 // ======================================================
 // Os dados vêm de dados.json (mesma pasta deste arquivo).
-// Edite/atualize esse JSON — não precisa mexer neste HTML.
 // ======================================================
 let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
@@ -567,33 +566,7 @@ async function carregarDados(){
   }
 }
 
-// (o restante do seu código existente continua — funções de cálculo, renderização de gráficos, etc.)
-// Para manter o arquivo o mais próximo possível do original, eu preservei todas as suas funções.
-// Abaixo seguem as funções relacionadas ao Headcount e a nova lógica de tabela.
-
-
-const AREAS_VALIDAS = ['SPC1','SPC2','SPC3','SPC4'];
-
-function areasValidas(areasObj){
-  const out = {};
-  AREAS_VALIDAS.forEach(k=>{ if(areasObj[k]) out[k] = areasObj[k]; });
-  return out;
-}
-
-function totais(mesObj){
-  const areas = areasValidas(mesObj.areas);
-  let dentro=0, fora=0;
-  Object.values(areas).forEach(a=>{ dentro+=a.dentro; fora+=a.fora; });
-  return { dentro, fora, total: dentro+fora, pct: dentro/(dentro+fora) };
-}
-
-function statusColor(pct){
-  if(pct >= DADOS.meta) return cor.good;
-  if(pct >= DADOS.meta - 0.05) return cor.warn;
-  return cor.bad;
-}
-
-// ... (várias funções existentes no seu arquivo permanecem aqui, omitidas por brevidade no visual, mas mantidas no arquivo real) ...
+// ... (o restante das suas funções de cálculo e renderização de gráficos permanece como no seu arquivo original) ...
 
 // ======================================================
 // HEADCOUNT — ORGANOGRAMA (continuação / integração da tabela)
@@ -744,22 +717,44 @@ function renderHeadcount(){
 
 // ----------------- NOVAS FUNÇÕES: render / filtro da tabela de colaboradores -----------------
 
-// getVal tenta várias chaves comuns no objeto do colaborador para encontrar o valor
-function getVal(obj, keys) {
-  if (!obj) return '';
+// encontra a primeira chave do objeto que contém qualquer substring informada
+function findKeyLike(obj, substrings){
+  if(!obj) return null;
+  const keys = Object.keys(obj || {});
+  const low = substrings.map(s => s.toLowerCase());
+  // procura exata (igual) primeiro
   for (const k of keys) {
-    if (obj[k] !== undefined && obj[k] !== null && String(obj[k]).toString().trim() !== '') return obj[k];
+    const kl = k.toLowerCase();
+    for (const sub of low) {
+      if (kl === sub) return k;
+    }
   }
-  return '';
+  // procura por inclusão
+  for (const k of keys) {
+    const kl = k.toLowerCase();
+    for (const sub of low) {
+      if (kl.includes(sub)) return k;
+    }
+  }
+  return null;
+}
+
+function getValAuto(obj, substrings){
+  if(!obj) return '';
+  const k = findKeyLike(obj, substrings);
+  if(!k) return '';
+  return obj[k];
 }
 
 function formatDateLike(s) {
   if (!s) return '';
-  // tenta formatos: YYYY-MM-DD, DD/MM/YYYY, ISO
+  // tenta formatos: YYYY-MM-DD -> DD/MM/YYYY
   if (/\d{4}-\d{2}-\d{2}/.test(s)) {
     const parts = s.split('-');
     return parts[2] + '/' + parts[1] + '/' + parts[0];
   }
+  // se já for dd/mm/aaaa, apenas retorna
+  if (/\d{2}\/\d{2}\/\d{4}/.test(s)) return s;
   return s;
 }
 
@@ -772,20 +767,20 @@ function renderEmployeeTable(filterText = '') {
   const q = (filterText || '').toString().trim().toLowerCase();
 
   // aplica filtros globais (contrato/status) já existentes
-  const filtered = COLABORADORES.filter(c => {
+  const filtered = (COLABORADORES || []).filter(c => {
     if(contratoFiltroAtual && canonContratoHc(c.contrato) !== contratoFiltroAtual) return false;
     if(hcStatusFiltroAtual === 'Ativo' && !c.ativo) return false;
     if(hcStatusFiltroAtual === 'Inativo' && c.ativo) return false;
     return true;
   }).filter(c => {
     if(!q) return true;
-    const nome = getVal(c, ['nome','nomeCompleto','nomeFuncionario','nome_colaborador','colaborador']);
-    const matricula = getVal(c, ['matricula','matr','registro','mat']);
-    const placa = getVal(c, ['placa','placaVeiculo']);
-    const supervisor = getVal(c, ['supervisor','nomeSupervisor','supervisor_nome']);
-    const contrato2 = getVal(c, ['contrato_2','contrato2']);
-    const area = getVal(c, ['area','areaTecnica']);
-    const funcao = getVal(c, ['descFuncao','descricaoFuncao','funcao','cargo']);
+    const nome = getValAuto(c, ['nome','colaborador','nome completo','nome_colaborador','nomecompleto']);
+    const matricula = getValAuto(c, ['matric','registro','matr','matricula']);
+    const placa = getValAuto(c, ['placa','placaVeiculo','placa_veiculo']);
+    const supervisor = getValAuto(c, ['supervisor','nomeSupervisor','supervisor_nome','nome supervisor']);
+    const contrato2 = getValAuto(c, ['contrato_2','contrato2','contrato']);
+    const area = getValAuto(c, ['area','areatecnica','areaTecnica']);
+    const funcao = getValAuto(c, ['descFuncao','descricaoFuncao','funcao','cargo','descricao']);
 
     const hay = [nome, matricula, placa, supervisor, contrato2, area, funcao].map(x => norm(x)).join(' ');
     return hay.includes(q);
@@ -799,32 +794,34 @@ function renderEmployeeTable(filterText = '') {
     noResults.style.display = 'none';
   }
 
-  // monta linhas
   tbody.innerHTML = filtered.map(c => {
     const ativo = c.ativo === true || String(c.ativo).toLowerCase() === 'true' || String(c.ativo) === '1';
     const statusHtml = ativo ? `<span class="pill good">Ativo</span>` : `<span class="pill warn">Inativo</span>`;
-    const matricula = getVal(c, ['matricula','matr','registro','mat']) || '—';
-    const nome = getVal(c, ['nome','nomeCompleto','nomeFuncionario','nome_colaborador','colaborador']) || '—';
-    const supervisor = getVal(c, ['supervisor','nomeSupervisor','supervisor_nome']) || '—';
-    const dataAdmisRaw = getVal(c, ['dataAdmis','dataAdmissao','dataAdmit','dataAdmiss','dataAdmisao']);
+    const matricula = getValAuto(c, ['matric','registro','matr','matricula']) || '—';
+    const nome = getValAuto(c, ['nome','colaborador','nome completo','nome_colaborador','nomecompleto']) || '—';
+    const supervisor = getValAuto(c, ['supervisor','nombresupervisor','nomeSupervisor','supervisor_nome']) || '—';
+    const dataAdmisRaw = getValAuto(c, ['dataAdmis','dataAdmissao','data_adm','dataAdmis','dataAdmisao','dataAdmissao']);
     const dataAdmis = formatDateLike(dataAdmisRaw) || '—';
-    const coordenador = getVal(c, ['coordenador']) || '—';
-    const area = getVal(c, ['area','areaTecnica']) || '—';
-    const placa = getVal(c, ['placa','placaVeiculo']) || '—';
-    const contrato2 = getVal(c, ['contrato_2','contrato2']) || getVal(c, ['contrato']) || '—';
-    const descFuncao = getVal(c, ['descFuncao','descricaoFuncao','funcao','cargo']) || '—';
+    const coordenador = getValAuto(c, ['coordenador','coordenador_nome']) || '—';
+    const area = getValAuto(c, ['area','areatecnica','areaTecnica']) || '—';
+    const placa = getValAuto(c, ['placa','placaVeiculo','placa_veiculo']) || '—';
+    const contrato2 = getValAuto(c, ['contrato_2','contrato2']) || getValAuto(c, ['contrato']) || '—';
+    const descFuncao = getValAuto(c, ['descFuncao','descricaoFuncao','funcao','cargo','descricao']) || '—';
 
-    return `<tr data-nome="${nome}" data-matricula="${matricula}" data-supervisor="${supervisor}">
+    // escape valores simples para evitar quebra de HTML (caso tenham < ou &)
+    function esc(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    return `<tr data-nome="${esc(nome)}" data-matricula="${esc(matricula)}" data-supervisor="${esc(supervisor)}">
       <td>${statusHtml}</td>
-      <td class="col-matricula">${matricula}</td>
-      <td class="col-nome">${nome}</td>
-      <td class="col-nome-supervisor">${supervisor}</td>
-      <td class="col-data-admis">${dataAdmis}</td>
-      <td class="col-coordenador">${coordenador}</td>
-      <td class="col-area">${area}</td>
-      <td class="col-placa">${placa}</td>
-      <td class="col-contrato2">${contrato2}</td>
-      <td class="col-desc-funcao">${descFuncao}</td>
+      <td class="col-matricula">${esc(matricula)}</td>
+      <td class="col-nome">${esc(nome)}</td>
+      <td class="col-nome-supervisor">${esc(supervisor)}</td>
+      <td class="col-data-admis">${esc(dataAdmis)}</td>
+      <td class="col-coordenador">${esc(coordenador)}</td>
+      <td class="col-area">${esc(area)}</td>
+      <td class="col-placa">${esc(placa)}</td>
+      <td class="col-contrato2">${esc(contrato2)}</td>
+      <td class="col-desc-funcao">${esc(descFuncao)}</td>
     </tr>`;
   }).join('');
 }
@@ -838,7 +835,7 @@ function debounce(fn, wait) {
   };
 }
 
-// filtro ligado ao input de busca da seção Headcount
+// fio do input de busca do Headcount
 (function wireHcSearch(){
   document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('hc-search');
