@@ -466,9 +466,10 @@
         <h2>Gestão de Frotas</h2>
         <div class="hint">Dados da aba Placa, mesma base do painel de SLA.</div>
 
+        <div class="kpi-row" id="frotaOperacaoKpiRow" style="margin-bottom:14px;"></div>
         <div class="kpi-row" id="frotaKpiRow" style="margin-bottom:20px;"></div>
 
-        <div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
           <div class="panel">
             <h2>Veículos por Modelo</h2>
             <div class="hint">Top 10 modelos com mais veículos.</div>
@@ -481,6 +482,13 @@
             <div class="hint">Distribuição por status.</div>
             <div style="position:relative; height:260px;">
               <canvas id="frotaStatusChart"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Distribuição por Tipo</h2>
+            <div class="hint">Próprio vs. locado.</div>
+            <div style="position:relative; height:260px;">
+              <canvas id="frotaTipoChart"></canvas>
             </div>
           </div>
           <div class="panel">
@@ -1212,12 +1220,20 @@ let frotaCombustivelFiltroAtual = '';
 let frotaFiltrosPopulados = false;
 let frotaPaginaAtual = 1;
 const FROTA_POR_PAGINA = 10;
-let frotaModeloChartInst, frotaStatusChartInst;
+let frotaModeloChartInst, frotaStatusChartInst, frotaTipoChartInst;
+
+function filtrarFrotaPorOperacaoEKpi(valor){
+  frotaOperacaoFiltroAtual = valor;
+  frotaPaginaAtual = 1;
+  const select = document.getElementById('frotaOperacaoFiltro');
+  if(select) select.value = valor;
+  renderFrota();
+}
 
 function filtrarFrotaPorOperacao(valor){
   frotaOperacaoFiltroAtual = valor;
   frotaPaginaAtual = 1;
-  renderFrotaTabela();
+  renderFrota();
 }
 function filtrarFrotaPorStatus(valor){
   frotaStatusFiltroAtual = valor;
@@ -1416,6 +1432,37 @@ function renderFrota(){
 
   const total = FROTA.length;
 
+  // ---- KPIs clicáveis: Total + um por Operação (Claro/Cirion/...) ----
+  // Clicar num desses cards filtra a tabela pela operação, igual ao
+  // dropdown "Operação" — os dois ficam sincronizados.
+  const porOperacao = {};
+  FROTA.forEach(v => {
+    const k = canonOperacaoFrota(v.operacao) || 'Sem operação';
+    porOperacao[k] = (porOperacao[k] || 0) + 1;
+  });
+  const operacoesOrdenadas = Object.keys(porOperacao).sort((a,b)=> porOperacao[b]-porOperacao[a]);
+
+  const operacaoKpiRow = document.getElementById('frotaOperacaoKpiRow');
+  if(operacaoKpiRow){
+    const cardTotalAtivo = frotaOperacaoFiltroAtual === '';
+    let html = `<div class="kpi" style="cursor:pointer; ${cardTotalAtivo ? `border-color:${cor.accent}; box-shadow:0 0 0 2px ${cor.accent} inset;` : ''}" onclick="filtrarFrotaPorOperacaoEKpi('')">
+      <div class="label">Total de Veículos</div>
+      <div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div>
+    </div>`;
+    html += operacoesOrdenadas.map((k, i) => {
+      const qtd = porOperacao[k];
+      const pct = total > 0 ? (qtd/total*100).toFixed(1) : 0;
+      const p = PALETA_FROTA[i % PALETA_FROTA.length];
+      const ativo = frotaOperacaoFiltroAtual === k;
+      return `<div class="kpi" style="cursor:pointer; background:${p.bg}; border-color:${p.border}; ${ativo ? `box-shadow:0 0 0 2px ${p.text} inset;` : ''}" onclick="filtrarFrotaPorOperacaoEKpi('${k}')">
+        <div class="label" style="color:${p.text};">${k}</div>
+        <div class="value" style="color:${p.text};">${qtd}</div>
+        <div class="delta" style="color:${p.text};">${pct}% do total</div>
+      </div>`;
+    }).join('');
+    operacaoKpiRow.innerHTML = html;
+  }
+
   // ---- KPIs: total + um por status (na ordem do mais frequente) ----
   const porStatus = {};
   FROTA.forEach(v => {
@@ -1485,6 +1532,39 @@ function renderFrota(){
         datasets: [{
           data: statusOrdenados.map(k => porStatus[k]),
           backgroundColor: coresStatus,
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '68%',
+        plugins: {
+          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          datalabels: { display:false }
+        }
+      }
+    });
+  }
+
+  // ---- Gráfico: Distribuição por Tipo (rosca) ----
+  const porTipo = {};
+  FROTA.forEach(v => {
+    const k = normFrota(v.tipo) || 'Sem tipo';
+    porTipo[k] = (porTipo[k] || 0) + 1;
+  });
+  const tiposOrdenadosTipo = Object.keys(porTipo).sort((a,b)=> porTipo[b]-porTipo[a]);
+
+  const tipoCanvas = document.getElementById('frotaTipoChart');
+  if(tipoCanvas){
+    if(frotaTipoChartInst) frotaTipoChartInst.destroy();
+    const coresTipo = tiposOrdenadosTipo.map((_, i) => PALETA_FROTA[i % PALETA_FROTA.length].text);
+    frotaTipoChartInst = new Chart(tipoCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: tiposOrdenadosTipo,
+        datasets: [{
+          data: tiposOrdenadosTipo.map(k => porTipo[k]),
+          backgroundColor: coresTipo,
           borderWidth: 0
         }]
       },
