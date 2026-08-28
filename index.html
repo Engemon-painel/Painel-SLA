@@ -495,7 +495,11 @@
           <div class="hint">Busca por placa, condutor, marca ou modelo.</div>
 
           <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <label for="frotaStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Status</label>
+            <label for="frotaOperacaoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Operação</label>
+            <select id="frotaOperacaoFiltro" class="mono" onchange="filtrarFrotaPorOperacao(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="frotaStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
             <select id="frotaStatusFiltro" class="mono" onchange="filtrarFrotaPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
               <option value="">Todos</option>
             </select>
@@ -526,6 +530,7 @@
               <thead>
                 <tr>
                   <th>Placa</th>
+                  <th>Operação</th>
                   <th>Condutor</th>
                   <th>Marca</th>
                   <th>Modelo</th>
@@ -1200,6 +1205,7 @@ function renderHeadcount(){
 // ======================================================
 
 let frotaStatusFiltroAtual = '';
+let frotaOperacaoFiltroAtual = '';
 let frotaModeloFiltroAtual = '';
 let frotaTipoFiltroAtual = '';
 let frotaCombustivelFiltroAtual = '';
@@ -1208,6 +1214,11 @@ let frotaPaginaAtual = 1;
 const FROTA_POR_PAGINA = 10;
 let frotaModeloChartInst, frotaStatusChartInst;
 
+function filtrarFrotaPorOperacao(valor){
+  frotaOperacaoFiltroAtual = valor;
+  frotaPaginaAtual = 1;
+  renderFrotaTabela();
+}
 function filtrarFrotaPorStatus(valor){
   frotaStatusFiltroAtual = valor;
   frotaPaginaAtual = 1;
@@ -1230,6 +1241,7 @@ function filtrarFrotaPorCombustivel(valor){
 }
 
 function normFrota(s){ return (s || '').toString().replace(/\s+/g, ' ').trim(); }
+function canonOperacaoFrota(s){ const n = normFrota(s); return n ? n.toUpperCase() : n; }
 
 // Paleta cíclica usada nos KPIs de status e na lista de combustível —
 // os nomes de status/combustível vêm direto da planilha, então a cor é
@@ -1255,6 +1267,7 @@ function formatarValorFrota(v){
 function frotaFiltrada(){
   const q = (document.getElementById('frota-search')?.value || '').toLowerCase().trim();
   return FROTA.filter(v => {
+    if(frotaOperacaoFiltroAtual && canonOperacaoFrota(v.operacao) !== frotaOperacaoFiltroAtual) return false;
     if(frotaStatusFiltroAtual && normFrota(v.status) !== frotaStatusFiltroAtual) return false;
     if(frotaModeloFiltroAtual && normFrota(v.modelo) !== frotaModeloFiltroAtual) return false;
     if(frotaTipoFiltroAtual && normFrota(v.tipo) !== frotaTipoFiltroAtual) return false;
@@ -1302,6 +1315,7 @@ function renderFrotaTabela(){
 
   tbody.innerHTML = pagina.map(v => `<tr>
     <td class="mono">${esc(v.placa) || '—'}</td>
+    <td>${esc(v.operacao) || '—'}</td>
     <td>${esc(v.condutor) || '—'}</td>
     <td>${esc(v.marca) || '—'}</td>
     <td>${esc(v.modelo) || '—'}</td>
@@ -1338,7 +1352,7 @@ function exportarFrotaCsv(){
       alert('Nenhum veículo para exportar com os filtros atuais.');
       return;
     }
-    const colunas = ['Placa','Condutor','Marca','Modelo','Combustivel','Tipo','Status','Valor'];
+    const colunas = ['Placa','Operacao','Condutor','Marca','Modelo','Combustivel','Tipo','Status','Valor'];
     function csvEsc(v){
       const s = String(v ?? '');
       if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
@@ -1346,7 +1360,7 @@ function exportarFrotaCsv(){
     }
     const linhas = [colunas.map(csvEsc).join(';')];
     itens.forEach(v => {
-      linhas.push([v.placa, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor)].map(csvEsc).join(';'));
+      linhas.push([v.placa, v.operacao, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor)].map(csvEsc).join(';'));
     });
     const csvContent = '\uFEFF' + linhas.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1371,16 +1385,19 @@ function renderFrota(){
 
   // ---- Popula os filtros (uma única vez) ----
   if(!frotaFiltrosPopulados){
+    const selectOperacao = document.getElementById('frotaOperacaoFiltro');
     const selectStatus = document.getElementById('frotaStatusFiltro');
     const selectModelo = document.getElementById('frotaModeloFiltro');
     const selectTipo = document.getElementById('frotaTipoFiltro');
     const selectCombustivel = document.getElementById('frotaCombustivelFiltro');
 
     const statusUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.status)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const operacoesUnicas = Array.from(new Set(FROTA.map(v => canonOperacaoFrota(v.operacao)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const modelosUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.modelo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const tiposUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.tipo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const combustiveisUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.combustivel)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
 
+    if(selectOperacao) selectOperacao.innerHTML = '<option value="">Todos</option>' + operacoesUnicas.map(s => `<option value="${s}">${s}</option>`).join('');
     if(selectStatus) selectStatus.innerHTML = '<option value="">Todos</option>' + statusUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
     if(selectModelo) selectModelo.innerHTML = '<option value="">Todos</option>' + modelosUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
     if(selectTipo) selectTipo.innerHTML = '<option value="">Todos</option>' + tiposUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
