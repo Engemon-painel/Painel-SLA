@@ -167,13 +167,12 @@
   .unb-coord{ font-size:11.5px; color: var(--accent); margin-top:3px; font-weight:600; }
   .unb-value{ font-family:'JetBrains Mono', monospace; font-size:26px; font-weight:700; color:var(--accent); margin-top:6px; }
 
-  /* small helpers for headcount table */
+  /* busca da tabela de colaboradores */
   .search { display:flex; gap:8px; align-items:center; background:var(--panel); padding:6px 10px; border-radius:8px; border:1px solid var(--line); }
-  .search input[type="search"]{ border:0; outline:0; font-size:13px; min-width:280px; background:transparent; }
+  .search input[type="search"]{ border:0; outline:0; font-size:13px; min-width:280px; background:transparent; color:var(--text); }
   .no-results { padding:12px; text-align:center; color:var(--muted); }
   @media (max-width:900px){
     .search input[type="search"]{ min-width:160px; }
-    table { font-size:13px; }
   }
 </style>
 </head>
@@ -181,7 +180,7 @@
 
 <header>
   <div class="brand-title">
-    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASAAAADiCAYAAADu1BqLAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAADztSURBVHhe7d13eBTVwsfx78zWbMqmFwihSi9XaaJYURA[...]" alt="logo" class="brand-logo" />
+    <img src="data:image/png;base64,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" alt="Engemon Opservices" class="brand-logo">
     <div>
       <div class="brand-eyebrow">OPS · Monitoramento de Indisponibilidade</div>
       <h1>Painel do ESER</h1>
@@ -193,8 +192,8 @@
     <div class="month-strip">
       <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
       <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
-      <a class="link-base" href="#">Relatório</a>
-      <a class="link-base link-alt" href="#">Exportar</a>
+      <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
+      <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Organograma (Excel)</a>
     </div>
   </div>
 </header>
@@ -352,19 +351,19 @@
         </div>
 
         <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
-        <div class="hint">Incidentes fora do prazo. Use os filtros para ver por supervisor e/ou por status de preenchimento do Fato/Causa. Clique em "Preencher" para abrir o Forms já com os dado[...]</div>
+        <div class="hint">Incidentes fora do prazo. Use os filtros para ver por supervisor e/ou por status de preenchimento do Fato/Causa. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
-          <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel);">
+          <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
             <option value="">Todos</option>
           </select>
           <label for="statusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
-          <select id="statusFiltro" class="mono" onchange="filtrarPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel);">
+          <select id="statusFiltro" class="mono" onchange="filtrarPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
             <option value="">Todos</option>
             <option value="pendente">A preencher</option>
             <option value="preenchido">Preenchido</option>
           </select>
-          <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">Exportar FCA preenchido (CSV)</button>
+          <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
         </div>
         <table>
           <thead>
@@ -382,11 +381,11 @@
 
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <label for="contratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
-          <select id="contratoFiltro" class="mono" onchange="filtrarPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel);">
+          <select id="contratoFiltro" class="mono" onchange="filtrarPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
             <option value="">Todos</option>
           </select>
           <label for="hcStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
-          <select id="hcStatusFiltro" class="mono" onchange="filtrarPorStatusHc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel);">
+          <select id="hcStatusFiltro" class="mono" onchange="filtrarPorStatusHc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
             <option value="">Todos</option>
           </select>
         </div>
@@ -405,10 +404,9 @@
           <div class="unb-grid" id="unbGrid"></div>
         </div>
 
-        <!-- NOVA SEÇÃO: Tabela de Colaboradores com busca -->
         <div class="panel" style="margin-bottom:16px;">
           <h2>Colaboradores</h2>
-          <div class="hint">Busca por nome, matrícula, placa, supervisor, contrato ou área. A tabela é populada do array <code>COLABORADORES</code> (dados.json).</div>
+          <div class="hint">Busca por nome, matrícula, placa, supervisor, contrato ou área.</div>
 
           <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
             <div class="search" title="Buscar por nome, matrícula, placa, supervisor, contrato">
@@ -433,14 +431,11 @@
                   <th>Desc.Funcao</th>
                 </tr>
               </thead>
-              <tbody id="hcTableBody">
-                <!-- linhas geradas via JS -->
-              </tbody>
+              <tbody id="hcTableBody"></tbody>
             </table>
             <div id="hcNoResults" class="no-results" style="display:none">Nenhum colaborador encontrado.</div>
           </div>
         </div>
-        <!-- FIM DA NOVA SEÇÃO -->
 
         <div class="grid">
           <div class="panel">
@@ -473,6 +468,7 @@
 <script>
 // ======================================================
 // Os dados vêm de dados.json (mesma pasta deste arquivo).
+// Edite/atualize esse JSON — não precisa mexer neste HTML.
 // ======================================================
 let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
@@ -516,6 +512,10 @@ function mostrarPagina(nome){
     const navEl = document.getElementById('nav-' + p);
     if(navEl) navEl.classList.toggle('active', p === nome);
   });
+  // Gráficos criados enquanto a página estava com display:none nascem com
+  // largura 0, e um simples .resize() nem sempre "recupera" o canvas.
+  // Mais garantido: recriar os gráficos de vez, do mesmo jeito que já
+  // acontece ao trocar de mês/SLA — agora com a página certa visível.
   if(typeof render === 'function') render();
   if(nome === 'organograma' && typeof renderHeadcount === 'function') renderHeadcount();
 }
@@ -523,6 +523,8 @@ function mostrarPagina(nome){
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
 
 // Mapa de nome de mês (abreviação em pt-BR) -> número do mês com 2 dígitos.
+// Usado para filtrar o array "diario" (formato "dd/mm") pelo mês selecionado
+// nos chips (formato "Mes/aa", ex.: "Ago/26").
 const NOME_MES = {
   Jan:'01', Fev:'02', Mar:'03', Abr:'04', Mai:'05', Jun:'06',
   Jul:'07', Ago:'08', Set:'09', Out:'10', Nov:'11', Dez:'12'
@@ -566,10 +568,148 @@ async function carregarDados(){
   }
 }
 
-// ... (o restante das suas funções de cálculo e renderização de gráficos permanece como no seu arquivo original) ...
+const AREAS_VALIDAS = ['SPC1','SPC2','SPC3','SPC4'];
+
+function areasValidas(areasObj){
+  const out = {};
+  AREAS_VALIDAS.forEach(k=>{ if(areasObj[k]) out[k] = areasObj[k]; });
+  return out;
+}
+
+function totais(mesObj){
+  const areas = areasValidas(mesObj.areas);
+  let dentro=0, fora=0;
+  Object.values(areas).forEach(a=>{ dentro+=a.dentro; fora+=a.fora; });
+  return { dentro, fora, total: dentro+fora, pct: dentro/(dentro+fora) };
+}
+
+function statusColor(pct){
+  if(pct >= DADOS.meta) return cor.good;
+  if(pct >= DADOS.meta - 0.05) return cor.warn;
+  return cor.bad;
+}
+
+// Retorna os itens de DIARIO cujo mês (segunda parte de "dd/mm") bate com
+// o mês de um objeto de mês qualquer (ex.: "Ago/26" -> "08").
+function diarioDoMes(mesObj){
+  const nomeMes = mesObj.mes.split('/')[0]; // "Ago/26" -> "Ago"
+  const mm = NOME_MES[nomeMes];
+  return (DIARIO || []).filter(d => d.data.split('/')[1] === mm);
+}
+
+// Igual acima, mas pro mês atualmente selecionado nos chips.
+function diarioDoMesAtual(){
+  return diarioDoMes(DADOS.meses[mesAtualIdx]);
+}
+
+// Quantidade de dias de um mês qualquer (ex.: "Ago/26" -> 31).
+function diasNoMes(mesObj){
+  const nomeMes = mesObj.mes.split('/')[0];
+  const mm = NOME_MES[nomeMes];
+  const anoCurto = mesObj.mes.split('/')[1];
+  const anoFull = 2000 + Number(anoCurto);
+  return new Date(anoFull, Number(mm), 0).getDate();
+}
+
+// Igual acima, mas pro mês atualmente selecionado nos chips.
+function diasNoMesSelecionado(){
+  return diasNoMes(DADOS.meses[mesAtualIdx]);
+}
+
+// Projeção de fechamento do mês: usa SEMPRE a janela dos últimos 7 dias
+// com dado (D-1 pra trás, podendo cruzar pro mês anterior) — tanto pro
+// ritmo diário de entrantes (volume) quanto pra taxa de fora do prazo —
+// e projeta isso pros dias que faltam no mês (dias restantes). Retorna
+// null se o mês já fechou (sem dias restantes) ou não tem dado nenhum.
+function calcularProjecaoMes(mesObj){
+  const diarioMes = diarioDoMes(mesObj);
+  const diasComDado = diarioMes.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  const totalDiasMes = diasNoMes(mesObj);
+  const diasRestantes = Math.max(0, totalDiasMes - diasCorridos);
+
+  if(diasCorridos <= 0 || diasRestantes <= 0) return null;
+
+  const t = totais(mesObj);
+
+  // Últimos 7 dias com dado, na base global (DIARIO já vem ordenado
+  // cronologicamente do Office Script) — usados tanto pro ritmo de
+  // entrantes quanto pra taxa de fora do prazo.
+  const ultimos7 = (DIARIO || []).slice(-7);
+  let dentro7 = 0, fora7 = 0;
+  ultimos7.forEach(d => { dentro7 += d.dentro; fora7 += d.fora; });
+  const total7 = dentro7 + fora7;
+
+  const mediaDiaria = ultimos7.length > 0 ? (total7 / ultimos7.length) : (t.total / diasCorridos);
+  const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
+
+  const taxaFora7 = total7 > 0 ? (fora7/total7) : (t.total > 0 ? t.fora/t.total : 0);
+
+  const foraProjetado = Math.round(entrantesProjetados * taxaFora7);
+  const dentroProjetado = entrantesProjetados - foraProjetado;
+
+  const totalFinal = t.total + entrantesProjetados;
+  const dentroFinal = t.dentro + dentroProjetado;
+  const foraFinal = t.fora + foraProjetado;
+  const pctFinal = totalFinal > 0 ? (dentroFinal/totalFinal) : t.pct;
+
+  return {
+    diasCorridos, diasRestantes, entrantesProjetados, mediaDiaria,
+    foraProjetado, dentroProjetado,
+    totalFinal, dentroFinal, foraFinal, pctFinal, taxaFora7
+  };
+}
+
+// MTTR médio do mês selecionado (coluna MTTR da base, em segundos).
+// Espera mesObj.mttrValores = [3598, 16806, ...] (um valor por incidente do mês);
+// células vazias/"-" na planilha devem virar null/undefined no dados.json e são
+// ignoradas no cálculo da média (não contam como 0).
+function mttrMedioDoMes(mesObj){
+  const valores = Array.isArray(mesObj.mttrValores)
+    ? mesObj.mttrValores.filter(v => typeof v === 'number' && !isNaN(v))
+    : [];
+  if(!valores.length) return null;
+  const soma = valores.reduce((a,b) => a+b, 0);
+  return soma / valores.length;
+}
+
+// Formata segundos como "Xh YYmin" (ou só "YYmin" se < 1h).
+function formatarMttr(segundos){
+  if(segundos === null || segundos === undefined || isNaN(segundos)) return '—';
+  const totalMin = Math.round(segundos / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${String(m).padStart(2,'0')}min` : `${m}min`;
+}
+
+// Dias corridos (D-1) e dias restantes com base no ÚLTIMO dia com dado na base
+// (DIARIO) para o mês selecionado — não usa a data real do sistema, só a base.
+function renderDiasRow(diarioFiltrado){
+  const diasRow = document.getElementById('diasRow');
+  if(!diasRow) return;
+  const diasComDado = diarioFiltrado.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  const diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  const totalDiasMes = diasNoMesSelecionado();
+  const diasRestantes = Math.max(0, totalDiasMes - diasCorridos);
+  diasRow.innerHTML = `
+    <div class="mini-card">
+      <div class="mini-icon">📅</div>
+      <div class="mini-value">${diasCorridos}</div>
+      <div class="mini-label">Dias corridos (D-1)</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-icon">❗</div>
+      <div class="mini-value">${diasRestantes}</div>
+      <div class="mini-label">Dias restantes</div>
+    </div>
+  `;
+}
 
 // ======================================================
-// HEADCOUNT — ORGANOGRAMA (continuação / integração da tabela)
+// HEADCOUNT — ORGANOGRAMA
+// Seção independente do mês/SLA selecionados acima; fica em escopo
+// global (não aninhada em montarPagina) para não repetir o bug de
+// escopo que já tivemos com renderPendenciasFca.
 // ======================================================
 
 let hcContratoPopulado = false;
@@ -580,6 +720,8 @@ const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out',
 
 function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
 function normHc(s){ return (s || '').replace(/\s+/g, ' ').trim(); }
+// Unifica variações de maiúsculas/minúsculas do mesmo contrato (ex.: "Claro"
+// e "CLARO" vindos de abas diferentes) num único valor em maiúsculas.
 function canonContratoHc(s){ const n = normHc(s); return n ? n.toUpperCase() : n; }
 function semAcentoHc(s){ return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 
@@ -596,6 +738,128 @@ function ultimosNMesesHc(n){
   }
   return arr;
 }
+
+// ---------- Colaboradores: busca/tabela ----------
+
+function findKeyLike(obj, substrings){
+  if(!obj) return null;
+  const keys = Object.keys(obj || {});
+  const low = substrings.map(s => s.toLowerCase());
+  for (const k of keys) {
+    const kl = k.toLowerCase();
+    for (const sub of low) {
+      if (kl === sub) return k;
+    }
+  }
+  for (const k of keys) {
+    const kl = k.toLowerCase();
+    for (const sub of low) {
+      if (kl.includes(sub)) return k;
+    }
+  }
+  return null;
+}
+
+function getValAuto(obj, substrings){
+  if(!obj) return '';
+  const k = findKeyLike(obj, substrings);
+  if(!k) return '';
+  return obj[k];
+}
+
+function formatDateLike(s) {
+  if (!s) return '';
+  if (/\d{4}-\d{2}-\d{2}/.test(s)) {
+    const parts = s.split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  }
+  if (/\d{2}\/\d{2}\/\d{4}/.test(s)) return s;
+  return s;
+}
+
+function renderEmployeeTable(filterText = '') {
+  const tbody = document.getElementById('hcTableBody');
+  const noResults = document.getElementById('hcNoResults');
+  if(!tbody) return;
+
+  const norm = (v) => (v || '').toString().toLowerCase();
+  const q = (filterText || '').toString().trim().toLowerCase();
+
+  const filtered = (COLABORADORES || []).filter(c => {
+    if(contratoFiltroAtual && canonContratoHc(c.contrato) !== contratoFiltroAtual) return false;
+    if(hcStatusFiltroAtual === 'Ativo' && !c.ativo) return false;
+    if(hcStatusFiltroAtual === 'Inativo' && c.ativo) return false;
+    return true;
+  }).filter(c => {
+    if(!q) return true;
+    const nome = getValAuto(c, ['nome','colaborador','nome completo','nome_colaborador','nomecompleto']);
+    const matricula = getValAuto(c, ['matric','registro','matr','matricula']);
+    const placa = getValAuto(c, ['placa','placaVeiculo','placa_veiculo']);
+    const supervisor = getValAuto(c, ['supervisor','nomeSupervisor','supervisor_nome','nome supervisor']);
+    const contrato2 = getValAuto(c, ['contrato_2','contrato2','contrato']);
+    const area = getValAuto(c, ['area','areatecnica','areaTecnica']);
+    const funcao = getValAuto(c, ['descFuncao','descricaoFuncao','funcao','cargo','descricao']);
+
+    const hay = [nome, matricula, placa, supervisor, contrato2, area, funcao].map(x => norm(x)).join(' ');
+    return hay.includes(q);
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    if(noResults) noResults.style.display = '';
+    return;
+  } else if(noResults) {
+    noResults.style.display = 'none';
+  }
+
+  function esc(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  tbody.innerHTML = filtered.map(c => {
+    const ativo = c.ativo === true || String(c.ativo).toLowerCase() === 'true' || String(c.ativo) === '1';
+    const statusHtml = ativo ? `<span class="pill good">Ativo</span>` : `<span class="pill warn">Inativo</span>`;
+    const matricula = getValAuto(c, ['matric','registro','matr','matricula']) || '—';
+    const nome = getValAuto(c, ['nome','colaborador','nome completo','nome_colaborador','nomecompleto']) || '—';
+    const supervisor = getValAuto(c, ['supervisor','nombresupervisor','nomeSupervisor','supervisor_nome']) || '—';
+    const dataAdmisRaw = getValAuto(c, ['dataAdmis','dataAdmissao','data_adm','dataAdmisao']);
+    const dataAdmis = formatDateLike(dataAdmisRaw) || '—';
+    const coordenador = getValAuto(c, ['coordenador','coordenador_nome']) || '—';
+    const area = getValAuto(c, ['area','areatecnica','areaTecnica']) || '—';
+    const placa = getValAuto(c, ['placa','placaVeiculo','placa_veiculo']) || '—';
+    const contrato2 = getValAuto(c, ['contrato_2','contrato2']) || getValAuto(c, ['contrato']) || '—';
+    const descFuncao = getValAuto(c, ['descFuncao','descricaoFuncao','funcao','cargo','descricao']) || '—';
+
+    return `<tr data-nome="${esc(nome)}" data-matricula="${esc(matricula)}" data-supervisor="${esc(supervisor)}">
+      <td>${statusHtml}</td>
+      <td>${esc(matricula)}</td>
+      <td>${esc(nome)}</td>
+      <td>${esc(supervisor)}</td>
+      <td>${esc(dataAdmis)}</td>
+      <td>${esc(coordenador)}</td>
+      <td>${esc(area)}</td>
+      <td>${esc(placa)}</td>
+      <td>${esc(contrato2)}</td>
+      <td>${esc(descFuncao)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function debounce(fn, wait) {
+  let t;
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('hc-search');
+  if(!input) return;
+  input.addEventListener('input', debounce(function(e){
+    renderEmployeeTable(e.target.value || '');
+  }, 200));
+});
+
+// ---------------------------------------------------
 
 function renderHeadcount(){
   const kpiRow = document.getElementById('hcKpiRow');
@@ -674,6 +938,11 @@ function renderHeadcount(){
 
   const unbGrid = document.getElementById('unbGrid');
   if(unbGrid){
+    // Agrupa por Unidade de Negócio (c.unidadeNegocio). O coordenador exibido
+    // vem direto da coluna Coordenador (c.coordenador) — usa o valor mais
+    // frequente entre os colaboradores ativos daquela unidade (normalmente
+    // é o mesmo pra todos os da unidade, mas caso haja divergência de
+    // preenchimento na planilha, prevalece o mais comum).
     const porUnidade = {};
     ativos.forEach(c => {
       const k = normHc(c.unidadeNegocio);
@@ -711,147 +980,981 @@ function renderHeadcount(){
     }).join('');
   }
 
-  // Após recomputar KPIs e grids, atualiza a tabela de colaboradores
-  renderEmployeeTable();
-}
+  const meses8 = ultimosNMesesHc(8);
+  const admPorMes = meses8.map(()=>0);
+  const demPorMes = meses8.map(()=>0);
 
-// ----------------- NOVAS FUNÇÕES: render / filtro da tabela de colaboradores -----------------
-
-// encontra a primeira chave do objeto que contém qualquer substring informada
-function findKeyLike(obj, substrings){
-  if(!obj) return null;
-  const keys = Object.keys(obj || {});
-  const low = substrings.map(s => s.toLowerCase());
-  // procura exata (igual) primeiro
-  for (const k of keys) {
-    const kl = k.toLowerCase();
-    for (const sub of low) {
-      if (kl === sub) return k;
-    }
+  function indexDoMesHc(dataIso){
+    if(!dataIso) return -1;
+    const partes = dataIso.split('-');
+    const ano = Number(partes[0]);
+    const mes = Number(partes[1]) - 1;
+    return meses8.findIndex(m => m.ano === ano && m.mes === mes);
   }
-  // procura por inclusão
-  for (const k of keys) {
-    const kl = k.toLowerCase();
-    for (const sub of low) {
-      if (kl.includes(sub)) return k;
-    }
-  }
-  return null;
-}
 
-function getValAuto(obj, substrings){
-  if(!obj) return '';
-  const k = findKeyLike(obj, substrings);
-  if(!k) return '';
-  return obj[k];
-}
-
-function formatDateLike(s) {
-  if (!s) return '';
-  // tenta formatos: YYYY-MM-DD -> DD/MM/YYYY
-  if (/\d{4}-\d{2}-\d{2}/.test(s)) {
-    const parts = s.split('-');
-    return parts[2] + '/' + parts[1] + '/' + parts[0];
-  }
-  // se já for dd/mm/aaaa, apenas retorna
-  if (/\d{2}\/\d{2}\/\d{4}/.test(s)) return s;
-  return s;
-}
-
-function renderEmployeeTable(filterText = '') {
-  const tbody = document.getElementById('hcTableBody');
-  const noResults = document.getElementById('hcNoResults');
-  if(!tbody) return;
-
-  const norm = (v) => (v || '').toString().toLowerCase();
-  const q = (filterText || '').toString().trim().toLowerCase();
-
-  // aplica filtros globais (contrato/status) já existentes
-  const filtered = (COLABORADORES || []).filter(c => {
-    if(contratoFiltroAtual && canonContratoHc(c.contrato) !== contratoFiltroAtual) return false;
-    if(hcStatusFiltroAtual === 'Ativo' && !c.ativo) return false;
-    if(hcStatusFiltroAtual === 'Inativo' && c.ativo) return false;
-    return true;
-  }).filter(c => {
-    if(!q) return true;
-    const nome = getValAuto(c, ['nome','colaborador','nome completo','nome_colaborador','nomecompleto']);
-    const matricula = getValAuto(c, ['matric','registro','matr','matricula']);
-    const placa = getValAuto(c, ['placa','placaVeiculo','placa_veiculo']);
-    const supervisor = getValAuto(c, ['supervisor','nomeSupervisor','supervisor_nome','nome supervisor']);
-    const contrato2 = getValAuto(c, ['contrato_2','contrato2','contrato']);
-    const area = getValAuto(c, ['area','areatecnica','areaTecnica']);
-    const funcao = getValAuto(c, ['descFuncao','descricaoFuncao','funcao','cargo','descricao']);
-
-    const hay = [nome, matricula, placa, supervisor, contrato2, area, funcao].map(x => norm(x)).join(' ');
-    return hay.includes(q);
+  colabFiltrados.forEach(c => {
+    const iAdm = indexDoMesHc(c.dataAdmis);
+    if(iAdm !== -1) admPorMes[iAdm]++;
+    const iDem = indexDoMesHc(c.dataDemissao);
+    if(iDem !== -1) demPorMes[iDem]++;
   });
 
-  if (filtered.length === 0) {
-    tbody.innerHTML = '';
-    noResults.style.display = '';
-    return;
-  } else {
-    noResults.style.display = 'none';
+  const admDemCanvas = document.getElementById('admDemChart');
+  if(admDemCanvas){
+    if(admDemChartInst) admDemChartInst.destroy();
+    admDemChartInst = new Chart(admDemCanvas, {
+      type: 'bar',
+      data: {
+        labels: meses8.map(m => m.label),
+        datasets: [
+          { label: 'Admitidos', data: admPorMes, backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} } },
+          { label: 'Demitidos', data: demPorMes, backgroundColor: cor.bad, borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} } }
+        ]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: cor.muted, font: {family:'Inter', size:11} } }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {display:false} },
+          y: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true }
+        }
+      }
+    });
   }
 
-  tbody.innerHTML = filtered.map(c => {
-    const ativo = c.ativo === true || String(c.ativo).toLowerCase() === 'true' || String(c.ativo) === '1';
-    const statusHtml = ativo ? `<span class="pill good">Ativo</span>` : `<span class="pill warn">Inativo</span>`;
-    const matricula = getValAuto(c, ['matric','registro','matr','matricula']) || '—';
-    const nome = getValAuto(c, ['nome','colaborador','nome completo','nome_colaborador','nomecompleto']) || '—';
-    const supervisor = getValAuto(c, ['supervisor','nombresupervisor','nomeSupervisor','supervisor_nome']) || '—';
-    const dataAdmisRaw = getValAuto(c, ['dataAdmis','dataAdmissao','data_adm','dataAdmis','dataAdmisao','dataAdmissao']);
-    const dataAdmis = formatDateLike(dataAdmisRaw) || '—';
-    const coordenador = getValAuto(c, ['coordenador','coordenador_nome']) || '—';
-    const area = getValAuto(c, ['area','areatecnica','areaTecnica']) || '—';
-    const placa = getValAuto(c, ['placa','placaVeiculo','placa_veiculo']) || '—';
-    const contrato2 = getValAuto(c, ['contrato_2','contrato2']) || getValAuto(c, ['contrato']) || '—';
-    const descFuncao = getValAuto(c, ['descFuncao','descricaoFuncao','funcao','cargo','descricao']) || '—';
+  const evolucaoDados = meses8.map(m => {
+    const fimDoMes = new Date(m.ano, m.mes + 1, 0);
+    const fimIso = fimDoMes.getFullYear() + '-' + pad2hc(fimDoMes.getMonth()+1) + '-' + pad2hc(fimDoMes.getDate());
+    return colabFiltrados.filter(c => {
+      if(!c.dataAdmis || c.dataAdmis > fimIso) return false;
+      if(c.dataDemissao && c.dataDemissao <= fimIso) return false;
+      return true;
+    }).length;
+  });
 
-    // escape valores simples para evitar quebra de HTML (caso tenham < ou &)
-    function esc(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  const evolucaoCanvas = document.getElementById('evolucaoChart');
+  if(evolucaoCanvas){
+    if(evolucaoChartInst) evolucaoChartInst.destroy();
+    evolucaoChartInst = new Chart(evolucaoCanvas, {
+      type: 'bar',
+      data: {
+        labels: meses8.map(m => m.label),
+        datasets: [{
+          label: 'Headcount', data: evolucaoDados,
+          backgroundColor: 'rgba(107,117,144,.6)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {display:false} },
+          y: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
 
-    return `<tr data-nome="${esc(nome)}" data-matricula="${esc(matricula)}" data-supervisor="${esc(supervisor)}">
-      <td>${statusHtml}</td>
-      <td class="col-matricula">${esc(matricula)}</td>
-      <td class="col-nome">${esc(nome)}</td>
-      <td class="col-nome-supervisor">${esc(supervisor)}</td>
-      <td class="col-data-admis">${esc(dataAdmis)}</td>
-      <td class="col-coordenador">${esc(coordenador)}</td>
-      <td class="col-area">${esc(area)}</td>
-      <td class="col-placa">${esc(placa)}</td>
-      <td class="col-contrato2">${esc(contrato2)}</td>
-      <td class="col-desc-funcao">${esc(descFuncao)}</td>
+  const tecnicosAtivos = ativos.filter(c => semAcentoHc(c.areaTecnica) === 'tecnico');
+  const porSupervisor = {};
+  tecnicosAtivos.forEach(c => {
+    const k = normHc(c.supervisor) || 'Sem supervisor';
+    porSupervisor[k] = (porSupervisor[k] || 0) + 1;
+  });
+  const supervisoresOrdenados = Object.keys(porSupervisor).sort((a,b)=> porSupervisor[b]-porSupervisor[a]);
+
+  const tecnicosCanvas = document.getElementById('tecnicosSupervisorChart');
+  if(tecnicosCanvas){
+    if(tecnicosSupChartInst) tecnicosSupChartInst.destroy();
+    const alturaPorBarra = 28;
+    const alturaMinima = 260;
+    const alturaCalculada = Math.max(alturaMinima, supervisoresOrdenados.length * alturaPorBarra);
+    tecnicosCanvas.parentElement.style.height = alturaCalculada + 'px';
+    tecnicosSupChartInst = new Chart(tecnicosCanvas, {
+      type: 'bar',
+      data: {
+        labels: supervisoresOrdenados,
+        datasets: [{
+          label: 'Técnicos ativos', data: supervisoresOrdenados.map(k => porSupervisor[k]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        maxBarThickness: 20,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true },
+          y: { ticks: {color: cor.muted, font:{size:11}}, grid: {display:false} }
+        }
+      }
+    });
+  }
+
+  // Atualiza também a tabela de colaboradores com o texto de busca atual
+  const searchInput = document.getElementById('hc-search');
+  renderEmployeeTable(searchInput ? searchInput.value : '');
+}
+
+function exportarFcaPreenchidoCsv(){
+  try {
+    if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
+      alert('Os dados do painel ainda não foram carregados.');
+      return;
+    }
+
+    if (!Array.isArray(PENDENTES_FCA)) {
+      alert('A base de FCA não foi carregada corretamente.');
+      return;
+    }
+
+    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+
+    const mesObj = DADOS.meses[mesAtualIdx];
+    if (!mesObj || !mesObj.mes) {
+      alert('Não foi possível identificar o mês selecionado.');
+      return;
+    }
+
+    const partesMes = String(mesObj.mes).split('/');
+    const nomeMes = partesMes[0];
+    const anoCurto = partesMes[1];
+    const mm = NOME_MES[nomeMes];
+
+    if (!mm || !anoCurto) {
+      alert('Formato de mês inválido: ' + mesObj.mes);
+      return;
+    }
+
+    const mesOrdAtual = '20' + anoCurto + '-' + mm;
+
+    const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
+
+    function estaPendente(p) {
+      const valor = p ? p.pendente : false;
+
+      if (valor === true || valor === 1) return true;
+
+      if (typeof valor === 'string') {
+        const v = valor.trim().toLowerCase();
+        return v === 'true' || v === '1' || v === 'sim';
+      }
+
+      return false;
+    }
+
+    const todosDoMes = PENDENTES_FCA.filter(p => {
+      if (!p) return false;
+
+      if (!areasDoMes.includes(norm(p.area))) return false;
+
+      if (norm(p.mesOrd) !== mesOrdAtual) return false;
+
+      if (
+        supervisorFiltroAtual &&
+        norm(p.supervisor) !== norm(supervisorFiltroAtual)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const preenchidos = todosDoMes.filter(p => !estaPendente(p));
+
+    if (!preenchidos.length) {
+      console.log('--- EXPORTAÇÃO FCA ---');
+      console.log('Mês selecionado:', mesObj.mes);
+      console.log('Mês esperado:', mesOrdAtual);
+      console.log('Áreas:', areasDoMes);
+      console.log('Total PENDENTES_FCA:', PENDENTES_FCA.length);
+      console.log('Total do mês:', todosDoMes.length);
+      console.log('Supervisor:', supervisorFiltroAtual || 'Todos');
+
+      alert(
+        'Nenhum incidente preenchido para exportar.\n\n' +
+        'Mês: ' + mesObj.mes +
+        (supervisorFiltroAtual
+          ? '\nSupervisor: ' + supervisorFiltroAtual
+          : '')
+      );
+      return;
+    }
+
+    const colunas = [
+      'Supervisor',
+      'Área',
+      'Site',
+      'Incidente',
+      'Causa',
+      'Ação',
+      'Reported',
+      'Submit',
+      'Clear',
+      'Resolved'
+    ];
+
+    function csvEsc(v) {
+      const s = String(v ?? '');
+
+      if (/[",;\n\r]/.test(s)) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+
+      return s;
+    }
+
+    const linhasCsv = [];
+    linhasCsv.push(colunas.map(csvEsc).join(';'));
+
+    preenchidos.forEach(p => {
+      linhasCsv.push([
+        p.supervisor || '',
+        p.area || '',
+        p.site || '',
+        p.incidente || '',
+        p.causa || '',
+        p.acao || '',
+        p.reported || '',
+        p.submit || '',
+        p.clear || '',
+        p.resolved || ''
+      ].map(csvEsc).join(';'));
+    });
+
+    const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
+
+    const blob = new Blob(
+      [csvContent],
+      { type: 'text/csv;charset=utf-8;' }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const nomeArquivo =
+      'FCA_Preenchidos_' +
+      mesObj.mes.replace('/', '-') +
+      '.csv';
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    a.style.display = 'none';
+    a.setAttribute('download', nomeArquivo);
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    console.log(
+      'CSV FCA exportado com sucesso:',
+      nomeArquivo,
+      'Registros:',
+      preenchidos.length
+    );
+
+  } catch (erro) {
+    console.error('Erro ao exportar FCA:', erro);
+
+    alert(
+      'Ocorreu um erro ao exportar o CSV.\n\n' +
+      (erro && erro.message ? erro.message : erro)
+    );
+  }
+}
+
+function montarPagina(){
+
+// ---- Month chips ----
+const monthStrip = document.getElementById('monthStrip');
+monthStrip.innerHTML = '';
+DADOS.meses.forEach((m, i)=>{
+  const chip = document.createElement('div');
+  chip.className = 'chip' + (i===mesAtualIdx ? ' active' : '');
+  chip.textContent = m.mes;
+  chip.onclick = ()=>{ mesAtualIdx = i; render(); };
+  chip.dataset.idx = i;
+  monthStrip.appendChild(chip);
+});
+
+// ---- Signal strip (visão diária simulada a partir do % do mês) ----
+const signalStrip = document.getElementById('signalStrip');
+function renderSignal(pct){
+  signalStrip.innerHTML = '';
+  const blocks = 30;
+  const onCount = Math.round(pct * blocks);
+  for(let i=0;i<blocks;i++){
+    const d = document.createElement('div');
+    const isGood = i < onCount;
+    d.style.background = isGood ? 'rgba(5,150,105,.7)' : 'rgba(220,38,38,.7)';
+    signalStrip.appendChild(d);
+  }
+}
+
+function renderDailyWeekly(){
+  const diarioFiltrado = diarioDoMesAtual();
+
+  if(dailyChart) dailyChart.destroy();
+  dailyChart = new Chart(document.getElementById('dailyChart'), {
+    data:{
+      labels: diarioFiltrado.map(d=>d.data),
+      datasets:[
+        {
+          type:'bar', label:'Dentro', data: diarioFiltrado.map(d=>d.dentro),
+          backgroundColor:'rgba(107,117,144,.6)', borderRadius:4, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: diarioFiltrado.map(d=>d.fora),
+          backgroundColor: cor.bad, borderRadius:4, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: diarioFiltrado.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius:3, yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
+        },
+      ]
+    },
+    plugins:[ChartDataLabels],
+    options:{ responsive:true,
+      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:true } },
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+
+  if(weeklyChart) weeklyChart.destroy();
+  weeklyChart = new Chart(document.getElementById('weeklyChart'), {
+    data:{
+      labels: SEMANAL.map(d=>d.semana),
+      datasets:[
+        {
+          type:'bar', label:'Dentro', data: SEMANAL.map(d=>d.dentro),
+          backgroundColor:'rgba(107,117,144,.6)', borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: SEMANAL.map(d=>d.fora),
+          backgroundColor: cor.bad, borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: SEMANAL.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius:4, yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(0)+'%' }
+        },
+        {
+          type:'line', label:'Meta 85%', data: SEMANAL.map(()=>85),
+          borderColor:'#a78bfa', borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1,
+          datalabels:{ display:false }
+        },
+      ]
+    },
+    plugins:[ChartDataLabels],
+    options:{ responsive:true,
+      plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:true } },
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+function render(){
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.classList.toggle('active', Number(c.dataset.idx) === mesAtualIdx);
+  });
+
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const t = totais(mesObj);
+  renderSignal(t.pct);
+
+  const prevIdx = mesAtualIdx - 1;
+  const prevPct = prevIdx >= 0 ? totais(DADOS.meses[prevIdx]).pct : null;
+  const deltaPP = prevPct !== null ? (t.pct - prevPct) * 100 : null;
+
+  const diarioMesAtual = diarioDoMesAtual();
+  const diasComDado = diarioMesAtual.map(d => Number(d.data.split('/')[0])).filter(n => !isNaN(n));
+  let diasCorridos = diasComDado.length ? Math.max(...diasComDado) : 0;
+  // Se o mês selecionado é o mês corrente (real, do sistema), o dia de hoje
+  // que porventura já entrou na base é sempre parcial (o dia ainda não
+  // fechou) e não pode contar como "corrido". Nesse caso, força D-1: os
+  // dias corridos vão até ontem, não até hoje. Meses já fechados (passados)
+  // continuam usando o último dia presente na base normalmente.
+  const nomeMesSelecionado = mesObj.mes.split('/')[0];
+  const anoCurtoSelecionado = mesObj.mes.split('/')[1];
+  const hoje = new Date();
+  const ehMesAtual =
+    NOME_MES[nomeMesSelecionado] === String(hoje.getMonth() + 1).padStart(2, '0') &&
+    Number(anoCurtoSelecionado) === (hoje.getFullYear() % 100);
+  if (ehMesAtual) {
+    diasCorridos = Math.min(diasCorridos, hoje.getDate() - 1);
+  }
+  const diasRestantes = Math.max(0, diasNoMesSelecionado() - diasCorridos);
+  const mttrTexto = formatarMttr(mttrMedioDoMes(mesObj));
+
+  const kpiRow = document.getElementById('kpiRow');
+  kpiRow.innerHTML = `
+    <div class="kpi"><div class="label">Total Indisponibilidade</div><div class="value">${t.total.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">Dentro do Prazo</div><div class="value" style="color:${cor.good}">${t.dentro.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi">
+      <div class="label">Fora do Prazo</div>
+      <div class="value" style="display:flex; gap:10px; align-items:baseline; justify-content:center;">
+        <span style="color:${cor.bad}">${t.fora.toLocaleString('pt-BR')}</span>
+        <span style="color:${cor.line};">|</span>
+        <span style="font-size:16px; color:${cor.muted};">MTTR <span class="mono" style="color:${cor.text}; font-size:16px; font-weight:600;">${mttrTexto}</span></span>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="label">Dias do Mês (D-1)</div>
+      <div class="value" style="display:flex; gap:10px; justify-content:center; align-items:baseline;">
+        <span>${diasCorridos}<span style="font-family:'Inter',sans-serif; font-size:10px; font-weight:600; color:${cor.muted}; text-transform:uppercase; margin-left:4px;">corridos</span></span>
+        <span style="color:${cor.muted};">/</span>
+        <span>${diasRestantes}<span style="font-family:'Inter',sans-serif; font-size:10px; font-weight:600; color:${cor.muted}; text-transform:uppercase; margin-left:4px;">restantes</span></span>
+      </div>
+    </div>
+    <div class="kpi"><div class="label">% Atendimento</div><div class="value" style="color:${statusColor(t.pct)}">${(t.pct*100).toFixed(1)}%</div>
+      ${deltaPP!==null ? `<div class="delta ${deltaPP>=0?'up':'down'}">${deltaPP>=0?'▲ +':'▼ '}${deltaPP.toFixed(1)} p.p. vs mês anterior</div>` : ''}
+    </div>
+  `;
+
+  const areasFiltradas = areasValidas(mesObj.areas);
+  const areaNames = Object.keys(areasFiltradas);
+  const dentroArr = areaNames.map(a=>areasFiltradas[a].dentro);
+  const foraArr = areaNames.map(a=>areasFiltradas[a].fora);
+  const pctPorArea = areaNames.map(a=>{
+    const d = areasFiltradas[a];
+    const totalArea = d.dentro + d.fora;
+    return totalArea ? (d.dentro/totalArea*100) : 0;
+  });
+
+  if(areaChart) areaChart.destroy();
+  areaChart = new Chart(document.getElementById('areaChart'), {
+    data:{ labels: areaNames, datasets:[
+      {
+        type:'bar', label:'Dentro do prazo', data:dentroArr,
+        backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2, yAxisID:'y',
+        datalabels:{
+          color: cor.text, anchor:'end', align:'top',
+          font:{ size:10, family:'JetBrains Mono', weight:'600' }
+        }
+      },
+      {
+        type:'bar', label:'Fora do prazo', data:foraArr,
+        backgroundColor: cor.bad, borderRadius:5, order:2, yAxisID:'y',
+        datalabels:{
+          color: cor.text, anchor:'end', align:'top',
+          font:{ size:10, family:'JetBrains Mono', weight:'600' }
+        }
+      },
+      {
+        type:'line', label:'% Dentro do prazo', data:pctPorArea,
+        borderColor: cor.warn, backgroundColor: cor.warn,
+        tension:.3, pointRadius:4, pointBackgroundColor: cor.warn,
+        yAxisID:'y1', order:1,
+        datalabels:{
+          color: cor.warn, align:'top', offset:8,
+          font:{ size:10, family:'JetBrains Mono', weight:'600' },
+          formatter: v => v.toFixed(0) + '%'
+        }
+      },
+    ]},
+    plugins:[ChartDataLabels],
+    options:{
+      responsive:true,
+      layout:{ padding:{ top:16 } },
+      plugins:{
+        legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } },
+        datalabels:{ display:true }
+      },
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+
+  const pct = t.pct;
+  if(gaugeChart) gaugeChart.destroy();
+  // Zonas fixas do mostrador: Ruim (vermelho) até meta-5pp, Regular (laranja) até a meta,
+  // Ótimo (verde) da meta até 100% — mesmos limites usados em statusColor()/nas pills das tabelas.
+  const zonaRuim = Math.max(0, DADOS.meta - 0.05);
+  const zonaRegular = 0.05;
+  const zonaOtimo = Math.max(0, 1 - DADOS.meta);
+  gaugeChart = new Chart(document.getElementById('gaugeChart'), {
+    type:'doughnut',
+    data:{ datasets:[{ data:[zonaRuim, zonaRegular, zonaOtimo], backgroundColor:[cor.bad, cor.warn, cor.good], borderWidth:0 }] },
+    options:{
+      rotation:-90, circumference:180, cutout:'75%',
+      plugins:{ tooltip:{enabled:false}, legend:{display:false}, datalabels:{display:false} }
+    },
+    plugins:[{
+      id:'gaugeNeedle',
+      afterDatasetsDraw(chart){
+        const arc = chart.getDatasetMeta(0).data[0];
+        if(!arc) return;
+        const { x, y, outerRadius, innerRadius, startAngle } = arc;
+        const angle = startAngle + pct * Math.PI; // varredura total do gauge = 180° (Math.PI rad)
+        const raio = (outerRadius + innerRadius) / 2;
+        const { ctx } = chart;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(-raio * 0.18, 0);
+        ctx.lineTo(raio * 0.92, 0);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#1b2440';
+        ctx.stroke();
+        ctx.restore();
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#1b2440';
+        ctx.fill();
+      }
+    }]
+  });
+  document.getElementById('gaugeTitulo').textContent = '% Atendimento no prazo (SLA ' + slaAtivo + ')';
+  document.getElementById('gaugeValue').textContent = (pct*100).toFixed(1) + '%';
+  document.getElementById('gaugeValue').style.color = statusColor(pct);
+  const diffPP = (pct - DADOS.meta)*100;
+  document.getElementById('gaugeDiff').textContent = `Meta 85% · ${diffPP>=0?'+':''}${diffPP.toFixed(1)} p.p.`;
+
+  // Visão mensal: barras Dentro/Fora (cinza/vermelho) + linha de % dentro
+  // do prazo mostrando a tendência de um mês pro outro + linha de Meta.
+  const monthlyLabels = DADOS.meses.map(m=>m.mes);
+  const monthlyDentro = DADOS.meses.map(m=>totais(m).dentro);
+  const monthlyFora = DADOS.meses.map(m=>totais(m).fora);
+  const monthlyPct = DADOS.meses.map(m=>totais(m).pct*100);
+  const monthlyMeta = DADOS.meses.map(()=>DADOS.meta*100);
+
+  if(monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(document.getElementById('monthlyChart'), {
+    data:{
+      labels: monthlyLabels,
+      datasets:[
+        {
+          type:'bar', label:'Dentro', data: monthlyDentro,
+          backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'bar', label:'Fora', data: monthlyFora,
+          backgroundColor: cor.bad, borderRadius:5, order:2,
+          datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+        },
+        {
+          type:'line', label:'% Dentro', data: monthlyPct,
+          borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
+          tension:.3, pointRadius:4, yAxisID:'y1', order:1,
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v.toFixed(1)+'%' }
+        },
+        {
+          type:'line', label:'Meta 85%', data: monthlyMeta,
+          borderColor: '#000000', borderDash:[5,5], pointRadius:0, yAxisID:'y1', order:1,
+          datalabels:{ display:false }
+        },
+      ]
+    },
+    plugins:[ChartDataLabels],
+    options:{ responsive:true,
+      plugins:{
+        legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } },
+        datalabels:{ display:true }
+      },
+      scales:{
+        x:{ stacked:false, ticks:{color:cor.muted}, grid:{display:false} },
+        y:{ stacked:false, ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+        y1:{ position:'right', min:0, max:100, ticks:{color:cor.muted, callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+
+  // ---- Total de sites únicos com incidente de indisponibilidade — mês selecionado ----
+  const totalSitesValueEl = document.getElementById('totalSitesValue');
+  if(totalSitesValueEl){
+    const totalSitesUnicos = typeof mesObj.totalSitesUnicos === 'number'
+      ? mesObj.totalSitesUnicos
+      : (Array.isArray(mesObj.topSites) ? mesObj.topSites.length : 0);
+    totalSitesValueEl.textContent = totalSitesUnicos.toLocaleString('pt-BR');
+  }
+
+  // ---- Top 15 Sites (SITE_CI) com mais incidentes — mês selecionado ----
+  const topSitesCanvas = document.getElementById('topSitesChart');
+  if(topSitesCanvas){
+    const topSites = Array.isArray(mesObj.topSites) ? mesObj.topSites : [];
+    const alturaPorBarra = 24;
+    const alturaMinima = 260;
+    const wrap = document.getElementById('topSitesChartWrap');
+    if(wrap) wrap.style.height = Math.max(alturaMinima, topSites.length * alturaPorBarra) + 'px';
+
+    if(topSitesChart) topSitesChart.destroy();
+    topSitesChart = new Chart(topSitesCanvas, {
+      type: 'bar',
+      data: {
+        labels: topSites.map(s => s.site),
+        datasets: [{
+          label: 'Incidentes', data: topSites.map(s => s.total),
+          backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Tier 2 / Tier 3 / Resolução (Top 10) — mês selecionado ----
+  // Vêm de mesObj.genericTier2Top10, mesObj.genericTier3Top10 e
+  // mesObj.resolucaoTop10 (gerados pelo Office Script por mês, igual o
+  // topSites): [{ nome: 'FALHA ENERGIA', total: 504 }, ...], vindos de
+  // GENERIC_CATEGORIZATION_TIER_2, GENERIC_CATEGORIZATION_TIER_3 e
+  // RESOLUTION_CATEGORY_TIER_1 na base de origem — cada um separado,
+  // sem fallback entre colunas.
+  function renderTopBarChart(canvasId, chartAtual, dados, paletaCores){
+    const canvasEl = document.getElementById(canvasId);
+    if(!canvasEl) return chartAtual;
+    const itens = Array.isArray(dados) ? dados.slice(0, 10) : [];
+    if(chartAtual) chartAtual.destroy();
+    return new Chart(canvasEl, {
+      type: 'bar',
+      data: {
+        labels: itens.map(i => i.nome),
+        datasets: [{
+          label: 'Ocorrências',
+          data: itens.map(i => i.total),
+          backgroundColor: itens.map((_, idx) => paletaCores[idx % paletaCores.length]),
+          borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted, font:{size:9}, maxRotation:60, minRotation:60}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  const paletaTier2 = ['#dc2626','#0e7c86','#d97706','#7f1d1d','#9ca3af','#fca5a5','#6ee7b7','#a8a29e','#a8a29e','#7f1d1d'];
+  const paletaTier3 = ['#2563eb','#5e34b5','#0e7490','#7c3aed','#94a3b8','#93c5fd','#a5b4fc','#94a3b8','#94a3b8','#7c3aed'];
+  const paletaResolucao = ['#f59e0b'];
+  genericTier2Chart = renderTopBarChart('genericTier2Chart', genericTier2Chart, mesObj.genericTier2Top10, paletaTier2);
+  genericTier3Chart = renderTopBarChart('genericTier3Chart', genericTier3Chart, mesObj.genericTier3Top10, paletaTier3);
+  resolucaoChart = renderTopBarChart('resolucaoChart', resolucaoChart, mesObj.resolucaoTop10, paletaResolucao);
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = areaNames.map(a=>{
+    const d = mesObj.areas[a];
+    const total = d.dentro + d.fora;
+    const p = d.dentro/total;
+    const cls = p>=DADOS.meta ? 'good' : (p>=DADOS.meta-0.05 ? 'warn' : 'bad');
+    return `<tr>
+      <td>${a}</td>
+      <td class="num">${total}</td>
+      <td class="num">${d.dentro}</td>
+      <td class="num">${d.fora}</td>
+      <td class="num"><span class="pill ${cls}">${(p*100).toFixed(1)}%</span></td>
     </tr>`;
+  }).join('');
+
+  renderDailyWeekly();
+
+  renderPendenciasFca();
+}
+
+const FORMS_BASE_URL = 'https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=ihNOxfV5lEKqm7AEz41_9z2zZl5tQQRLpF5gH_pjKXBUNkZWM0REVzVIQ0w0VTA3SExKQlRHWkJHSC4u';
+
+function montarLinkForms(p){
+  const params = [
+    ['rd4af75b8855c4a468cac043c40f222ea', '%22Reclassifica%C3%A7%C3%A3o%22'],
+    ['rd70c550b6fc24c109aafe1ff8e97cc4d', encodeURIComponent(p.supervisor || '')],
+    ['r127daf30934e49e3a3b4d4713c1f5baa', encodeURIComponent(p.incidente || '')],
+    ['r8831081a06f742ffb01171c464ac2d90', encodeURIComponent(p.site || '')],
+    ['r8833ecb62ffe44d1b758d6fc09bdab3f', encodeURIComponent(p.clear || '')],
+    ['r04f7ca84c88d453f87de59e6ee186715', encodeURIComponent(p.resolved || '')],
+    ['rf640f293e2c14ec0bf1525bc18d9091e', encodeURIComponent(p.reported || '')],
+    ['r135a04b2690b4d1f9188fd657b0e0027', encodeURIComponent(p.submit || '')],
+  ];
+  return FORMS_BASE_URL + params.map(([k,v]) => '&' + k + '=' + v).join('');
+}
+
+
+
+function renderPendenciasFca(){
+  const tbody = document.getElementById('pendenciasBody');
+  if(!tbody) return;
+  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+  const mesObj = DADOS.meses[mesAtualIdx];
+  const areasDoMes = Object.keys(areasValidas(mesObj.areas));
+  const nomeMes = mesObj.mes.split('/')[0];
+  const mm = NOME_MES[nomeMes];
+  const anoCurto = mesObj.mes.split('/')[1];
+  const mesOrdAtual = '20' + anoCurto + '-' + mm;
+  const todosDoMes = PENDENTES_FCA.filter(p => areasDoMes.indexOf(p.area) !== -1 && p.mesOrd === mesOrdAtual);
+  const pendentesDoMes = todosDoMes.filter(p => p.pendente);
+
+  const itensFiltrados = todosDoMes.filter(p => {
+    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return false;
+    if(statusFiltroAtual === 'pendente' && !p.pendente) return false;
+    if(statusFiltroAtual === 'preenchido' && p.pendente) return false;
+    return true;
+  });
+  const justificadosDoMes = itensFiltrados.filter(p => !p.pendente);
+
+  const badge = document.getElementById('fcaCountNav');
+  if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
+
+  // ---- Total x Fora do Prazo por Horário (mês atual) — compara SUBMIT_DATE x CLEAR_DATE ----
+  // mesObj.horasSubmit / horasClear vêm do Office Script: array de 24
+  // posições ({hora, total, fora}) já considerando o SLA ativo (4h/6h).
+  function renderHoraForaChart(canvasId, statsArray, chartAtual){
+    const canvasEl = document.getElementById(canvasId);
+    if(!canvasEl) return chartAtual;
+    const stats = (Array.isArray(statsArray) && statsArray.length === 24)
+      ? statsArray
+      : Array.from({length:24}, (_, h) => ({ hora: String(h).padStart(2,'0'), total: 0, fora: 0 }));
+
+    const horaLabels = stats.map(s => s.hora + 'h');
+    const totalArr = stats.map(s => s.total);
+    const foraArr = stats.map(s => s.fora);
+
+    if(chartAtual) chartAtual.destroy();
+    const novoChart = new Chart(canvasEl, {
+      type: 'bar',
+      data: {
+        labels: horaLabels,
+        datasets: [
+          {
+            label: 'Total de incidentes', data: totalArr,
+            backgroundColor: 'rgba(107,117,144,.35)', borderRadius: 4,
+            datalabels: { display:false }
+          },
+          {
+            label: 'Fora do prazo', data: foraArr,
+            backgroundColor: cor.bad, borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'}, formatter: v => v > 0 ? v : '' }
+          }
+        ]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: cor.muted, font:{family:'Inter', size:10} } },
+          datalabels: { display:true },
+          tooltip: {
+            callbacks: {
+              title: (items) => 'Horário ' + items[0].label,
+              afterBody: (items) => {
+                const idx = items[0].dataIndex;
+                const total = totalArr[idx];
+                const fora = foraArr[idx];
+                const pct = total > 0 ? (fora/total*100).toFixed(0) : 0;
+                return total > 0 ? [fora + ' de ' + total + ' fora do prazo (' + pct + '%)'] : [];
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+    return novoChart;
+  }
+
+  horaForaSubmitChart = renderHoraForaChart('horaForaSubmitChart', mesObj.horasSubmit, horaForaSubmitChart);
+  horaForaClearChart = renderHoraForaChart('horaForaClearChart', mesObj.horasClear, horaForaClearChart);
+
+  // ---- Resumo por Supervisor (mês atual, sem aplicar os filtros de Supervisor/Status da tela) ----
+  const resumoSupervisorBody = document.getElementById('resumoSupervisorBody');
+  if(resumoSupervisorBody){
+    const porSupervisorResumo = {};
+    todosDoMes.forEach(p => {
+      const k = norm(p.supervisor) || 'Sem supervisor';
+      if(!porSupervisorResumo[k]) porSupervisorResumo[k] = { total: 0, preenchido: 0 };
+      porSupervisorResumo[k].total++;
+      if(!p.pendente) porSupervisorResumo[k].preenchido++;
+    });
+    const supervisoresResumo = Object.keys(porSupervisorResumo).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(supervisoresResumo.length === 0){
+      resumoSupervisorBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:${cor.muted};">Nenhum incidente fora do prazo neste mês</td></tr>`;
+    } else {
+      resumoSupervisorBody.innerHTML = supervisoresResumo.map(k => {
+        const r = porSupervisorResumo[k];
+        const pct = r.total > 0 ? (r.preenchido / r.total * 100) : 0;
+        const cls = pct >= 85 ? 'good' : (pct >= 60 ? 'warn' : 'bad');
+        return `<tr>
+          <td>${k}</td>
+          <td class="num">${r.total}</td>
+          <td class="num">${r.preenchido}</td>
+          <td class="num"><span class="pill ${cls}">${pct.toFixed(1)}%</span></td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  const total = itensFiltrados.length;
+  const qtdJustificado = justificadosDoMes.length;
+  const pctJustificado = total > 0 ? (qtdJustificado / total * 100) : 0;
+  const kpiRow = document.getElementById('fcaKpiRow');
+  if(kpiRow){
+    kpiRow.innerHTML = `
+      <div class="kpi"><div class="label">Total Fora do Prazo</div><div class="value">${total.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi"><div class="label">Qtd Justificado</div><div class="value" style="color:${cor.accent}">${qtdJustificado.toLocaleString('pt-BR')}</div></div>
+      <div class="kpi"><div class="label">% Justificado</div><div class="value" style="color:${statusColor(pctJustificado/100)}">${pctJustificado.toFixed(1)}%</div></div>
+    `;
+  }
+
+  const causaCounts = {};
+  justificadosDoMes.forEach(p => {
+    const c = p.causa || 'Não informado';
+    causaCounts[c] = (causaCounts[c] || 0) + 1;
+  });
+  const causaEntries = Object.entries(causaCounts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+
+  if(causaChart) causaChart.destroy();
+  const causaCanvas = document.getElementById('causaChart');
+  if(causaCanvas){
+    causaChart = new Chart(causaCanvas, {
+      type: 'bar',
+      data: {
+        labels: causaEntries.map(e => e[0]),
+        datasets: [{
+          label: 'Ocorrências', data: causaEntries.map(e => e[1]),
+          backgroundColor: 'rgba(94,52,181,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  const acaoCounts = {};
+  justificadosDoMes.forEach(p => {
+    const a = p.acao || 'Não informado';
+    acaoCounts[a] = (acaoCounts[a] || 0) + 1;
+  });
+  const acaoEntries = Object.entries(acaoCounts).sort((a,b) => b[1]-a[1]);
+
+  if(acaoChart) acaoChart.destroy();
+  const acaoCanvas = document.getElementById('acaoChart');
+  if(acaoCanvas){
+    acaoChart = new Chart(acaoCanvas, {
+      type: 'bar',
+      data: {
+        labels: acaoEntries.map(e => e[0]),
+        datasets: [{
+          label: 'Ocorrências', data: acaoEntries.map(e => e[1]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 5,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:11, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  const selectSupervisor = document.getElementById('supervisorFiltro');
+  if(selectSupervisor && mesPopuladoFiltro !== mesAtualIdx){
+    const supervisores = Array.from(new Set(todosDoMes.map(p => norm(p.supervisor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(supervisorFiltroAtual && supervisores.indexOf(supervisorFiltroAtual) === -1){
+      supervisorFiltroAtual = '';
+    }
+    selectSupervisor.innerHTML = '<option value="">Todos</option>' +
+      supervisores.map(s => `<option value="${s}">${s}</option>`).join('');
+    selectSupervisor.value = supervisorFiltroAtual;
+    const selectStatus = document.getElementById('statusFiltro');
+    if(selectStatus) selectStatus.value = statusFiltroAtual;
+    mesPopuladoFiltro = mesAtualIdx;
+  }
+
+  if(itensFiltrados.length === 0){
+    const msg = (supervisorFiltroAtual || statusFiltroAtual)
+      ? 'Nenhum incidente para os filtros selecionados neste mês.'
+      : 'Nenhum incidente fora do prazo neste mês 🎉';
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:${cor.muted};">${msg}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = itensFiltrados.map(p => {
+    const statusPill = p.pendente
+      ? `<span class="pill bad">A preencher</span>`
+      : `<span class="pill good">Preenchido</span>`;
+    const ultimaCol = p.pendente
+      ? `<a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">Preencher</a>`
+      : '-';
+    return `<tr>
+    <td>${p.supervisor || '-'}</td>
+    <td>${p.area || '-'}</td>
+    <td>${p.site || '-'}</td>
+    <td>${p.incidente || '-'}</td>
+    <td>${statusPill}</td>
+    <td>${p.causa || '-'}</td>
+    <td>${p.acao || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.submit || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.clear || '-'}</td>
+    <td class="mono" style="font-size:12px;">${p.resolved || '-'}</td>
+    <td>${ultimaCol}</td>
+  </tr>`;
   }).join('');
 }
 
-// debounce helper
-function debounce(fn, wait) {
-  let t;
-  return function(...args) {
-    clearTimeout(t);
-    t = setTimeout(() => fn.apply(this, args), wait);
-  };
-}
+renderPendenciasFcaRef = renderPendenciasFca;
 
-// fio do input de busca do Headcount
-(function wireHcSearch(){
-  document.addEventListener('DOMContentLoaded', () => {
-    const input = document.getElementById('hc-search');
-    if(!input) return;
-    input.addEventListener('input', debounce(function(e){
-      const q = e.target.value || '';
-      renderEmployeeTable(q);
-    }, 200));
-  });
-})();
+render();
 
-// Inicializa carregamento de dados
-document.addEventListener('DOMContentLoaded', () => {
-  carregarDados().catch(()=>{});
-});
+} // fim montarPagina
 
+carregarDados();
 </script>
 </body>
 </html>
