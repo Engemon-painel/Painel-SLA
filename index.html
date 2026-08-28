@@ -1472,7 +1472,6 @@ function renderFrota(){
   const statusOrdenados = Object.keys(porStatus).sort((a,b)=> porStatus[b]-porStatus[a]);
 
   kpiRow.innerHTML =
-    `<div class="kpi"><div class="label">Total de Veículos</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div></div>` +
     statusOrdenados.map((k, i) => {
       const qtd = porStatus[k];
       const pct = total > 0 ? (qtd/total*100).toFixed(1) : 0;
