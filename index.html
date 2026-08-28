@@ -538,6 +538,7 @@
               <thead>
                 <tr>
                   <th>Placa</th>
+                  <th class="num">Valor Combustível</th>
                   <th>Operação</th>
                   <th>Condutor</th>
                   <th>Marca</th>
@@ -1331,6 +1332,7 @@ function renderFrotaTabela(){
 
   tbody.innerHTML = pagina.map(v => `<tr>
     <td class="mono">${esc(v.placa) || '—'}</td>
+    <td class="num mono">${esc(formatarValorFrota(v.valorCombustivel))}</td>
     <td>${esc(v.operacao) || '—'}</td>
     <td>${esc(v.condutor) || '—'}</td>
     <td>${esc(v.marca) || '—'}</td>
@@ -1368,7 +1370,7 @@ function exportarFrotaCsv(){
       alert('Nenhum veículo para exportar com os filtros atuais.');
       return;
     }
-    const colunas = ['Placa','Operacao','Condutor','Marca','Modelo','Combustivel','Tipo','Status','Valor'];
+    const colunas = ['Placa','ValorCombustivel','Operacao','Condutor','Marca','Modelo','Combustivel','Tipo','Status','Valor'];
     function csvEsc(v){
       const s = String(v ?? '');
       if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
@@ -1376,7 +1378,7 @@ function exportarFrotaCsv(){
     }
     const linhas = [colunas.map(csvEsc).join(';')];
     itens.forEach(v => {
-      linhas.push([v.placa, v.operacao, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor)].map(csvEsc).join(';'));
+      linhas.push([v.placa, formatarValorFrota(v.valorCombustivel), v.operacao, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor)].map(csvEsc).join(';'));
     });
     const csvContent = '\uFEFF' + linhas.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
