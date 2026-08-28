@@ -206,6 +206,7 @@
     <div class="nav-item" id="nav-site" onclick="mostrarPagina('site')"><span class="nav-icon">📡</span> Por Site</div>
     <div class="nav-item" id="nav-fca" onclick="mostrarPagina('fca')"><span class="nav-icon">⚠️</span> FCA<span id="fcaCountNav" style="margin-left:4px;"></span></div>
     <div class="nav-item" id="nav-organograma" onclick="mostrarPagina('organograma')"><span class="nav-icon">👥</span> Organograma</div>
+    <div class="nav-item" id="nav-frota" onclick="mostrarPagina('frota')"><span class="nav-icon">🚗</span> Gestão de Frotas</div>
   </nav>
 
   <main class="main-content">
@@ -460,6 +461,90 @@
       </div>
     </div>
 
+    <div class="pagina" id="pagina-frota" style="display:none;">
+      <div class="panel" id="frotaSecao">
+        <h2>Gestão de Frotas</h2>
+        <div class="hint">Dados da aba Placa, mesma base do painel de SLA.</div>
+
+        <div class="kpi-row" id="frotaKpiRow" style="margin-bottom:20px;"></div>
+
+        <div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="panel">
+            <h2>Veículos por Modelo</h2>
+            <div class="hint">Top 10 modelos com mais veículos.</div>
+            <div style="position:relative; height:260px;">
+              <canvas id="frotaModeloChart"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Status da Frota</h2>
+            <div class="hint">Distribuição por status.</div>
+            <div style="position:relative; height:260px;">
+              <canvas id="frotaStatusChart"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Veículos por Combustível</h2>
+            <div class="hint">Distribuição por tipo de combustível.</div>
+            <div id="frotaCombustivelLista"></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <h2>Veículos</h2>
+          <div class="hint">Busca por placa, condutor, marca ou modelo.</div>
+
+          <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <label for="frotaStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Status</label>
+            <select id="frotaStatusFiltro" class="mono" onchange="filtrarFrotaPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="frotaModeloFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Modelo</label>
+            <select id="frotaModeloFiltro" class="mono" onchange="filtrarFrotaPorModelo(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="frotaTipoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Tipo</label>
+            <select id="frotaTipoFiltro" class="mono" onchange="filtrarFrotaPorTipo(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="frotaCombustivelFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Combustível</label>
+            <select id="frotaCombustivelFiltro" class="mono" onchange="filtrarFrotaPorCombustivel(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFrotaCsv()">⬇ Exportar (CSV)</button>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
+            <div class="search" title="Buscar por placa, condutor, marca ou modelo">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <input id="frota-search" type="search" placeholder="Buscar por placa, condutor, marca ou modelo..." aria-label="Buscar veículos" />
+            </div>
+          </div>
+
+          <div style="overflow:auto; border-radius:8px;">
+            <table id="frotaTable" role="table" aria-label="Tabela de veículos">
+              <thead>
+                <tr>
+                  <th>Placa</th>
+                  <th>Condutor</th>
+                  <th>Marca</th>
+                  <th>Modelo</th>
+                  <th>Combustível</th>
+                  <th>Tipo</th>
+                  <th>Status</th>
+                  <th class="num">Valor</th>
+                </tr>
+              </thead>
+              <tbody id="frotaTableBody"></tbody>
+            </table>
+            <div id="frotaNoResults" class="no-results" style="display:none">Nenhum veículo encontrado.</div>
+          </div>
+
+          <div id="frotaPaginacao" style="display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-top:12px; flex-wrap:wrap;"></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -474,6 +559,7 @@ let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
 let COLABORADORES = [];
+let FROTA = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
@@ -503,7 +589,7 @@ function filtrarPorStatusHc(valor){
 }
 
 // ---- Navegação por páginas (menu lateral) ----
-const PAGINAS = ['consolidado', 'diario', 'area', 'site', 'fca', 'organograma'];
+const PAGINAS = ['consolidado', 'diario', 'area', 'site', 'fca', 'organograma', 'frota'];
 
 function mostrarPagina(nome){
   PAGINAS.forEach(p => {
@@ -518,6 +604,7 @@ function mostrarPagina(nome){
   // acontece ao trocar de mês/SLA — agora com a página certa visível.
   if(typeof render === 'function') render();
   if(nome === 'organograma' && typeof renderHeadcount === 'function') renderHeadcount();
+  if(nome === 'frota' && typeof renderFrota === 'function') renderFrota();
 }
 
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
@@ -555,6 +642,7 @@ async function carregarDados(){
     DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
     PENDENTES_FCA = data.pendentesFca || [];
     COLABORADORES = data.colaboradores || [];
+    FROTA = data.frota || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
@@ -1103,6 +1191,323 @@ function renderHeadcount(){
   // Atualiza também a tabela de colaboradores com o texto de busca atual
   const searchInput = document.getElementById('hc-search');
   renderEmployeeTable(searchInput ? searchInput.value : '');
+}
+
+// ======================================================
+// GESTÃO DE FROTAS
+// Seção independente do mês/SLA selecionados no Consolidado; fica em
+// escopo global, mesmo padrão de HEADCOUNT logo acima.
+// ======================================================
+
+let frotaStatusFiltroAtual = '';
+let frotaModeloFiltroAtual = '';
+let frotaTipoFiltroAtual = '';
+let frotaCombustivelFiltroAtual = '';
+let frotaFiltrosPopulados = false;
+let frotaPaginaAtual = 1;
+const FROTA_POR_PAGINA = 10;
+let frotaModeloChartInst, frotaStatusChartInst;
+
+function filtrarFrotaPorStatus(valor){
+  frotaStatusFiltroAtual = valor;
+  frotaPaginaAtual = 1;
+  renderFrotaTabela();
+}
+function filtrarFrotaPorModelo(valor){
+  frotaModeloFiltroAtual = valor;
+  frotaPaginaAtual = 1;
+  renderFrotaTabela();
+}
+function filtrarFrotaPorTipo(valor){
+  frotaTipoFiltroAtual = valor;
+  frotaPaginaAtual = 1;
+  renderFrotaTabela();
+}
+function filtrarFrotaPorCombustivel(valor){
+  frotaCombustivelFiltroAtual = valor;
+  frotaPaginaAtual = 1;
+  renderFrotaTabela();
+}
+
+function normFrota(s){ return (s || '').toString().replace(/\s+/g, ' ').trim(); }
+
+// Paleta cíclica usada nos KPIs de status e na lista de combustível —
+// os nomes de status/combustível vêm direto da planilha, então a cor é
+// atribuída pela ordem de aparição (mais frequente primeiro), não por
+// palavra-chave fixa.
+const PALETA_FROTA = [
+  { bg:'rgba(5,150,105,.10)',  border:'rgba(5,150,105,.35)',  text:'#047857' },
+  { bg:'rgba(37,99,235,.10)',  border:'rgba(37,99,235,.35)',  text:'#1d4ed8' },
+  { bg:'rgba(217,119,6,.10)',  border:'rgba(217,119,6,.35)',  text:'#b45309' },
+  { bg:'rgba(220,38,38,.10)',  border:'rgba(220,38,38,.35)',  text:'#b91c1c' },
+  { bg:'rgba(94,52,181,.10)',  border:'rgba(94,52,181,.35)',  text:'#5e34b5' },
+  { bg:'rgba(14,124,134,.10)', border:'rgba(14,124,134,.35)', text:'#0e7c86' },
+];
+
+function formatarValorFrota(v){
+  if(v === null || v === undefined || v === '') return '—';
+  if(typeof v === 'number'){
+    return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+  }
+  return String(v);
+}
+
+function frotaFiltrada(){
+  const q = (document.getElementById('frota-search')?.value || '').toLowerCase().trim();
+  return FROTA.filter(v => {
+    if(frotaStatusFiltroAtual && normFrota(v.status) !== frotaStatusFiltroAtual) return false;
+    if(frotaModeloFiltroAtual && normFrota(v.modelo) !== frotaModeloFiltroAtual) return false;
+    if(frotaTipoFiltroAtual && normFrota(v.tipo) !== frotaTipoFiltroAtual) return false;
+    if(frotaCombustivelFiltroAtual && normFrota(v.combustivel) !== frotaCombustivelFiltroAtual) return false;
+    if(q){
+      const hay = [v.placa, v.condutor, v.marca, v.modelo].map(x => normFrota(x).toLowerCase()).join(' ');
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderFrotaTabela(){
+  const tbody = document.getElementById('frotaTableBody');
+  const noResults = document.getElementById('frotaNoResults');
+  const paginacao = document.getElementById('frotaPaginacao');
+  if(!tbody) return;
+
+  const itens = frotaFiltrada();
+
+  if(itens.length === 0){
+    tbody.innerHTML = '';
+    if(noResults) noResults.style.display = '';
+    if(paginacao) paginacao.innerHTML = '';
+    return;
+  }
+  if(noResults) noResults.style.display = 'none';
+
+  const totalPaginas = Math.max(1, Math.ceil(itens.length / FROTA_POR_PAGINA));
+  if(frotaPaginaAtual > totalPaginas) frotaPaginaAtual = totalPaginas;
+  if(frotaPaginaAtual < 1) frotaPaginaAtual = 1;
+
+  const inicio = (frotaPaginaAtual - 1) * FROTA_POR_PAGINA;
+  const pagina = itens.slice(inicio, inicio + FROTA_POR_PAGINA);
+
+  function esc(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function pillStatusFrota(status){
+    const n = semAcentoHc(status);
+    let cls = 'good';
+    if(n.includes('inativ') || n.includes('sinistr') || n.includes('roubad')) cls = 'bad';
+    else if(n.includes('manuten') || n.includes('oficina') || n.includes('funilaria')) cls = 'warn';
+    return `<span class="pill ${cls}">${esc(status) || '—'}</span>`;
+  }
+
+  tbody.innerHTML = pagina.map(v => `<tr>
+    <td class="mono">${esc(v.placa) || '—'}</td>
+    <td>${esc(v.condutor) || '—'}</td>
+    <td>${esc(v.marca) || '—'}</td>
+    <td>${esc(v.modelo) || '—'}</td>
+    <td>${esc(v.combustivel) || '—'}</td>
+    <td>${esc(v.tipo) || '—'}</td>
+    <td>${pillStatusFrota(v.status)}</td>
+    <td class="num mono">${esc(formatarValorFrota(v.valor))}</td>
+  </tr>`).join('');
+
+  if(paginacao){
+    let html = `<span class="mono" style="font-size:11px; color:${cor.muted}; margin-right:auto;">Mostrando ${inicio+1}–${Math.min(inicio+FROTA_POR_PAGINA, itens.length)} de ${itens.length} veículos</span>`;
+    html += `<button type="button" class="chip" ${frotaPaginaAtual<=1?'disabled':''} onclick="mudarPaginaFrota(${frotaPaginaAtual-1})" style="cursor:pointer;">‹</button>`;
+    const maxBotoes = 7;
+    let ini = Math.max(1, frotaPaginaAtual - 3);
+    let fim = Math.min(totalPaginas, ini + maxBotoes - 1);
+    ini = Math.max(1, fim - maxBotoes + 1);
+    for(let p = ini; p <= fim; p++){
+      html += `<button type="button" class="chip${p===frotaPaginaAtual?' active':''}" onclick="mudarPaginaFrota(${p})" style="cursor:pointer;">${p}</button>`;
+    }
+    html += `<button type="button" class="chip" ${frotaPaginaAtual>=totalPaginas?'disabled':''} onclick="mudarPaginaFrota(${frotaPaginaAtual+1})" style="cursor:pointer;">›</button>`;
+    paginacao.innerHTML = html;
+  }
+}
+
+function mudarPaginaFrota(p){
+  frotaPaginaAtual = p;
+  renderFrotaTabela();
+}
+
+function exportarFrotaCsv(){
+  try {
+    const itens = frotaFiltrada();
+    if(!itens.length){
+      alert('Nenhum veículo para exportar com os filtros atuais.');
+      return;
+    }
+    const colunas = ['Placa','Condutor','Marca','Modelo','Combustivel','Tipo','Status','Valor'];
+    function csvEsc(v){
+      const s = String(v ?? '');
+      if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }
+    const linhas = [colunas.map(csvEsc).join(';')];
+    itens.forEach(v => {
+      linhas.push([v.placa, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor)].map(csvEsc).join(';'));
+    });
+    const csvContent = '\uFEFF' + linhas.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Frota_Veiculos.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (erro) {
+    console.error('Erro ao exportar frota:', erro);
+    alert('Ocorreu um erro ao exportar o CSV.\n\n' + (erro && erro.message ? erro.message : erro));
+  }
+}
+
+function renderFrota(){
+  const kpiRow = document.getElementById('frotaKpiRow');
+  if(!kpiRow) return;
+
+  // ---- Popula os filtros (uma única vez) ----
+  if(!frotaFiltrosPopulados){
+    const selectStatus = document.getElementById('frotaStatusFiltro');
+    const selectModelo = document.getElementById('frotaModeloFiltro');
+    const selectTipo = document.getElementById('frotaTipoFiltro');
+    const selectCombustivel = document.getElementById('frotaCombustivelFiltro');
+
+    const statusUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.status)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const modelosUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.modelo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const tiposUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.tipo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const combustiveisUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.combustivel)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+
+    if(selectStatus) selectStatus.innerHTML = '<option value="">Todos</option>' + statusUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectModelo) selectModelo.innerHTML = '<option value="">Todos</option>' + modelosUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectTipo) selectTipo.innerHTML = '<option value="">Todos</option>' + tiposUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectCombustivel) selectCombustivel.innerHTML = '<option value="">Todos</option>' + combustiveisUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+
+    const inputBusca = document.getElementById('frota-search');
+    if(inputBusca){
+      inputBusca.addEventListener('input', debounce(() => {
+        frotaPaginaAtual = 1;
+        renderFrotaTabela();
+      }, 200));
+    }
+
+    frotaFiltrosPopulados = true;
+  }
+
+  const total = FROTA.length;
+
+  // ---- KPIs: total + um por status (na ordem do mais frequente) ----
+  const porStatus = {};
+  FROTA.forEach(v => {
+    const k = normFrota(v.status) || 'Sem status';
+    porStatus[k] = (porStatus[k] || 0) + 1;
+  });
+  const statusOrdenados = Object.keys(porStatus).sort((a,b)=> porStatus[b]-porStatus[a]);
+
+  kpiRow.innerHTML =
+    `<div class="kpi"><div class="label">Total de Veículos</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div></div>` +
+    statusOrdenados.map((k, i) => {
+      const qtd = porStatus[k];
+      const pct = total > 0 ? (qtd/total*100).toFixed(1) : 0;
+      const p = PALETA_FROTA[i % PALETA_FROTA.length];
+      return `<div class="kpi" style="background:${p.bg}; border-color:${p.border};">
+        <div class="label" style="color:${p.text};">${k}</div>
+        <div class="value" style="color:${p.text};">${qtd}</div>
+        <div class="delta" style="color:${p.text};">${pct}% do total</div>
+      </div>`;
+    }).join('');
+
+  // ---- Gráfico: Veículos por Modelo (Top 10) ----
+  const porModelo = {};
+  FROTA.forEach(v => {
+    const k = normFrota(v.modelo) || 'Sem modelo';
+    porModelo[k] = (porModelo[k] || 0) + 1;
+  });
+  const modelosTop10 = Object.keys(porModelo)
+    .map(k => ({ modelo: k, total: porModelo[k] }))
+    .sort((a,b) => b.total - a.total)
+    .slice(0, 10);
+
+  const modeloCanvas = document.getElementById('frotaModeloChart');
+  if(modeloCanvas){
+    if(frotaModeloChartInst) frotaModeloChartInst.destroy();
+    frotaModeloChartInst = new Chart(modeloCanvas, {
+      type: 'bar',
+      data: {
+        labels: modelosTop10.map(m => m.modelo),
+        datasets: [{
+          label: 'Veículos', data: modelosTop10.map(m => m.total),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Gráfico: Status da Frota (rosca) ----
+  const statusCanvas = document.getElementById('frotaStatusChart');
+  if(statusCanvas){
+    if(frotaStatusChartInst) frotaStatusChartInst.destroy();
+    const coresStatus = statusOrdenados.map((_, i) => PALETA_FROTA[i % PALETA_FROTA.length].text);
+    frotaStatusChartInst = new Chart(statusCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: statusOrdenados,
+        datasets: [{
+          data: statusOrdenados.map(k => porStatus[k]),
+          backgroundColor: coresStatus,
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '68%',
+        plugins: {
+          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          datalabels: { display:false }
+        }
+      }
+    });
+  }
+
+  // ---- Lista: Veículos por Combustível ----
+  const listaCombustivel = document.getElementById('frotaCombustivelLista');
+  if(listaCombustivel){
+    const porCombustivel = {};
+    FROTA.forEach(v => {
+      const k = normFrota(v.combustivel) || 'Sem combustível';
+      porCombustivel[k] = (porCombustivel[k] || 0) + 1;
+    });
+    const combustiveisOrdenados = Object.keys(porCombustivel).sort((a,b)=> porCombustivel[b]-porCombustivel[a]);
+    listaCombustivel.innerHTML = combustiveisOrdenados.map((k, i) => {
+      const qtd = porCombustivel[k];
+      const pct = total > 0 ? (qtd/total*100) : 0;
+      const p = PALETA_FROTA[i % PALETA_FROTA.length];
+      return `<div style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+          <span>${k}</span>
+          <span class="mono" style="color:${cor.muted};">${qtd} (${pct.toFixed(1)}%)</span>
+        </div>
+        <div style="background:${cor.line}; border-radius:999px; height:8px; overflow:hidden;">
+          <div style="width:${pct}%; background:${p.text}; height:100%;"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  renderFrotaTabela();
 }
 
 function exportarFcaPreenchidoCsv(){
