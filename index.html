@@ -206,6 +206,7 @@
     <div class="nav-item" id="nav-site" onclick="mostrarPagina('site')"><span class="nav-icon">📡</span> Por Site</div>
     <div class="nav-item" id="nav-fca" onclick="mostrarPagina('fca')"><span class="nav-icon">⚠️</span> FCA<span id="fcaCountNav" style="margin-left:4px;"></span></div>
     <div class="nav-item" id="nav-organograma" onclick="mostrarPagina('organograma')"><span class="nav-icon">👥</span> Organograma</div>
+    <div class="nav-item" id="nav-vagas" onclick="mostrarPagina('vagas')"><span class="nav-icon">🧑‍💼</span> Gestão de Vagas</div>
     <div class="nav-item" id="nav-frota" onclick="mostrarPagina('frota')"><span class="nav-icon">🚗</span> Gestão de Frotas</div>
   </nav>
 
@@ -461,6 +462,112 @@
       </div>
     </div>
 
+    <div class="pagina" id="pagina-vagas" style="display:none;">
+      <div class="panel" id="vagasSecao">
+        <h2>Gestão de Vagas</h2>
+        <div class="hint">Dados da aba Controle, mesma base do painel de SLA.</div>
+
+        <div class="kpi-row" id="vagasKpiRow" style="margin-bottom:20px;"></div>
+
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+          <div class="panel">
+            <h2>Por Cargo</h2>
+            <div class="hint">Volume de requisições por cargo.</div>
+            <div id="vagasCargoLista"></div>
+          </div>
+          <div class="panel">
+            <h2>Por Motivo</h2>
+            <div class="hint">Volume de requisições por motivo.</div>
+            <div id="vagasMotivoLista"></div>
+          </div>
+          <div class="panel">
+            <h2>Por Status Req.</h2>
+            <div class="hint">Volume por status da requisição.</div>
+            <div id="vagasStatusReqLista"></div>
+          </div>
+          <div class="panel">
+            <h2>Por Status</h2>
+            <div class="hint">Volume por status geral.</div>
+            <div id="vagasStatusLista"></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <h2>Requisições</h2>
+          <div class="hint">Busca por requisição, cargo, recrutadora, área, supervisão, candidato ou CPF.</div>
+
+          <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <label for="vagasCargoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Cargo</label>
+            <select id="vagasCargoFiltro" class="mono" onchange="filtrarVagasPorCargo(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="vagasMotivoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Motivo</label>
+            <select id="vagasMotivoFiltro" class="mono" onchange="filtrarVagasPorMotivo(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="vagasStatusReqFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status Req.</label>
+            <select id="vagasStatusReqFiltro" class="mono" onchange="filtrarVagasPorStatusReq(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="vagasStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
+            <select id="vagasStatusFiltro" class="mono" onchange="filtrarVagasPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarVagasCsv()">⬇ Exportar (CSV)</button>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
+            <div class="search" title="Buscar por requisição, cargo, recrutadora, área, supervisão, candidato ou CPF">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <input id="vagas-search" type="search" placeholder="Buscar por requisição, cargo, recrutadora, área, supervisão, candidato ou CPF..." aria-label="Buscar vagas" />
+            </div>
+          </div>
+
+          <div style="overflow:auto; border-radius:8px;">
+            <table id="vagasTable" role="table" aria-label="Tabela de vagas">
+              <thead>
+                <tr>
+                  <th>Recrutadora</th>
+                  <th>Data de criação da Requisição</th>
+                  <th>Requisição aprovada</th>
+                  <th>Previsão de entrega</th>
+                  <th>Requisição</th>
+                  <th>ÁREA</th>
+                  <th>SUPERVISÃO</th>
+                  <th>Cargo (Obrigatório)</th>
+                  <th class="num">Número de posições</th>
+                  <th>Motivo</th>
+                  <th>PROFISSIONAL SUBSTITUÍDO</th>
+                  <th>Column12</th>
+                  <th>Column13</th>
+                  <th>Status Req.</th>
+                  <th>Fechamento</th>
+                  <th>STATUS</th>
+                  <th>Nome do candidato aprovado</th>
+                  <th>CPF</th>
+                  <th class="num">SLA dias</th>
+                  <th>Envio de link documento</th>
+                  <th>Status ASO</th>
+                  <th>Data exame</th>
+                  <th>Previsão de admissão</th>
+                  <th class="num">SLA Admissão</th>
+                  <th>Data Integração</th>
+                  <th>Liberado?</th>
+                  <th class="num">SLA total</th>
+                  <th>Column28</th>
+                  <th>Column29</th>
+                </tr>
+              </thead>
+              <tbody id="vagasTableBody"></tbody>
+            </table>
+            <div id="vagasNoResults" class="no-results" style="display:none">Nenhuma requisição encontrada.</div>
+          </div>
+
+          <div id="vagasPaginacao" style="display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-top:12px; flex-wrap:wrap;"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="pagina" id="pagina-frota" style="display:none;">
       <div class="panel" id="frotaSecao">
         <h2>Gestão de Frotas</h2>
@@ -586,6 +693,7 @@ let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
 let COLABORADORES = [];
 let FROTA = [];
+let VAGAS = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
@@ -615,7 +723,7 @@ function filtrarPorStatusHc(valor){
 }
 
 // ---- Navegação por páginas (menu lateral) ----
-const PAGINAS = ['consolidado', 'diario', 'area', 'site', 'fca', 'organograma', 'frota'];
+const PAGINAS = ['consolidado', 'diario', 'area', 'site', 'fca', 'organograma', 'vagas', 'frota'];
 
 function mostrarPagina(nome){
   PAGINAS.forEach(p => {
@@ -630,6 +738,7 @@ function mostrarPagina(nome){
   // acontece ao trocar de mês/SLA — agora com a página certa visível.
   if(typeof render === 'function') render();
   if(nome === 'organograma' && typeof renderHeadcount === 'function') renderHeadcount();
+  if(nome === 'vagas' && typeof renderVagas === 'function') renderVagas();
   if(nome === 'frota' && typeof renderFrota === 'function') renderFrota();
 }
 
@@ -669,6 +778,7 @@ async function carregarDados(){
     PENDENTES_FCA = data.pendentesFca || [];
     COLABORADORES = data.colaboradores || [];
     FROTA = data.frota || [];
+    VAGAS = data.vagas || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
@@ -1217,6 +1327,245 @@ function renderHeadcount(){
   // Atualiza também a tabela de colaboradores com o texto de busca atual
   const searchInput = document.getElementById('hc-search');
   renderEmployeeTable(searchInput ? searchInput.value : '');
+}
+
+// ======================================================
+// GESTÃO DE VAGAS
+// Seção independente do mês/SLA selecionados no Consolidado; mesmo
+// padrão de GESTÃO DE FROTAS logo abaixo.
+// ======================================================
+
+let vagasCargoFiltroAtual = '';
+let vagasMotivoFiltroAtual = '';
+let vagasStatusReqFiltroAtual = '';
+let vagasStatusFiltroAtual = '';
+let vagasFiltrosPopulados = false;
+let vagasPaginaAtual = 1;
+const VAGAS_POR_PAGINA = 10;
+
+function filtrarVagasPorCargo(valor){
+  vagasCargoFiltroAtual = valor;
+  vagasPaginaAtual = 1;
+  renderVagasTabela();
+}
+function filtrarVagasPorMotivo(valor){
+  vagasMotivoFiltroAtual = valor;
+  vagasPaginaAtual = 1;
+  renderVagasTabela();
+}
+function filtrarVagasPorStatusReq(valor){
+  vagasStatusReqFiltroAtual = valor;
+  vagasPaginaAtual = 1;
+  renderVagasTabela();
+}
+function filtrarVagasPorStatus(valor){
+  vagasStatusFiltroAtual = valor;
+  vagasPaginaAtual = 1;
+  renderVagasTabela();
+}
+
+function vagasFiltrada(){
+  const q = (document.getElementById('vagas-search')?.value || '').toLowerCase().trim();
+  return VAGAS.filter(v => {
+    if(vagasCargoFiltroAtual && normFrota(v.cargo) !== vagasCargoFiltroAtual) return false;
+    if(vagasMotivoFiltroAtual && normFrota(v.motivo) !== vagasMotivoFiltroAtual) return false;
+    if(vagasStatusReqFiltroAtual && normFrota(v.statusReq) !== vagasStatusReqFiltroAtual) return false;
+    if(vagasStatusFiltroAtual && normFrota(v.status) !== vagasStatusFiltroAtual) return false;
+    if(q){
+      const hay = [v.requisicao, v.cargo, v.recrutadora, v.area, v.supervisao, v.nomeCandidatoAprovado, v.cpf]
+        .map(x => normFrota(x).toLowerCase()).join(' ');
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderVagasTabela(){
+  const tbody = document.getElementById('vagasTableBody');
+  const noResults = document.getElementById('vagasNoResults');
+  const paginacao = document.getElementById('vagasPaginacao');
+  if(!tbody) return;
+
+  const itens = vagasFiltrada();
+
+  if(itens.length === 0){
+    tbody.innerHTML = '';
+    if(noResults) noResults.style.display = '';
+    if(paginacao) paginacao.innerHTML = '';
+    return;
+  }
+  if(noResults) noResults.style.display = 'none';
+
+  const totalPaginas = Math.max(1, Math.ceil(itens.length / VAGAS_POR_PAGINA));
+  if(vagasPaginaAtual > totalPaginas) vagasPaginaAtual = totalPaginas;
+  if(vagasPaginaAtual < 1) vagasPaginaAtual = 1;
+
+  const inicio = (vagasPaginaAtual - 1) * VAGAS_POR_PAGINA;
+  const pagina = itens.slice(inicio, inicio + VAGAS_POR_PAGINA);
+
+  function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function cel(v){ return esc(v) || '—'; }
+
+  tbody.innerHTML = pagina.map(v => `<tr>
+    <td>${cel(v.recrutadora)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.dataCriacaoRequisicao)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.requisicaoAprovada)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.previsaoEntrega)}</td>
+    <td>${cel(v.requisicao)}</td>
+    <td>${cel(v.area)}</td>
+    <td>${cel(v.supervisao)}</td>
+    <td>${cel(v.cargo)}</td>
+    <td class="num mono">${cel(v.numeroPosicoes)}</td>
+    <td>${cel(v.motivo)}</td>
+    <td>${cel(v.profissionalSubstituido)}</td>
+    <td>${cel(v.column12)}</td>
+    <td>${cel(v.column13)}</td>
+    <td>${cel(v.statusReq)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.fechamento)}</td>
+    <td>${cel(v.status)}</td>
+    <td>${cel(v.nomeCandidatoAprovado)}</td>
+    <td class="mono">${cel(v.cpf)}</td>
+    <td class="num mono">${cel(v.slaDias)}</td>
+    <td>${cel(v.envioLinkDocumento)}</td>
+    <td>${cel(v.statusAso)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.dataExame)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.previsaoAdmissao)}</td>
+    <td class="num mono">${cel(v.slaAdmissao)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.dataIntegracao)}</td>
+    <td>${cel(v.liberado)}</td>
+    <td class="num mono">${cel(v.slaTotal)}</td>
+    <td>${cel(v.column28)}</td>
+    <td>${cel(v.column29)}</td>
+  </tr>`).join('');
+
+  if(paginacao){
+    let html = `<span class="mono" style="font-size:11px; color:${cor.muted}; margin-right:auto;">Mostrando ${inicio+1}–${Math.min(inicio+VAGAS_POR_PAGINA, itens.length)} de ${itens.length} requisições</span>`;
+    html += `<button type="button" class="chip" ${vagasPaginaAtual<=1?'disabled':''} onclick="mudarPaginaVagas(${vagasPaginaAtual-1})" style="cursor:pointer;">‹</button>`;
+    const maxBotoes = 7;
+    let ini = Math.max(1, vagasPaginaAtual - 3);
+    let fim = Math.min(totalPaginas, ini + maxBotoes - 1);
+    ini = Math.max(1, fim - maxBotoes + 1);
+    for(let p = ini; p <= fim; p++){
+      html += `<button type="button" class="chip${p===vagasPaginaAtual?' active':''}" onclick="mudarPaginaVagas(${p})" style="cursor:pointer;">${p}</button>`;
+    }
+    html += `<button type="button" class="chip" ${vagasPaginaAtual>=totalPaginas?'disabled':''} onclick="mudarPaginaVagas(${vagasPaginaAtual+1})" style="cursor:pointer;">›</button>`;
+    paginacao.innerHTML = html;
+  }
+}
+
+function mudarPaginaVagas(p){
+  vagasPaginaAtual = p;
+  renderVagasTabela();
+}
+
+function exportarVagasCsv(){
+  try {
+    const itens = vagasFiltrada();
+    if(!itens.length){
+      alert('Nenhuma requisição para exportar com os filtros atuais.');
+      return;
+    }
+    const colunas = ['Recrutadora','DataCriacaoRequisicao','RequisicaoAprovada','PrevisaoEntrega','Requisicao','Area','Supervisao','Cargo','NumeroPosicoes','Motivo','ProfissionalSubstituido','Column12','Column13','StatusReq','Fechamento','Status','NomeCandidatoAprovado','CPF','SLADias','EnvioLinkDocumento','StatusASO','DataExame','PrevisaoAdmissao','SLAAdmissao','DataIntegracao','Liberado','SLATotal','Column28','Column29'];
+    function csvEsc(v){
+      const s = String(v ?? '');
+      if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }
+    const linhas = [colunas.map(csvEsc).join(';')];
+    itens.forEach(v => {
+      linhas.push([
+        v.recrutadora, v.dataCriacaoRequisicao, v.requisicaoAprovada, v.previsaoEntrega, v.requisicao,
+        v.area, v.supervisao, v.cargo, v.numeroPosicoes, v.motivo, v.profissionalSubstituido,
+        v.column12, v.column13, v.statusReq, v.fechamento, v.status, v.nomeCandidatoAprovado, v.cpf,
+        v.slaDias, v.envioLinkDocumento, v.statusAso, v.dataExame, v.previsaoAdmissao, v.slaAdmissao,
+        v.dataIntegracao, v.liberado, v.slaTotal, v.column28, v.column29
+      ].map(csvEsc).join(';'));
+    });
+    const csvContent = '\uFEFF' + linhas.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Vagas_Requisicoes.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (erro) {
+    console.error('Erro ao exportar vagas:', erro);
+    alert('Ocorreu um erro ao exportar o CSV.\n\n' + (erro && erro.message ? erro.message : erro));
+  }
+}
+
+// Renderiza uma lista "Por <categoria>" (nome + contagem + barra), igual
+// ao estilo usado em "Veículos por Combustível" na Gestão de Frotas.
+function renderListaContagemVagas(elId, campo){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  const porCategoria = {};
+  VAGAS.forEach(v => {
+    const k = normFrota(v[campo]) || 'Sem informação';
+    porCategoria[k] = (porCategoria[k] || 0) + 1;
+  });
+  const total = VAGAS.length;
+  const ordenados = Object.keys(porCategoria).sort((a,b)=> porCategoria[b]-porCategoria[a]);
+  el.innerHTML = ordenados.map((k, i) => {
+    const qtd = porCategoria[k];
+    const pct = total > 0 ? (qtd/total*100) : 0;
+    const p = PALETA_FROTA[i % PALETA_FROTA.length];
+    return `<div style="margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+        <span>${k}</span>
+        <span class="mono" style="color:${cor.muted};">${qtd} (${pct.toFixed(1)}%)</span>
+      </div>
+      <div style="background:${cor.line}; border-radius:999px; height:8px; overflow:hidden;">
+        <div style="width:${pct}%; background:${p.text}; height:100%;"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderVagas(){
+  const kpiRow = document.getElementById('vagasKpiRow');
+  if(!kpiRow) return;
+
+  if(!vagasFiltrosPopulados){
+    const selectCargo = document.getElementById('vagasCargoFiltro');
+    const selectMotivo = document.getElementById('vagasMotivoFiltro');
+    const selectStatusReq = document.getElementById('vagasStatusReqFiltro');
+    const selectStatus = document.getElementById('vagasStatusFiltro');
+
+    const cargosUnicos = Array.from(new Set(VAGAS.map(v => normFrota(v.cargo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const motivosUnicos = Array.from(new Set(VAGAS.map(v => normFrota(v.motivo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const statusReqUnicos = Array.from(new Set(VAGAS.map(v => normFrota(v.statusReq)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const statusUnicos = Array.from(new Set(VAGAS.map(v => normFrota(v.status)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+
+    if(selectCargo) selectCargo.innerHTML = '<option value="">Todos</option>' + cargosUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectMotivo) selectMotivo.innerHTML = '<option value="">Todos</option>' + motivosUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectStatusReq) selectStatusReq.innerHTML = '<option value="">Todos</option>' + statusReqUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectStatus) selectStatus.innerHTML = '<option value="">Todos</option>' + statusUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+
+    const inputBusca = document.getElementById('vagas-search');
+    if(inputBusca){
+      inputBusca.addEventListener('input', debounce(() => {
+        vagasPaginaAtual = 1;
+        renderVagasTabela();
+      }, 200));
+    }
+
+    vagasFiltrosPopulados = true;
+  }
+
+  const total = VAGAS.length;
+  kpiRow.innerHTML = `<div class="kpi"><div class="label">Volume de Requisições</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div></div>`;
+
+  renderListaContagemVagas('vagasCargoLista', 'cargo');
+  renderListaContagemVagas('vagasMotivoLista', 'motivo');
+  renderListaContagemVagas('vagasStatusReqLista', 'statusReq');
+  renderListaContagemVagas('vagasStatusLista', 'status');
+
+  renderVagasTabela();
 }
 
 // ======================================================
