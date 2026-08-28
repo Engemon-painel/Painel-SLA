@@ -469,6 +469,17 @@
         <div class="kpi-row" id="frotaOperacaoKpiRow" style="margin-bottom:14px;"></div>
         <div class="kpi-row" id="frotaKpiRow" style="margin-bottom:20px;"></div>
 
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Gasto por Contrato</h2>
+          <div class="hint">Aluguel/compra + combustível somados, por operação.</div>
+          <table>
+            <thead>
+              <tr><th>Operação</th><th class="num">Aluguel/Compra</th><th class="num">Combustível</th><th class="num">Total</th></tr>
+            </thead>
+            <tbody id="frotaGastoContratoBody"></tbody>
+          </table>
+        </div>
+
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
           <div class="panel">
             <h2>Veículos por Modelo</h2>
@@ -538,7 +549,6 @@
               <thead>
                 <tr>
                   <th>Placa</th>
-                  <th class="num">Valor Combustível</th>
                   <th>Operação</th>
                   <th>Condutor</th>
                   <th>Marca</th>
@@ -546,7 +556,9 @@
                   <th>Combustível</th>
                   <th>Tipo</th>
                   <th>Status</th>
-                  <th class="num">Valor</th>
+                  <th class="num">Valor Aluguel/Compra</th>
+                  <th class="num">Valor Combustível</th>
+                  <th class="num">Total</th>
                 </tr>
               </thead>
               <tbody id="frotaTableBody"></tbody>
@@ -1281,6 +1293,20 @@ function formatarValorFrota(v){
   return String(v);
 }
 
+// Extrai um número de qualquer formato de valor (número puro, ou texto
+// tipo "R$ 1.950,00 / mês"), pra poder somar aluguel/compra + combustível.
+// Retorna 0 quando não consegue extrair nada (nunca null), pra somas
+// sempre funcionarem mesmo com dados parciais.
+function extrairNumeroValorFrota(v){
+  if(v === null || v === undefined || v === '') return 0;
+  if(typeof v === 'number') return isFinite(v) ? v : 0;
+  const s = String(v);
+  const m = s.match(/[\d.,]+/);
+  if(!m) return 0;
+  const num = parseFloat(m[0].replace(/\./g, '').replace(',', '.'));
+  return isNaN(num) ? 0 : num;
+}
+
 function frotaFiltrada(){
   const q = (document.getElementById('frota-search')?.value || '').toLowerCase().trim();
   return FROTA.filter(v => {
@@ -1330,9 +1356,10 @@ function renderFrotaTabela(){
     return `<span class="pill ${cls}">${esc(status) || '—'}</span>`;
   }
 
-  tbody.innerHTML = pagina.map(v => `<tr>
+  tbody.innerHTML = pagina.map(v => {
+    const totalPlaca = extrairNumeroValorFrota(v.valor) + extrairNumeroValorFrota(v.valorCombustivel);
+    return `<tr>
     <td class="mono">${esc(v.placa) || '—'}</td>
-    <td class="num mono">${esc(formatarValorFrota(v.valorCombustivel))}</td>
     <td>${esc(v.operacao) || '—'}</td>
     <td>${esc(v.condutor) || '—'}</td>
     <td>${esc(v.marca) || '—'}</td>
@@ -1341,7 +1368,10 @@ function renderFrotaTabela(){
     <td>${esc(v.tipo) || '—'}</td>
     <td>${pillStatusFrota(v.status)}</td>
     <td class="num mono">${esc(formatarValorFrota(v.valor))}</td>
-  </tr>`).join('');
+    <td class="num mono">${esc(formatarValorFrota(v.valorCombustivel))}</td>
+    <td class="num mono" style="font-weight:600;">${esc(formatarValorFrota(totalPlaca))}</td>
+  </tr>`;
+  }).join('');
 
   if(paginacao){
     let html = `<span class="mono" style="font-size:11px; color:${cor.muted}; margin-right:auto;">Mostrando ${inicio+1}–${Math.min(inicio+FROTA_POR_PAGINA, itens.length)} de ${itens.length} veículos</span>`;
@@ -1370,7 +1400,7 @@ function exportarFrotaCsv(){
       alert('Nenhum veículo para exportar com os filtros atuais.');
       return;
     }
-    const colunas = ['Placa','ValorCombustivel','Operacao','Condutor','Marca','Modelo','Combustivel','Tipo','Status','Valor'];
+    const colunas = ['Placa','Operacao','Condutor','Marca','Modelo','Combustivel','Tipo','Status','ValorAluguelCompra','ValorCombustivel','Total'];
     function csvEsc(v){
       const s = String(v ?? '');
       if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
@@ -1378,7 +1408,8 @@ function exportarFrotaCsv(){
     }
     const linhas = [colunas.map(csvEsc).join(';')];
     itens.forEach(v => {
-      linhas.push([v.placa, formatarValorFrota(v.valorCombustivel), v.operacao, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor)].map(csvEsc).join(';'));
+      const totalPlaca = extrairNumeroValorFrota(v.valor) + extrairNumeroValorFrota(v.valorCombustivel);
+      linhas.push([v.placa, v.operacao, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor), formatarValorFrota(v.valorCombustivel), formatarValorFrota(totalPlaca)].map(csvEsc).join(';'));
     });
     const csvContent = '\uFEFF' + linhas.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1463,6 +1494,40 @@ function renderFrota(){
       </div>`;
     }).join('');
     operacaoKpiRow.innerHTML = html;
+  }
+
+  // ---- Tabela: Gasto por Contrato (Operação) — aluguel/compra + combustível ----
+  const gastoContratoBody = document.getElementById('frotaGastoContratoBody');
+  if(gastoContratoBody){
+    const gastoPorOperacao = {};
+    FROTA.forEach(v => {
+      const k = canonOperacaoFrota(v.operacao) || 'Sem operação';
+      if(!gastoPorOperacao[k]) gastoPorOperacao[k] = { aluguel: 0, combustivel: 0 };
+      gastoPorOperacao[k].aluguel += extrairNumeroValorFrota(v.valor);
+      gastoPorOperacao[k].combustivel += extrairNumeroValorFrota(v.valorCombustivel);
+    });
+    const operacoesGasto = Object.keys(gastoPorOperacao).sort((a,b)=> (gastoPorOperacao[b].aluguel+gastoPorOperacao[b].combustivel) - (gastoPorOperacao[a].aluguel+gastoPorOperacao[a].combustivel));
+
+    let totalAluguelGeral = 0, totalCombustivelGeral = 0;
+    let htmlGasto = operacoesGasto.map(k => {
+      const g = gastoPorOperacao[k];
+      const total = g.aluguel + g.combustivel;
+      totalAluguelGeral += g.aluguel;
+      totalCombustivelGeral += g.combustivel;
+      return `<tr>
+        <td>${k}</td>
+        <td class="num mono">${formatarValorFrota(g.aluguel)}</td>
+        <td class="num mono">${formatarValorFrota(g.combustivel)}</td>
+        <td class="num mono" style="font-weight:600;">${formatarValorFrota(total)}</td>
+      </tr>`;
+    }).join('');
+    htmlGasto += `<tr style="font-weight:700; border-top:2px solid ${cor.line};">
+      <td>Total Geral</td>
+      <td class="num mono">${formatarValorFrota(totalAluguelGeral)}</td>
+      <td class="num mono">${formatarValorFrota(totalCombustivelGeral)}</td>
+      <td class="num mono">${formatarValorFrota(totalAluguelGeral + totalCombustivelGeral)}</td>
+    </tr>`;
+    gastoContratoBody.innerHTML = htmlGasto;
   }
 
   // ---- KPIs: total + um por status (na ordem do mais frequente) ----
