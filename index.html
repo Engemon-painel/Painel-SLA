@@ -469,27 +469,73 @@
 
         <div class="kpi-row" id="vagasKpiRow" style="margin-bottom:20px;"></div>
 
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom:16px;">
           <div class="panel">
-            <h2>Por Cargo</h2>
-            <div class="hint">Volume de requisições por cargo.</div>
-            <div id="vagasCargoLista"></div>
+            <h2>Motivo da Vaga</h2>
+            <div class="hint">Substituição vs. aumento de quadro.</div>
+            <div style="position:relative; height:240px;">
+              <canvas id="vagasMotivoChart"></canvas>
+            </div>
           </div>
           <div class="panel">
-            <h2>Por Motivo</h2>
-            <div class="hint">Volume de requisições por motivo.</div>
-            <div id="vagasMotivoLista"></div>
+            <h2>Status da Requisição</h2>
+            <div class="hint">Aprovada vs. pendente.</div>
+            <div style="position:relative; height:240px;">
+              <canvas id="vagasStatusReqChart"></canvas>
+            </div>
           </div>
           <div class="panel">
-            <h2>Por Status Req.</h2>
-            <div class="hint">Volume por status da requisição.</div>
-            <div id="vagasStatusReqLista"></div>
+            <h2>Etapa Atual da Vaga</h2>
+            <div class="hint">Distribuição por etapa (coluna STATUS).</div>
+            <div style="position:relative; height:240px;">
+              <canvas id="vagasEtapaChart"></canvas>
+            </div>
           </div>
           <div class="panel">
-            <h2>Por Status</h2>
-            <div class="hint">Volume por status geral.</div>
-            <div id="vagasStatusLista"></div>
+            <h2>Funil de Recrutamento</h2>
+            <div class="hint">Requisições → Aprovadas → etapas em andamento.</div>
+            <div style="position:relative; height:240px;">
+              <canvas id="vagasFunilChart"></canvas>
+            </div>
           </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 1fr 1.4fr 1fr; margin-bottom:16px;">
+          <div class="panel">
+            <h2>Matriz Motivo x Status da Requisição</h2>
+            <div class="hint">Cruzamento de volume.</div>
+            <table>
+              <thead>
+                <tr><th>Motivo</th><th class="num">Aprovada</th><th class="num">Pendente</th><th class="num">Total</th></tr>
+              </thead>
+              <tbody id="vagasMatrizBody"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h2>Evolução das Requisições</h2>
+            <div class="hint">Aprovadas vs. pendentes, por mês de criação.</div>
+            <div style="position:relative; height:220px;">
+              <canvas id="vagasEvolucaoChart"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Vagas por Área</h2>
+            <div class="hint">Volume de requisições por área.</div>
+            <div style="position:relative; height:220px;">
+              <canvas id="vagasAreaChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Requisições Aguardando Aprovação</h2>
+          <div class="hint">Etapa atual (STATUS) = "Aguardando Aprovação", ordenadas por dias em aberto.</div>
+          <table>
+            <thead>
+              <tr><th>Requisição</th><th>Cargo</th><th>Área</th><th>Motivo</th><th>Status Req.</th><th>Etapa</th><th>Data da Solicitação</th><th class="num">Dias em Aberto</th><th>Solicitante</th></tr>
+            </thead>
+            <tbody id="vagasAguardandoBody"></tbody>
+          </table>
         </div>
 
         <div class="panel" style="margin-top:16px;">
@@ -1500,31 +1546,28 @@ function exportarVagasCsv(){
 
 // Renderiza uma lista "Por <categoria>" (nome + contagem + barra), igual
 // ao estilo usado em "Veículos por Combustível" na Gestão de Frotas.
-function renderListaContagemVagas(elId, campo){
-  const el = document.getElementById(elId);
-  if(!el) return;
-  const porCategoria = {};
-  VAGAS.forEach(v => {
-    const k = normFrota(v[campo]) || 'Sem informação';
-    porCategoria[k] = (porCategoria[k] || 0) + 1;
-  });
-  const total = VAGAS.length;
-  const ordenados = Object.keys(porCategoria).sort((a,b)=> porCategoria[b]-porCategoria[a]);
-  el.innerHTML = ordenados.map((k, i) => {
-    const qtd = porCategoria[k];
-    const pct = total > 0 ? (qtd/total*100) : 0;
-    const p = PALETA_FROTA[i % PALETA_FROTA.length];
-    return `<div style="margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
-        <span>${k}</span>
-        <span class="mono" style="color:${cor.muted};">${qtd} (${pct.toFixed(1)}%)</span>
-      </div>
-      <div style="background:${cor.line}; border-radius:999px; height:8px; overflow:hidden;">
-        <div style="width:${pct}%; background:${p.text}; height:100%;"></div>
-      </div>
-    </div>`;
-  }).join('');
+// Converte "dd/mm/aaaa" (como o Office Script formata datas de Vagas) de
+// volta pra um Date. Retorna null se não for um formato válido.
+function parseDataBrVagas(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(!m) return null;
+  const dia = Number(m[1]), mes = Number(m[2]), ano = Number(m[3]);
+  const d = new Date(ano, mes - 1, dia);
+  return isNaN(d.getTime()) ? null : d;
 }
+
+const MES_PT_VAGAS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+const META_APROVACAO_VAGAS = 0.80;
+
+function statusColorVagas(pct){
+  if(pct >= META_APROVACAO_VAGAS) return cor.good;
+  if(pct >= META_APROVACAO_VAGAS - 0.05) return cor.warn;
+  return cor.bad;
+}
+
+let vagasMotivoChartInst, vagasStatusReqChartInst, vagasEtapaChartInst, vagasFunilChartInst, vagasEvolucaoChartInst, vagasAreaChartInst;
 
 function renderVagas(){
   const kpiRow = document.getElementById('vagasKpiRow');
@@ -1558,12 +1601,293 @@ function renderVagas(){
   }
 
   const total = VAGAS.length;
-  kpiRow.innerHTML = `<div class="kpi"><div class="label">Volume de Requisições</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div></div>`;
 
-  renderListaContagemVagas('vagasCargoLista', 'cargo');
-  renderListaContagemVagas('vagasMotivoLista', 'motivo');
-  renderListaContagemVagas('vagasStatusReqLista', 'statusReq');
-  renderListaContagemVagas('vagasStatusLista', 'status');
+  // ---- KPIs do topo ----
+  const aprovadas = VAGAS.filter(v => semAcentoHc(v.statusReq).includes('aprovad')).length;
+  const pendentes = VAGAS.filter(v => semAcentoHc(v.statusReq).includes('pendente')).length;
+  const emTriagem = VAGAS.filter(v => semAcentoHc(v.status).includes('triagem')).length;
+  const aguardandoAprovacao = VAGAS.filter(v => semAcentoHc(v.status).includes('aguardando aprovacao')).length;
+  const pctAprovacao = total > 0 ? (aprovadas/total) : 0;
+
+  function pctDoTotal(n){ return total > 0 ? (n/total*100).toFixed(1) : '0.0'; }
+
+  kpiRow.innerHTML = `
+    <div class="kpi"><div class="label">Total de Requisições</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div><div class="delta">100% do total</div></div>
+    <div class="kpi"><div class="label">Aprovadas</div><div class="value" style="color:${cor.good}">${aprovadas.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(aprovadas)}% do total</div></div>
+    <div class="kpi"><div class="label">Pendentes</div><div class="value" style="color:${cor.warn}">${pendentes.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(pendentes)}% do total</div></div>
+    <div class="kpi"><div class="label">Em Triagem</div><div class="value" style="color:#2563eb">${emTriagem.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(emTriagem)}% do total</div></div>
+    <div class="kpi"><div class="label">Aguardando Aprovação</div><div class="value" style="color:#5e34b5">${aguardandoAprovacao.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(aguardandoAprovacao)}% do total</div></div>
+    <div class="kpi"><div class="label">% de Aprovação</div><div class="value" style="color:${statusColorVagas(pctAprovacao)}">${(pctAprovacao*100).toFixed(1)}%</div><div class="delta">Meta ${(META_APROVACAO_VAGAS*100).toFixed(0)}%</div></div>
+  `;
+
+  // ---- Motivo da Vaga (rosca) ----
+  const motivoCanvas = document.getElementById('vagasMotivoChart');
+  if(motivoCanvas){
+    const porMotivo = {};
+    VAGAS.forEach(v => {
+      const k = normFrota(v.motivo) || 'Sem motivo';
+      porMotivo[k] = (porMotivo[k] || 0) + 1;
+    });
+    const motivosOrd = Object.keys(porMotivo).sort((a,b)=> porMotivo[b]-porMotivo[a]);
+    if(vagasMotivoChartInst) vagasMotivoChartInst.destroy();
+    vagasMotivoChartInst = new Chart(motivoCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: motivosOrd,
+        datasets: [{
+          data: motivosOrd.map(k => porMotivo[k]),
+          backgroundColor: motivosOrd.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '60%',
+        plugins: {
+          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          datalabels: { display:false }
+        }
+      }
+    });
+  }
+
+  // ---- Status da Requisição (barra) ----
+  const statusReqCanvas = document.getElementById('vagasStatusReqChart');
+  if(statusReqCanvas){
+    const porStatusReq = {};
+    VAGAS.forEach(v => {
+      const k = normFrota(v.statusReq) || 'Sem status';
+      porStatusReq[k] = (porStatusReq[k] || 0) + 1;
+    });
+    const statusReqOrd = Object.keys(porStatusReq).sort((a,b)=> porStatusReq[b]-porStatusReq[a]);
+    if(vagasStatusReqChartInst) vagasStatusReqChartInst.destroy();
+    vagasStatusReqChartInst = new Chart(statusReqCanvas, {
+      type: 'bar',
+      data: {
+        labels: statusReqOrd,
+        datasets: [{
+          label: 'Requisições', data: statusReqOrd.map(k => porStatusReq[k]),
+          backgroundColor: statusReqOrd.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
+          borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Etapa Atual da Vaga (barra, coluna STATUS) ----
+  const etapaCanvas = document.getElementById('vagasEtapaChart');
+  const porEtapa = {};
+  VAGAS.forEach(v => {
+    const k = normFrota(v.status) || 'Sem etapa';
+    porEtapa[k] = (porEtapa[k] || 0) + 1;
+  });
+  const etapasOrd = Object.keys(porEtapa).sort((a,b)=> porEtapa[b]-porEtapa[a]);
+  if(etapaCanvas){
+    if(vagasEtapaChartInst) vagasEtapaChartInst.destroy();
+    vagasEtapaChartInst = new Chart(etapaCanvas, {
+      type: 'bar',
+      data: {
+        labels: etapasOrd,
+        datasets: [{
+          label: 'Requisições', data: etapasOrd.map(k => porEtapa[k]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Funil de Recrutamento ----
+  // Total de Requisições -> Aprovadas -> demais etapas em ordem decrescente
+  // de volume (não há coluna de "Entrevista" na base, essa etapa fica de
+  // fora do funil).
+  const funilCanvas = document.getElementById('vagasFunilChart');
+  if(funilCanvas){
+    const etapasFunil = [
+      { nome: 'Requisições', valor: total },
+      { nome: 'Aprovadas', valor: aprovadas }
+    ];
+    etapasOrd.forEach(k => {
+      if(semAcentoHc(k).includes('aprovad')) return; // já contabilizado acima
+      etapasFunil.push({ nome: k, valor: porEtapa[k] });
+    });
+    if(vagasFunilChartInst) vagasFunilChartInst.destroy();
+    vagasFunilChartInst = new Chart(funilCanvas, {
+      type: 'bar',
+      data: {
+        labels: etapasFunil.map(e => e.nome),
+        datasets: [{
+          label: 'Requisições', data: etapasFunil.map(e => e.valor),
+          backgroundColor: etapasFunil.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
+          borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Matriz Motivo x Status da Requisição ----
+  const matrizBody = document.getElementById('vagasMatrizBody');
+  if(matrizBody){
+    const motivos = Array.from(new Set(VAGAS.map(v => normFrota(v.motivo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    let totalAprovadaGeral = 0, totalPendenteGeral = 0;
+    let html = motivos.map(motivo => {
+      const doMotivo = VAGAS.filter(v => normFrota(v.motivo) === motivo);
+      const aprov = doMotivo.filter(v => semAcentoHc(v.statusReq).includes('aprovad')).length;
+      const pend = doMotivo.filter(v => semAcentoHc(v.statusReq).includes('pendente')).length;
+      totalAprovadaGeral += aprov;
+      totalPendenteGeral += pend;
+      return `<tr>
+        <td>${motivo}</td>
+        <td class="num mono">${aprov}</td>
+        <td class="num mono">${pend}</td>
+        <td class="num mono" style="font-weight:600;">${doMotivo.length}</td>
+      </tr>`;
+    }).join('');
+    html += `<tr style="font-weight:700; border-top:2px solid ${cor.line};">
+      <td>Total</td>
+      <td class="num mono">${totalAprovadaGeral}</td>
+      <td class="num mono">${totalPendenteGeral}</td>
+      <td class="num mono">${total}</td>
+    </tr>`;
+    matrizBody.innerHTML = html;
+  }
+
+  // ---- Evolução das Requisições (Aprovadas vs Pendentes por mês) ----
+  const evolucaoCanvas = document.getElementById('vagasEvolucaoChart');
+  if(evolucaoCanvas){
+    const porMes = {};
+    VAGAS.forEach(v => {
+      const d = parseDataBrVagas(v.dataCriacaoRequisicao);
+      if(!d) return;
+      const chave = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+      if(!porMes[chave]) porMes[chave] = { aprovadas: 0, pendentes: 0, ano: d.getFullYear(), mes: d.getMonth() };
+      if(semAcentoHc(v.statusReq).includes('aprovad')) porMes[chave].aprovadas++;
+      else if(semAcentoHc(v.statusReq).includes('pendente')) porMes[chave].pendentes++;
+    });
+    const chavesOrd = Object.keys(porMes).sort();
+    const labelsEvolucao = chavesOrd.map(k => MES_PT_VAGAS[porMes[k].mes] + '/' + String(porMes[k].ano).slice(-2));
+    if(vagasEvolucaoChartInst) vagasEvolucaoChartInst.destroy();
+    vagasEvolucaoChartInst = new Chart(evolucaoCanvas, {
+      type: 'line',
+      data: {
+        labels: labelsEvolucao,
+        datasets: [
+          {
+            label: 'Aprovadas', data: chavesOrd.map(k => porMes[k].aprovadas),
+            borderColor: cor.good, backgroundColor: cor.good, tension:.3, pointRadius:4,
+            datalabels: { color: cor.good, align:'top', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+          },
+          {
+            label: 'Pendentes', data: chavesOrd.map(k => porMes[k].pendentes),
+            borderColor: cor.warn, backgroundColor: cor.warn, tension:.3, pointRadius:4,
+            datalabels: { color: cor.warn, align:'bottom', font:{size:9, family:'JetBrains Mono', weight:'600'} }
+          }
+        ]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels:{ color: cor.muted, font:{family:'Inter', size:10} } }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted, font:{size:10}}, grid:{display:false} },
+          y: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true }
+        }
+      }
+    });
+  }
+
+  // ---- Vagas por Área ----
+  const areaCanvas = document.getElementById('vagasAreaChart');
+  if(areaCanvas){
+    const porArea = {};
+    VAGAS.forEach(v => {
+      const k = normFrota(v.area) || 'Sem área';
+      porArea[k] = (porArea[k] || 0) + 1;
+    });
+    const areasOrd = Object.keys(porArea).sort((a,b)=> porArea[b]-porArea[a]);
+    if(vagasAreaChartInst) vagasAreaChartInst.destroy();
+    vagasAreaChartInst = new Chart(areaCanvas, {
+      type: 'bar',
+      data: {
+        labels: areasOrd,
+        datasets: [{
+          label: 'Requisições', data: areasOrd.map(k => porArea[k]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Requisições Aguardando Aprovação ----
+  const aguardandoBody = document.getElementById('vagasAguardandoBody');
+  if(aguardandoBody){
+    const hoje = new Date();
+    const aguardando = VAGAS.filter(v => semAcentoHc(v.status).includes('aguardando aprovacao'));
+    const comDias = aguardando.map(v => {
+      const d = parseDataBrVagas(v.dataCriacaoRequisicao);
+      const dias = d ? Math.max(0, Math.round((hoje - d) / 86400000)) : null;
+      return { v, dias };
+    }).sort((a,b) => (b.dias ?? -1) - (a.dias ?? -1));
+
+    function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    if(comDias.length === 0){
+      aguardandoBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:${cor.muted};">Nenhuma requisição aguardando aprovação 🎉</td></tr>`;
+    } else {
+      aguardandoBody.innerHTML = comDias.map(({v, dias}) => {
+        const corDias = dias === null ? cor.muted : (dias >= 20 ? cor.bad : (dias >= 10 ? cor.warn : cor.good));
+        return `<tr>
+          <td>${esc(v.requisicao) || '—'}</td>
+          <td>${esc(v.cargo) || '—'}</td>
+          <td>${esc(v.area) || '—'}</td>
+          <td>${esc(v.motivo) || '—'}</td>
+          <td><span class="pill warn">${esc(v.statusReq) || '—'}</span></td>
+          <td><span class="pill" style="background:rgba(94,52,181,.14); color:#5e34b5;">${esc(v.status) || '—'}</span></td>
+          <td class="mono" style="font-size:12px;">${esc(v.dataCriacaoRequisicao) || '—'}</td>
+          <td class="num mono" style="color:${corDias}; font-weight:600;">${dias ?? '—'}</td>
+          <td>${esc(v.recrutadora) || '—'}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
 
   renderVagasTabela();
 }
