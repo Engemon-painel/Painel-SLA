@@ -636,7 +636,7 @@
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Ranking de Gastos por Veículo</h2>
-          <div class="hint">Aluguel/compra + combustível somados, do maior para o menor.</div>
+          <div class="hint">Top 10 — aluguel/compra + combustível somados, do maior para o menor.</div>
           <table>
             <thead>
               <tr><th class="num">#</th><th>Placa</th><th>Condutor</th><th>Operação</th><th class="num">Aluguel/Compra</th><th class="num">Combustível</th><th class="num">Total</th></tr>
@@ -2280,7 +2280,7 @@ function renderFrota(){
       const aluguel = extrairNumeroValorFrota(v.valor);
       const combustivel = extrairNumeroValorFrota(v.valorCombustivel);
       return { v, aluguel, combustivel, total: aluguel + combustivel };
-    }).sort((a,b) => b.total - a.total);
+    }).sort((a,b) => b.total - a.total).slice(0, 10);
 
     function escRanking(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
