@@ -634,6 +634,17 @@
           </table>
         </div>
 
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Ranking de Gastos por Veículo</h2>
+          <div class="hint">Aluguel/compra + combustível somados, do maior para o menor.</div>
+          <table>
+            <thead>
+              <tr><th class="num">#</th><th>Placa</th><th>Condutor</th><th>Operação</th><th class="num">Aluguel/Compra</th><th class="num">Combustível</th><th class="num">Total</th></tr>
+            </thead>
+            <tbody id="frotaRankingBody"></tbody>
+          </table>
+        </div>
+
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
           <div class="panel">
             <h2>Veículos por Modelo</h2>
@@ -2260,6 +2271,28 @@ function renderFrota(){
       <td class="num mono">${formatarValorFrota(totalAluguelGeral + totalCombustivelGeral)}</td>
     </tr>`;
     gastoContratoBody.innerHTML = htmlGasto;
+  }
+
+  // ---- Ranking de Gastos por Veículo (aluguel/compra + combustível) ----
+  const rankingBody = document.getElementById('frotaRankingBody');
+  if(rankingBody){
+    const ranking = FROTA.map(v => {
+      const aluguel = extrairNumeroValorFrota(v.valor);
+      const combustivel = extrairNumeroValorFrota(v.valorCombustivel);
+      return { v, aluguel, combustivel, total: aluguel + combustivel };
+    }).sort((a,b) => b.total - a.total);
+
+    function escRanking(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    rankingBody.innerHTML = ranking.map((item, i) => `<tr>
+      <td class="num mono">${i+1}</td>
+      <td class="mono">${escRanking(item.v.placa) || '—'}</td>
+      <td>${escRanking(item.v.condutor) || '—'}</td>
+      <td>${escRanking(item.v.operacao) || '—'}</td>
+      <td class="num mono">${formatarValorFrota(item.aluguel)}</td>
+      <td class="num mono">${formatarValorFrota(item.combustivel)}</td>
+      <td class="num mono" style="font-weight:600;">${formatarValorFrota(item.total)}</td>
+    </tr>`).join('');
   }
 
   // ---- KPIs: total + um por status (na ordem do mais frequente) ----
