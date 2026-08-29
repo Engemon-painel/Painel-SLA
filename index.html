@@ -467,6 +467,7 @@
         <h2>Gestão de Vagas</h2>
         <div class="hint">Dados da aba Controle, mesma base do painel de SLA.</div>
 
+        <div class="kpi-row" id="vagasMotivoKpiRow" style="margin-bottom:14px;"></div>
         <div class="kpi-row" id="vagasKpiRow" style="margin-bottom:20px;"></div>
 
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom:16px;">
@@ -1392,22 +1393,46 @@ const VAGAS_POR_PAGINA = 10;
 function filtrarVagasPorCargo(valor){
   vagasCargoFiltroAtual = valor;
   vagasPaginaAtual = 1;
-  renderVagasTabela();
+  renderVagas();
 }
 function filtrarVagasPorMotivo(valor){
   vagasMotivoFiltroAtual = valor;
   vagasPaginaAtual = 1;
-  renderVagasTabela();
+  const select = document.getElementById('vagasMotivoFiltro');
+  if(select) select.value = valor;
+  renderVagas();
 }
 function filtrarVagasPorStatusReq(valor){
   vagasStatusReqFiltroAtual = valor;
   vagasPaginaAtual = 1;
-  renderVagasTabela();
+  renderVagas();
 }
 function filtrarVagasPorStatus(valor){
   vagasStatusFiltroAtual = valor;
   vagasPaginaAtual = 1;
-  renderVagasTabela();
+  renderVagas();
+}
+
+function filtrarVagasPorMotivoEKpi(valor){
+  vagasMotivoFiltroAtual = valor;
+  vagasPaginaAtual = 1;
+  const select = document.getElementById('vagasMotivoFiltro');
+  if(select) select.value = valor;
+  renderVagas();
+}
+
+// Aplica os filtros estruturais (Cargo/Motivo/Status Req./Status) sem a
+// busca textual — usado pelos KPIs e gráficos, que devem refletir os
+// filtros escolhidos mas não a busca livre (essa é só pra achar uma
+// linha específica na tabela detalhada).
+function vagasFiltradaGeral(){
+  return VAGAS.filter(v => {
+    if(vagasCargoFiltroAtual && normFrota(v.cargo) !== vagasCargoFiltroAtual) return false;
+    if(vagasMotivoFiltroAtual && normFrota(v.motivo) !== vagasMotivoFiltroAtual) return false;
+    if(vagasStatusReqFiltroAtual && normFrota(v.statusReq) !== vagasStatusReqFiltroAtual) return false;
+    if(vagasStatusFiltroAtual && normFrota(v.status) !== vagasStatusFiltroAtual) return false;
+    return true;
+  });
 }
 
 function vagasFiltrada(){
@@ -1600,13 +1625,47 @@ function renderVagas(){
     vagasFiltrosPopulados = true;
   }
 
-  const total = VAGAS.length;
+  // ---- Cards clicáveis de Motivo (Total / Aumento de Quadro / Substituição...) ----
+  const motivoKpiRow = document.getElementById('vagasMotivoKpiRow');
+  if(motivoKpiRow){
+    const totalGeral = VAGAS.length;
+    const porMotivoKpi = {};
+    VAGAS.forEach(v => {
+      const k = normFrota(v.motivo) || 'Sem motivo';
+      porMotivoKpi[k] = (porMotivoKpi[k] || 0) + 1;
+    });
+    const motivosKpiOrd = Object.keys(porMotivoKpi).sort((a,b)=> porMotivoKpi[b]-porMotivoKpi[a]);
+    const totalAtivo = vagasMotivoFiltroAtual === '';
+    let htmlMotivoKpi = `<div class="kpi" style="cursor:pointer; ${totalAtivo ? `border-color:${cor.accent}; box-shadow:0 0 0 2px ${cor.accent} inset;` : ''}" onclick="filtrarVagasPorMotivoEKpi('')">
+      <div class="label">Todas as Vagas</div>
+      <div class="value" style="color:${cor.accent}">${totalGeral.toLocaleString('pt-BR')}</div>
+    </div>`;
+    htmlMotivoKpi += motivosKpiOrd.map((k, i) => {
+      const qtd = porMotivoKpi[k];
+      const pct = totalGeral > 0 ? (qtd/totalGeral*100).toFixed(1) : 0;
+      const p = PALETA_FROTA[i % PALETA_FROTA.length];
+      const ativo = vagasMotivoFiltroAtual === k;
+      return `<div class="kpi" style="cursor:pointer; background:${p.bg}; border-color:${p.border}; ${ativo ? `box-shadow:0 0 0 2px ${p.text} inset;` : ''}" onclick="filtrarVagasPorMotivoEKpi('${k}')">
+        <div class="label" style="color:${p.text};">${k}</div>
+        <div class="value" style="color:${p.text};">${qtd}</div>
+        <div class="delta" style="color:${p.text};">${pct}% do total</div>
+      </div>`;
+    }).join('');
+    motivoKpiRow.innerHTML = htmlMotivoKpi;
+  }
+
+  // ---- Conjunto filtrado (Cargo/Motivo/Status Req./Status) usado em
+  // todos os KPIs e gráficos abaixo — a busca de texto livre não entra
+  // aqui, só afeta a tabela detalhada no final da página.
+  const VAGAS_FILTRO = vagasFiltradaGeral();
+
+  const total = VAGAS_FILTRO.length;
 
   // ---- KPIs do topo ----
-  const aprovadas = VAGAS.filter(v => semAcentoHc(v.statusReq).includes('aprovad')).length;
-  const pendentes = VAGAS.filter(v => semAcentoHc(v.statusReq).includes('pendente')).length;
-  const emTriagem = VAGAS.filter(v => semAcentoHc(v.status).includes('triagem')).length;
-  const aguardandoAprovacao = VAGAS.filter(v => semAcentoHc(v.status).includes('aguardando aprovacao')).length;
+  const aprovadas = VAGAS_FILTRO.filter(v => semAcentoHc(v.statusReq).includes('aprovad')).length;
+  const pendentes = VAGAS_FILTRO.filter(v => semAcentoHc(v.statusReq).includes('pendente')).length;
+  const emTriagem = VAGAS_FILTRO.filter(v => semAcentoHc(v.status).includes('triagem')).length;
+  const aguardandoAprovacao = VAGAS_FILTRO.filter(v => semAcentoHc(v.status).includes('aguardando aprovacao')).length;
   const pctAprovacao = total > 0 ? (aprovadas/total) : 0;
 
   function pctDoTotal(n){ return total > 0 ? (n/total*100).toFixed(1) : '0.0'; }
@@ -1624,7 +1683,7 @@ function renderVagas(){
   const motivoCanvas = document.getElementById('vagasMotivoChart');
   if(motivoCanvas){
     const porMotivo = {};
-    VAGAS.forEach(v => {
+    VAGAS_FILTRO.forEach(v => {
       const k = normFrota(v.motivo) || 'Sem motivo';
       porMotivo[k] = (porMotivo[k] || 0) + 1;
     });
@@ -1654,7 +1713,7 @@ function renderVagas(){
   const statusReqCanvas = document.getElementById('vagasStatusReqChart');
   if(statusReqCanvas){
     const porStatusReq = {};
-    VAGAS.forEach(v => {
+    VAGAS_FILTRO.forEach(v => {
       const k = normFrota(v.statusReq) || 'Sem status';
       porStatusReq[k] = (porStatusReq[k] || 0) + 1;
     });
@@ -1686,7 +1745,7 @@ function renderVagas(){
   // ---- Etapa Atual da Vaga (barra, coluna STATUS) ----
   const etapaCanvas = document.getElementById('vagasEtapaChart');
   const porEtapa = {};
-  VAGAS.forEach(v => {
+  VAGAS_FILTRO.forEach(v => {
     const k = normFrota(v.status) || 'Sem etapa';
     porEtapa[k] = (porEtapa[k] || 0) + 1;
   });
@@ -1756,10 +1815,10 @@ function renderVagas(){
   // ---- Matriz Motivo x Status da Requisição ----
   const matrizBody = document.getElementById('vagasMatrizBody');
   if(matrizBody){
-    const motivos = Array.from(new Set(VAGAS.map(v => normFrota(v.motivo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const motivos = Array.from(new Set(VAGAS_FILTRO.map(v => normFrota(v.motivo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     let totalAprovadaGeral = 0, totalPendenteGeral = 0;
     let html = motivos.map(motivo => {
-      const doMotivo = VAGAS.filter(v => normFrota(v.motivo) === motivo);
+      const doMotivo = VAGAS_FILTRO.filter(v => normFrota(v.motivo) === motivo);
       const aprov = doMotivo.filter(v => semAcentoHc(v.statusReq).includes('aprovad')).length;
       const pend = doMotivo.filter(v => semAcentoHc(v.statusReq).includes('pendente')).length;
       totalAprovadaGeral += aprov;
@@ -1784,7 +1843,7 @@ function renderVagas(){
   const evolucaoCanvas = document.getElementById('vagasEvolucaoChart');
   if(evolucaoCanvas){
     const porMes = {};
-    VAGAS.forEach(v => {
+    VAGAS_FILTRO.forEach(v => {
       const d = parseDataBrVagas(v.dataCriacaoRequisicao);
       if(!d) return;
       const chave = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
@@ -1828,7 +1887,7 @@ function renderVagas(){
   const areaCanvas = document.getElementById('vagasAreaChart');
   if(areaCanvas){
     const porArea = {};
-    VAGAS.forEach(v => {
+    VAGAS_FILTRO.forEach(v => {
       const k = normFrota(v.area) || 'Sem área';
       porArea[k] = (porArea[k] || 0) + 1;
     });
@@ -1860,7 +1919,7 @@ function renderVagas(){
   const aguardandoBody = document.getElementById('vagasAguardandoBody');
   if(aguardandoBody){
     const hoje = new Date();
-    const aguardando = VAGAS.filter(v => semAcentoHc(v.status).includes('aguardando aprovacao'));
+    const aguardando = VAGAS_FILTRO.filter(v => semAcentoHc(v.status).includes('aguardando aprovacao'));
     const comDias = aguardando.map(v => {
       const d = parseDataBrVagas(v.dataCriacaoRequisicao);
       const dias = d ? Math.max(0, Math.round((hoje - d) / 86400000)) : null;
