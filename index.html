@@ -2900,12 +2900,12 @@ function renderBancoHoras(){
   function fmtH(n){ return n.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) + 'h'; }
 
   kpiRow.innerHTML = `
-    <div class="kpi"><div class="label">Colaboradores</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div></div>
-    <div class="kpi"><div class="label">Colaboradores Ativos</div><div class="value" style="color:${cor.good}">${colaboradoresAtivos.toLocaleString('pt-BR')}</div></div>
-    <div class="kpi"><div class="label">HE Identificada (h)</div><div class="value" style="color:#2563eb">${fmtH(somaHeIdentificada)}</div></div>
-    <div class="kpi"><div class="label">Saldo Projetado BH (h)</div><div class="value" style="color:${somaSaldoProjetado >= 0 ? cor.good : cor.bad}">${fmtH(somaSaldoProjetado)}</div></div>
-    <div class="kpi"><div class="label">HE Pendente (h)</div><div class="value" style="color:${cor.warn}">${fmtH(somaHePendente)}</div></div>
-    <div class="kpi"><div class="label">Média Saldo BH (h) / Colab.</div><div class="value" style="color:${mediaSaldoPorColab >= 0 ? cor.good : cor.bad}">${fmtH(mediaSaldoPorColab)}</div></div>
+    <div class="kpi"><div class="label">🧑‍🤝‍🧑 Colaboradores</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">✅ Colaboradores Ativos</div><div class="value" style="color:${cor.good}">${colaboradoresAtivos.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">⏱️ HE Identificada (h)</div><div class="value" style="color:#2563eb">${fmtH(somaHeIdentificada)}</div></div>
+    <div class="kpi"><div class="label">📈 Saldo Projetado BH (h)</div><div class="value" style="color:${somaSaldoProjetado >= 0 ? cor.good : cor.bad}">${fmtH(somaSaldoProjetado)}</div></div>
+    <div class="kpi"><div class="label">⚠️ HE Pendente (h)</div><div class="value" style="color:${cor.warn}">${fmtH(somaHePendente)}</div></div>
+    <div class="kpi"><div class="label">📊 Média Saldo BH (h) / Colab.</div><div class="value" style="color:${mediaSaldoPorColab >= 0 ? cor.good : cor.bad}">${fmtH(mediaSaldoPorColab)}</div></div>
   `;
 
   // ---- Status do Banco de Horas (Positivo/Zerado/Negativo, pelo sinal do Saldo Projetado BH (h)) ----
