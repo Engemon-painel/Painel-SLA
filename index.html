@@ -208,6 +208,7 @@
     <div class="nav-item" id="nav-organograma" onclick="mostrarPagina('organograma')"><span class="nav-icon">👥</span> Organograma</div>
     <div class="nav-item" id="nav-vagas" onclick="mostrarPagina('vagas')"><span class="nav-icon">🧑‍💼</span> Gestão de Vagas</div>
     <div class="nav-item" id="nav-frota" onclick="mostrarPagina('frota')"><span class="nav-icon">🚗</span> Gestão de Frotas</div>
+    <div class="nav-item" id="nav-bancohoras" onclick="mostrarPagina('bancohoras')"><span class="nav-icon">⏱️</span> Gestão de BH/Extra</div>
   </nav>
 
   <main class="main-content">
@@ -736,6 +737,182 @@
       </div>
     </div>
 
+    <div class="pagina" id="pagina-bancohoras" style="display:none;">
+      <div class="panel" id="bancoHorasSecao">
+        <h2>Gestão de BH/Extra</h2>
+        <div class="hint">Dados da aba qResumoFuncionario, planilha Banco_de_Horas_V2_Ajustes. Foto do momento — sem histórico mensal.</div>
+
+        <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="bancoHorasContratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
+          <select id="bancoHorasContratoFiltro" class="mono" onchange="filtrarBancoHorasPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="bancoHorasAreaFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Área</label>
+          <select id="bancoHorasAreaFiltro" class="mono" onchange="filtrarBancoHorasPorArea(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="bancoHorasUnidadeFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Unidade</label>
+          <select id="bancoHorasUnidadeFiltro" class="mono" onchange="filtrarBancoHorasPorUnidade(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="bancoHorasSupervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Gestor (Supervisor)</label>
+          <select id="bancoHorasSupervisorFiltro" class="mono" onchange="filtrarBancoHorasPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="bancoHorasStatusAprovFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status Aprovação</label>
+          <select id="bancoHorasStatusAprovFiltro" class="mono" onchange="filtrarBancoHorasPorStatusAprov(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:150px;">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <div class="kpi-row" id="bancoHorasKpiRow" style="margin-bottom:20px;"></div>
+
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom:16px;">
+          <div class="panel">
+            <h2>Status do Banco de Horas</h2>
+            <div class="hint">Positivo / Zerado / Negativo, por colaborador.</div>
+            <div style="position:relative; height:220px;">
+              <canvas id="bancoHorasStatusBancoChart"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Status da Aprovação</h2>
+            <div class="hint">Distribuição por status de aprovação.</div>
+            <div style="position:relative; height:220px;">
+              <canvas id="bancoHorasStatusAprovacaoChart"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Colaboradores por Prioridade</h2>
+            <div class="hint">Volume por nível de prioridade.</div>
+            <div style="position:relative; height:220px;">
+              <canvas id="bancoHorasPrioridadeChart"></canvas>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Saldo por Contrato</h2>
+            <div class="hint">Saldo Projetado BH (h) e HE Identificada (h), somados.</div>
+            <table>
+              <thead>
+                <tr><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
+              </thead>
+              <tbody id="bancoHorasSaldoContratoBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: 1.4fr 1.4fr 1fr; margin-bottom:16px;">
+          <div class="panel">
+            <h2>Top 10 — Maiores Saldos Positivos (h)</h2>
+            <div class="hint">Saldo Projetado BH (h), do maior para o menor.</div>
+            <table>
+              <thead>
+                <tr><th class="num">#</th><th>Colaborador</th><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
+              </thead>
+              <tbody id="bancoHorasRankingPositivoBody"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h2>Top 10 — Maiores Saldos Negativos (h)</h2>
+            <div class="hint">Saldo Projetado BH (h), do mais negativo para o menos.</div>
+            <table>
+              <thead>
+                <tr><th class="num">#</th><th>Colaborador</th><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
+              </thead>
+              <tbody id="bancoHorasRankingNegativoBody"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h2>Resumo Geral</h2>
+            <div class="hint">Totais consolidados.</div>
+            <table>
+              <tbody id="bancoHorasResumoGeralBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <h2>Colaboradores</h2>
+          <div class="hint">Busca por colaborador, matrícula, supervisor, coordenador ou centro de custo.</div>
+
+          <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <label for="bancoHorasStatusColabFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Status Colaborador</label>
+            <select id="bancoHorasStatusColabFiltro" class="mono" onchange="filtrarBancoHorasPorStatusColab(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="bancoHorasStatusBancoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status Banco</label>
+            <select id="bancoHorasStatusBancoFiltro" class="mono" onchange="filtrarBancoHorasPorStatusBanco(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+              <option value="">Todos</option>
+            </select>
+            <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarBancoHorasCsv()">⬇ Exportar (CSV)</button>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
+            <div class="search" title="Buscar por colaborador, matrícula, supervisor, coordenador ou centro de custo">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <input id="bancoHoras-search" type="search" placeholder="Buscar por colaborador, matrícula, supervisor, coordenador ou centro de custo..." aria-label="Buscar colaboradores" />
+            </div>
+          </div>
+
+          <div style="overflow:auto; border-radius:8px;">
+            <table id="bancoHorasTable" role="table" aria-label="Tabela de banco de horas">
+              <thead>
+                <tr>
+                  <th>Prioridade</th>
+                  <th>Colaborador</th>
+                  <th>Matrícula</th>
+                  <th>Centro de Custo</th>
+                  <th>Turno</th>
+                  <th>Contrato</th>
+                  <th>Área Técnica</th>
+                  <th>Supervisor</th>
+                  <th>Coordenador</th>
+                  <th>Gerente</th>
+                  <th>Unidade de Negócio</th>
+                  <th>Status Colaborador</th>
+                  <th>Situação do Cadastro</th>
+                  <th class="num">Qtd. Dias Espelho</th>
+                  <th class="num">Qtd. Pendências</th>
+                  <th class="num">Qtd. HE</th>
+                  <th class="num">Qtd. IJ</th>
+                  <th class="num">Qtd. PA</th>
+                  <th class="num">Qtd. SM</th>
+                  <th class="num">Qtd. FNC</th>
+                  <th class="num">Qtd. Respondidas</th>
+                  <th class="num">Qtd. Pendentes Resposta</th>
+                  <th>HE Identificada</th>
+                  <th>HE Aprovada</th>
+                  <th>BH Aprovado</th>
+                  <th>HE Pendente</th>
+                  <th>Ausência Líquida</th>
+                  <th>Saldo Anterior BH</th>
+                  <th>Movimento BH</th>
+                  <th>Saldo Projetado BH</th>
+                  <th class="num">HE Identificada (h)</th>
+                  <th class="num">HE Aprovada (h)</th>
+                  <th class="num">BH Aprovado (h)</th>
+                  <th class="num">HE Pendente (h)</th>
+                  <th class="num">Ausência Líquida (h)</th>
+                  <th class="num">Saldo Anterior BH (h)</th>
+                  <th class="num">Movimento BH (h)</th>
+                  <th class="num">Saldo Projetado BH (h)</th>
+                  <th class="num">Qtd. Dias Almoço Conferir</th>
+                  <th>Status Aprovação</th>
+                  <th>Status Banco</th>
+                  <th>Status Almoço</th>
+                  <th class="num">Qtd. Saldos Diferentes</th>
+                </tr>
+              </thead>
+              <tbody id="bancoHorasTableBody"></tbody>
+            </table>
+            <div id="bancoHorasNoResults" class="no-results" style="display:none">Nenhum colaborador encontrado.</div>
+          </div>
+
+          <div id="bancoHorasPaginacao" style="display:flex; align-items:center; justify-content:flex-end; gap:6px; margin-top:12px; flex-wrap:wrap;"></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -752,6 +929,7 @@ let PENDENTES_FCA = [];
 let COLABORADORES = [];
 let FROTA = [];
 let VAGAS = [];
+let BANCO_HORAS = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
@@ -781,7 +959,7 @@ function filtrarPorStatusHc(valor){
 }
 
 // ---- Navegação por páginas (menu lateral) ----
-const PAGINAS = ['consolidado', 'diario', 'area', 'site', 'fca', 'organograma', 'vagas', 'frota'];
+const PAGINAS = ['consolidado', 'diario', 'area', 'site', 'fca', 'organograma', 'vagas', 'frota', 'bancohoras'];
 
 function mostrarPagina(nome){
   PAGINAS.forEach(p => {
@@ -798,6 +976,7 @@ function mostrarPagina(nome){
   if(nome === 'organograma' && typeof renderHeadcount === 'function') renderHeadcount();
   if(nome === 'vagas' && typeof renderVagas === 'function') renderVagas();
   if(nome === 'frota' && typeof renderFrota === 'function') renderFrota();
+  if(nome === 'bancohoras' && typeof renderBancoHoras === 'function') renderBancoHoras();
 }
 
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
@@ -837,6 +1016,7 @@ async function carregarDados(){
     COLABORADORES = data.colaboradores || [];
     FROTA = data.frota || [];
     VAGAS = data.vagas || [];
+    BANCO_HORAS = data.bancoHoras || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
@@ -1977,6 +2157,7 @@ let frotaFiltrosPopulados = false;
 let frotaPaginaAtual = 1;
 const FROTA_POR_PAGINA = 10;
 let frotaModeloChartInst, frotaStatusChartInst, frotaTipoChartInst;
+let bancoHorasStatusBancoChartInst, bancoHorasStatusAprovacaoChartInst, bancoHorasPrioridadeChartInst;
 
 function filtrarFrotaPorOperacaoEKpi(valor){
   frotaOperacaoFiltroAtual = valor;
@@ -2436,6 +2617,475 @@ function renderFrota(){
   }
 
   renderFrotaTabela();
+}
+
+// ======================================================
+// BANCO DE HORAS / HORA EXTRA
+// Seção independente do mês/SLA selecionados no Consolidado; mesmo
+// padrão de GESTÃO DE FROTAS/VAGAS acima.
+// ======================================================
+
+let bancoHorasContratoFiltroAtual = '';
+let bancoHorasAreaFiltroAtual = '';
+let bancoHorasUnidadeFiltroAtual = '';
+let bancoHorasSupervisorFiltroAtual = '';
+let bancoHorasStatusColabFiltroAtual = '';
+let bancoHorasStatusAprovFiltroAtual = '';
+let bancoHorasStatusBancoFiltroAtual = '';
+let bancoHorasFiltrosPopulados = false;
+let bancoHorasPaginaAtual = 1;
+const BANCO_HORAS_POR_PAGINA = 10;
+
+function filtrarBancoHorasPorContrato(valor){
+  bancoHorasContratoFiltroAtual = valor;
+  bancoHorasPaginaAtual = 1;
+  renderBancoHoras();
+}
+function filtrarBancoHorasPorArea(valor){
+  bancoHorasAreaFiltroAtual = valor;
+  bancoHorasPaginaAtual = 1;
+  renderBancoHoras();
+}
+function filtrarBancoHorasPorUnidade(valor){
+  bancoHorasUnidadeFiltroAtual = valor;
+  bancoHorasPaginaAtual = 1;
+  renderBancoHoras();
+}
+function filtrarBancoHorasPorSupervisor(valor){
+  bancoHorasSupervisorFiltroAtual = valor;
+  bancoHorasPaginaAtual = 1;
+  renderBancoHoras();
+}
+function filtrarBancoHorasPorStatusColab(valor){
+  bancoHorasStatusColabFiltroAtual = valor;
+  bancoHorasPaginaAtual = 1;
+  renderBancoHoras();
+}
+function filtrarBancoHorasPorStatusAprov(valor){
+  bancoHorasStatusAprovFiltroAtual = valor;
+  bancoHorasPaginaAtual = 1;
+  renderBancoHoras();
+}
+function filtrarBancoHorasPorStatusBanco(valor){
+  bancoHorasStatusBancoFiltroAtual = valor;
+  bancoHorasPaginaAtual = 1;
+  renderBancoHoras();
+}
+
+// Aplica os filtros estruturais (sem a busca textual) — usado pelos
+// KPIs e gráficos, que devem refletir os filtros mas não a busca livre.
+function bancoHorasFiltradaGeral(){
+  return BANCO_HORAS.filter(v => {
+    if(bancoHorasContratoFiltroAtual && normFrota(v.contrato) !== bancoHorasContratoFiltroAtual) return false;
+    if(bancoHorasAreaFiltroAtual && normFrota(v.areaTecnica) !== bancoHorasAreaFiltroAtual) return false;
+    if(bancoHorasUnidadeFiltroAtual && normFrota(v.unidadeNegocio) !== bancoHorasUnidadeFiltroAtual) return false;
+    if(bancoHorasSupervisorFiltroAtual && normFrota(v.supervisor) !== bancoHorasSupervisorFiltroAtual) return false;
+    if(bancoHorasStatusColabFiltroAtual && normFrota(v.statusColaborador) !== bancoHorasStatusColabFiltroAtual) return false;
+    if(bancoHorasStatusAprovFiltroAtual && normFrota(v.statusAprovacao) !== bancoHorasStatusAprovFiltroAtual) return false;
+    if(bancoHorasStatusBancoFiltroAtual && normFrota(v.statusBanco) !== bancoHorasStatusBancoFiltroAtual) return false;
+    return true;
+  });
+}
+
+function bancoHorasFiltrada(){
+  const q = (document.getElementById('bancoHoras-search')?.value || '').toLowerCase().trim();
+  return bancoHorasFiltradaGeral().filter(v => {
+    if(q){
+      const hay = [v.colaborador, v.matricula, v.supervisor, v.coordenador, v.centroCusto]
+        .map(x => normFrota(x).toLowerCase()).join(' ');
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderBancoHorasTabela(){
+  const tbody = document.getElementById('bancoHorasTableBody');
+  const noResults = document.getElementById('bancoHorasNoResults');
+  const paginacao = document.getElementById('bancoHorasPaginacao');
+  if(!tbody) return;
+
+  const itens = bancoHorasFiltrada();
+
+  if(itens.length === 0){
+    tbody.innerHTML = '';
+    if(noResults) noResults.style.display = '';
+    if(paginacao) paginacao.innerHTML = '';
+    return;
+  }
+  if(noResults) noResults.style.display = 'none';
+
+  const totalPaginas = Math.max(1, Math.ceil(itens.length / BANCO_HORAS_POR_PAGINA));
+  if(bancoHorasPaginaAtual > totalPaginas) bancoHorasPaginaAtual = totalPaginas;
+  if(bancoHorasPaginaAtual < 1) bancoHorasPaginaAtual = 1;
+
+  const inicio = (bancoHorasPaginaAtual - 1) * BANCO_HORAS_POR_PAGINA;
+  const pagina = itens.slice(inicio, inicio + BANCO_HORAS_POR_PAGINA);
+
+  function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function cel(v){ return esc(v) || '—'; }
+  function celNum(v){ return (v === null || v === undefined) ? '—' : esc(v); }
+
+  tbody.innerHTML = pagina.map(v => `<tr>
+    <td>${cel(v.prioridade)}</td>
+    <td>${cel(v.colaborador)}</td>
+    <td class="mono">${cel(v.matricula)}</td>
+    <td>${cel(v.centroCusto)}</td>
+    <td>${cel(v.turno)}</td>
+    <td>${cel(v.contrato)}</td>
+    <td>${cel(v.areaTecnica)}</td>
+    <td>${cel(v.supervisor)}</td>
+    <td>${cel(v.coordenador)}</td>
+    <td>${cel(v.gerente)}</td>
+    <td>${cel(v.unidadeNegocio)}</td>
+    <td>${cel(v.statusColaborador)}</td>
+    <td>${cel(v.situacaoCadastro)}</td>
+    <td class="num mono">${celNum(v.qtdDiasEspelho)}</td>
+    <td class="num mono">${celNum(v.qtdPendencias)}</td>
+    <td class="num mono">${celNum(v.qtdHE)}</td>
+    <td class="num mono">${celNum(v.qtdIJ)}</td>
+    <td class="num mono">${celNum(v.qtdPA)}</td>
+    <td class="num mono">${celNum(v.qtdSM)}</td>
+    <td class="num mono">${celNum(v.qtdFNC)}</td>
+    <td class="num mono">${celNum(v.qtdRespondidas)}</td>
+    <td class="num mono">${celNum(v.qtdPendentesResposta)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.heIdentificada)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.heAprovada)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.bhAprovado)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.hePendente)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.ausenciaLiquida)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.saldoAnteriorBH)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.movimentoBH)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.saldoProjetadoBH)}</td>
+    <td class="num mono">${celNum(v.heIdentificadaH)}</td>
+    <td class="num mono">${celNum(v.heAprovadaH)}</td>
+    <td class="num mono">${celNum(v.bhAprovadoH)}</td>
+    <td class="num mono">${celNum(v.hePendenteH)}</td>
+    <td class="num mono">${celNum(v.ausenciaLiquidaH)}</td>
+    <td class="num mono">${celNum(v.saldoAnteriorBHH)}</td>
+    <td class="num mono">${celNum(v.movimentoBHH)}</td>
+    <td class="num mono" style="font-weight:600;">${celNum(v.saldoProjetadoBHH)}</td>
+    <td class="num mono">${celNum(v.qtdDiasAlmocoConferir)}</td>
+    <td>${cel(v.statusAprovacao)}</td>
+    <td>${cel(v.statusBanco)}</td>
+    <td>${cel(v.statusAlmoco)}</td>
+    <td class="num mono">${celNum(v.qtdSaldosDiferentes)}</td>
+  </tr>`).join('');
+
+  if(paginacao){
+    let html = `<span class="mono" style="font-size:11px; color:${cor.muted}; margin-right:auto;">Mostrando ${inicio+1}–${Math.min(inicio+BANCO_HORAS_POR_PAGINA, itens.length)} de ${itens.length} colaboradores</span>`;
+    html += `<button type="button" class="chip" ${bancoHorasPaginaAtual<=1?'disabled':''} onclick="mudarPaginaBancoHoras(${bancoHorasPaginaAtual-1})" style="cursor:pointer;">‹</button>`;
+    const maxBotoes = 7;
+    let ini = Math.max(1, bancoHorasPaginaAtual - 3);
+    let fim = Math.min(totalPaginas, ini + maxBotoes - 1);
+    ini = Math.max(1, fim - maxBotoes + 1);
+    for(let p = ini; p <= fim; p++){
+      html += `<button type="button" class="chip${p===bancoHorasPaginaAtual?' active':''}" onclick="mudarPaginaBancoHoras(${p})" style="cursor:pointer;">${p}</button>`;
+    }
+    html += `<button type="button" class="chip" ${bancoHorasPaginaAtual>=totalPaginas?'disabled':''} onclick="mudarPaginaBancoHoras(${bancoHorasPaginaAtual+1})" style="cursor:pointer;">›</button>`;
+    paginacao.innerHTML = html;
+  }
+}
+
+function mudarPaginaBancoHoras(p){
+  bancoHorasPaginaAtual = p;
+  renderBancoHorasTabela();
+}
+
+function exportarBancoHorasCsv(){
+  try {
+    const itens = bancoHorasFiltrada();
+    if(!itens.length){
+      alert('Nenhum colaborador para exportar com os filtros atuais.');
+      return;
+    }
+    const colunas = ['Prioridade','Colaborador','Matricula','CentroCusto','Turno','Contrato','AreaTecnica','Supervisor','Coordenador','Gerente','UnidadeNegocio','StatusColaborador','SituacaoCadastro','QtdDiasEspelho','QtdPendencias','QtdHE','QtdIJ','QtdPA','QtdSM','QtdFNC','QtdRespondidas','QtdPendentesResposta','HEIdentificada','HEAprovada','BHAprovado','HEPendente','AusenciaLiquida','SaldoAnteriorBH','MovimentoBH','SaldoProjetadoBH','HEIdentificadaH','HEAprovadaH','BHAprovadoH','HEPendenteH','AusenciaLiquidaH','SaldoAnteriorBHH','MovimentoBHH','SaldoProjetadoBHH','QtdDiasAlmocoConferir','StatusAprovacao','StatusBanco','StatusAlmoco','QtdSaldosDiferentes'];
+    function csvEsc(v){
+      const s = String(v ?? '');
+      if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }
+    const linhas = [colunas.map(csvEsc).join(';')];
+    itens.forEach(v => {
+      linhas.push([
+        v.prioridade, v.colaborador, v.matricula, v.centroCusto, v.turno, v.contrato, v.areaTecnica,
+        v.supervisor, v.coordenador, v.gerente, v.unidadeNegocio, v.statusColaborador, v.situacaoCadastro,
+        v.qtdDiasEspelho, v.qtdPendencias, v.qtdHE, v.qtdIJ, v.qtdPA, v.qtdSM, v.qtdFNC, v.qtdRespondidas,
+        v.qtdPendentesResposta, v.heIdentificada, v.heAprovada, v.bhAprovado, v.hePendente, v.ausenciaLiquida,
+        v.saldoAnteriorBH, v.movimentoBH, v.saldoProjetadoBH, v.heIdentificadaH, v.heAprovadaH, v.bhAprovadoH,
+        v.hePendenteH, v.ausenciaLiquidaH, v.saldoAnteriorBHH, v.movimentoBHH, v.saldoProjetadoBHH,
+        v.qtdDiasAlmocoConferir, v.statusAprovacao, v.statusBanco, v.statusAlmoco, v.qtdSaldosDiferentes
+      ].map(csvEsc).join(';'));
+    });
+    const csvContent = '\uFEFF' + linhas.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'BancoHoras_Colaboradores.csv';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (erro) {
+    console.error('Erro ao exportar banco de horas:', erro);
+    alert('Ocorreu um erro ao exportar o CSV.\n\n' + (erro && erro.message ? erro.message : erro));
+  }
+}
+
+// Renderiza uma lista "Por <categoria>" (nome + contagem + barra), igual
+// ao estilo usado em Frota/Vagas.
+function renderBancoHoras(){
+  const kpiRow = document.getElementById('bancoHorasKpiRow');
+  if(!kpiRow) return;
+
+  if(!bancoHorasFiltrosPopulados){
+    const selectContrato = document.getElementById('bancoHorasContratoFiltro');
+    const selectArea = document.getElementById('bancoHorasAreaFiltro');
+    const selectUnidade = document.getElementById('bancoHorasUnidadeFiltro');
+    const selectSupervisor = document.getElementById('bancoHorasSupervisorFiltro');
+    const selectStatusColab = document.getElementById('bancoHorasStatusColabFiltro');
+    const selectStatusAprov = document.getElementById('bancoHorasStatusAprovFiltro');
+    const selectStatusBanco = document.getElementById('bancoHorasStatusBancoFiltro');
+
+    const contratosUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const areasUnicas = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.areaTecnica)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const unidadesUnicas = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.unidadeNegocio)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const supervisoresUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.supervisor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const statusColabUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.statusColaborador)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const statusAprovUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.statusAprovacao)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const statusBancoUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.statusBanco)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+
+    if(selectContrato) selectContrato.innerHTML = '<option value="">Todos</option>' + contratosUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectArea) selectArea.innerHTML = '<option value="">Todos</option>' + areasUnicas.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectUnidade) selectUnidade.innerHTML = '<option value="">Todos</option>' + unidadesUnicas.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectSupervisor) selectSupervisor.innerHTML = '<option value="">Todos</option>' + supervisoresUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectStatusColab) selectStatusColab.innerHTML = '<option value="">Todos</option>' + statusColabUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectStatusAprov) selectStatusAprov.innerHTML = '<option value="">Todos</option>' + statusAprovUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectStatusBanco) selectStatusBanco.innerHTML = '<option value="">Todos</option>' + statusBancoUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+
+    const inputBusca = document.getElementById('bancoHoras-search');
+    if(inputBusca){
+      inputBusca.addEventListener('input', debounce(() => {
+        bancoHorasPaginaAtual = 1;
+        renderBancoHorasTabela();
+      }, 200));
+    }
+
+    bancoHorasFiltrosPopulados = true;
+  }
+
+  // Conjunto filtrado (Contrato/Área/Unidade/Supervisor/Status...) usado
+  // em todos os KPIs e gráficos abaixo — a busca de texto livre só afeta
+  // a tabela detalhada no final da página.
+  const BH_FILTRO = bancoHorasFiltradaGeral();
+
+  const total = BH_FILTRO.length;
+  const somaHeIdentificada = BH_FILTRO.reduce((s,v)=> s + (Number(v.heIdentificadaH)||0), 0);
+  const somaHeAprovada = BH_FILTRO.reduce((s,v)=> s + (Number(v.heAprovadaH)||0), 0);
+  const somaBhAprovado = BH_FILTRO.reduce((s,v)=> s + (Number(v.bhAprovadoH)||0), 0);
+  const somaHePendente = BH_FILTRO.reduce((s,v)=> s + (Number(v.hePendenteH)||0), 0);
+  const somaPendencias = BH_FILTRO.reduce((s,v)=> s + (Number(v.qtdPendencias)||0), 0);
+  const somaSaldoProjetado = BH_FILTRO.reduce((s,v)=> s + (Number(v.saldoProjetadoBHH)||0), 0);
+  const colaboradoresAtivos = BH_FILTRO.filter(v => semAcentoHc(v.statusColaborador).includes('ativo')).length;
+  const mediaSaldoPorColab = total > 0 ? (somaSaldoProjetado/total) : 0;
+
+  function fmtH(n){ return n.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) + 'h'; }
+
+  kpiRow.innerHTML = `
+    <div class="kpi"><div class="label">Colaboradores</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">Colaboradores Ativos</div><div class="value" style="color:${cor.good}">${colaboradoresAtivos.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">HE Identificada (h)</div><div class="value" style="color:#2563eb">${fmtH(somaHeIdentificada)}</div></div>
+    <div class="kpi"><div class="label">Saldo Projetado BH (h)</div><div class="value" style="color:${somaSaldoProjetado >= 0 ? cor.good : cor.bad}">${fmtH(somaSaldoProjetado)}</div></div>
+    <div class="kpi"><div class="label">HE Pendente (h)</div><div class="value" style="color:${cor.warn}">${fmtH(somaHePendente)}</div></div>
+    <div class="kpi"><div class="label">Média Saldo BH (h) / Colab.</div><div class="value" style="color:${mediaSaldoPorColab >= 0 ? cor.good : cor.bad}">${fmtH(mediaSaldoPorColab)}</div></div>
+  `;
+
+  // ---- Status do Banco de Horas (Positivo/Zerado/Negativo, pelo sinal do Saldo Projetado BH (h)) ----
+  const statusBancoCanvas = document.getElementById('bancoHorasStatusBancoChart');
+  if(statusBancoCanvas){
+    let positivos = 0, zerados = 0, negativos = 0;
+    BH_FILTRO.forEach(v => {
+      const saldo = Number(v.saldoProjetadoBHH) || 0;
+      if(saldo > 0) positivos++;
+      else if(saldo < 0) negativos++;
+      else zerados++;
+    });
+    if(bancoHorasStatusBancoChartInst) bancoHorasStatusBancoChartInst.destroy();
+    bancoHorasStatusBancoChartInst = new Chart(statusBancoCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Positivo', 'Zerado', 'Negativo'],
+        datasets: [{
+          data: [positivos, zerados, negativos],
+          backgroundColor: [cor.good, '#2563eb', cor.bad],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '60%',
+        plugins: {
+          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          datalabels: { display:false }
+        }
+      }
+    });
+  }
+
+  // ---- Status da Aprovação (rosca) ----
+  const statusAprovCanvas = document.getElementById('bancoHorasStatusAprovacaoChart');
+  if(statusAprovCanvas){
+    const porStatusAprov = {};
+    BH_FILTRO.forEach(v => {
+      const k = normFrota(v.statusAprovacao) || 'Sem status';
+      porStatusAprov[k] = (porStatusAprov[k] || 0) + 1;
+    });
+    const statusAprovOrd = Object.keys(porStatusAprov).sort((a,b)=> porStatusAprov[b]-porStatusAprov[a]);
+    if(bancoHorasStatusAprovacaoChartInst) bancoHorasStatusAprovacaoChartInst.destroy();
+    bancoHorasStatusAprovacaoChartInst = new Chart(statusAprovCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: statusAprovOrd,
+        datasets: [{
+          data: statusAprovOrd.map(k => porStatusAprov[k]),
+          backgroundColor: statusAprovOrd.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '60%',
+        plugins: {
+          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          datalabels: { display:false }
+        }
+      }
+    });
+  }
+
+  // ---- Colaboradores por Prioridade (barra) ----
+  const prioridadeCanvas = document.getElementById('bancoHorasPrioridadeChart');
+  if(prioridadeCanvas){
+    const porPrioridade = {};
+    BH_FILTRO.forEach(v => {
+      const k = normFrota(v.prioridade) || 'Sem prioridade';
+      porPrioridade[k] = (porPrioridade[k] || 0) + 1;
+    });
+    const prioridadesOrd = Object.keys(porPrioridade).sort((a,b)=> porPrioridade[b]-porPrioridade[a]);
+    if(bancoHorasPrioridadeChartInst) bancoHorasPrioridadeChartInst.destroy();
+    bancoHorasPrioridadeChartInst = new Chart(prioridadeCanvas, {
+      type: 'bar',
+      data: {
+        labels: prioridadesOrd,
+        datasets: [{
+          label: 'Colaboradores', data: prioridadesOrd.map(k => porPrioridade[k]),
+          backgroundColor: prioridadesOrd.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
+          borderRadius: 4,
+          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'600'} }
+        }]
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display:false }, datalabels: { display:true } },
+        scales: {
+          x: { ticks:{color:cor.muted}, grid:{color:cor.line}, beginAtZero:true },
+          y: { ticks:{color:cor.muted, font:{size:11}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Saldo por Contrato (tabela) ----
+  const saldoContratoBody = document.getElementById('bancoHorasSaldoContratoBody');
+  if(saldoContratoBody){
+    const porContrato = {};
+    BH_FILTRO.forEach(v => {
+      const k = normFrota(v.contrato) || 'Sem contrato';
+      if(!porContrato[k]) porContrato[k] = { saldo: 0, heIdent: 0 };
+      porContrato[k].saldo += Number(v.saldoProjetadoBHH) || 0;
+      porContrato[k].heIdent += Number(v.heIdentificadaH) || 0;
+    });
+    const contratosOrd = Object.keys(porContrato).sort((a,b)=> porContrato[b].saldo - porContrato[a].saldo);
+    let totalSaldo = 0, totalHeIdent = 0;
+    let html = contratosOrd.map(k => {
+      const c = porContrato[k];
+      totalSaldo += c.saldo;
+      totalHeIdent += c.heIdent;
+      return `<tr>
+        <td>${k}</td>
+        <td class="num mono" style="color:${c.saldo >= 0 ? cor.good : cor.bad};">${c.saldo.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
+        <td class="num mono">${c.heIdent.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
+      </tr>`;
+    }).join('');
+    html += `<tr style="font-weight:700; border-top:2px solid ${cor.line};">
+      <td>Total</td>
+      <td class="num mono" style="color:${totalSaldo >= 0 ? cor.good : cor.bad};">${totalSaldo.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
+      <td class="num mono">${totalHeIdent.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
+    </tr>`;
+    saldoContratoBody.innerHTML = html;
+  }
+
+  function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmtSaldo(n){ return n.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}); }
+
+  // ---- Top 10 Maiores Saldos Positivos ----
+  const rankingPositivoBody = document.getElementById('bancoHorasRankingPositivoBody');
+  if(rankingPositivoBody){
+    const positivos = BH_FILTRO.filter(v => (Number(v.saldoProjetadoBHH)||0) > 0)
+      .sort((a,b) => (Number(b.saldoProjetadoBHH)||0) - (Number(a.saldoProjetadoBHH)||0))
+      .slice(0, 10);
+    if(positivos.length === 0){
+      rankingPositivoBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum saldo positivo</td></tr>`;
+    } else {
+      rankingPositivoBody.innerHTML = positivos.map((v,i) => `<tr>
+        <td class="num mono">${i+1}</td>
+        <td>${esc(v.colaborador) || '—'}</td>
+        <td>${esc(v.contrato) || '—'}</td>
+        <td class="num mono" style="font-weight:600; color:${cor.good};">${fmtSaldo(Number(v.saldoProjetadoBHH)||0)}</td>
+        <td class="num mono">${fmtSaldo(Number(v.heIdentificadaH)||0)}</td>
+      </tr>`).join('');
+    }
+  }
+
+  // ---- Top 10 Maiores Saldos Negativos ----
+  const rankingNegativoBody = document.getElementById('bancoHorasRankingNegativoBody');
+  if(rankingNegativoBody){
+    const negativos = BH_FILTRO.filter(v => (Number(v.saldoProjetadoBHH)||0) < 0)
+      .sort((a,b) => (Number(a.saldoProjetadoBHH)||0) - (Number(b.saldoProjetadoBHH)||0))
+      .slice(0, 10);
+    if(negativos.length === 0){
+      rankingNegativoBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum saldo negativo 🎉</td></tr>`;
+    } else {
+      rankingNegativoBody.innerHTML = negativos.map((v,i) => `<tr>
+        <td class="num mono">${i+1}</td>
+        <td>${esc(v.colaborador) || '—'}</td>
+        <td>${esc(v.contrato) || '—'}</td>
+        <td class="num mono" style="font-weight:600; color:${cor.bad};">${fmtSaldo(Number(v.saldoProjetadoBHH)||0)}</td>
+        <td class="num mono">${fmtSaldo(Number(v.heIdentificadaH)||0)}</td>
+      </tr>`).join('');
+    }
+  }
+
+  // ---- Resumo Geral ----
+  const resumoBody = document.getElementById('bancoHorasResumoGeralBody');
+  if(resumoBody){
+    const saldoTotalPositivo = BH_FILTRO.reduce((s,v)=>{ const n = Number(v.saldoProjetadoBHH)||0; return s + (n>0?n:0); }, 0);
+    const saldoTotalNegativo = BH_FILTRO.reduce((s,v)=>{ const n = Number(v.saldoProjetadoBHH)||0; return s + (n<0?n:0); }, 0);
+    const qtdZerados = BH_FILTRO.filter(v => (Number(v.saldoProjetadoBHH)||0) === 0).length;
+    const qtdRejeitadas = BH_FILTRO.filter(v => semAcentoHc(v.statusAprovacao).includes('rejeit')).length;
+    resumoBody.innerHTML = `
+      <tr><td>Saldo Total Positivo (h)</td><td class="num mono" style="color:${cor.good}; font-weight:600;">${fmtSaldo(saldoTotalPositivo)}</td></tr>
+      <tr><td>Saldo Total Negativo (h)</td><td class="num mono" style="color:${cor.bad}; font-weight:600;">${fmtSaldo(saldoTotalNegativo)}</td></tr>
+      <tr><td>Colaboradores com Saldo Zerado</td><td class="num mono">${qtdZerados}</td></tr>
+      <tr><td>HE Identificada (h)</td><td class="num mono">${fmtSaldo(somaHeIdentificada)}</td></tr>
+      <tr><td>HE Aprovada (h)</td><td class="num mono" style="color:${cor.good};">${fmtSaldo(somaHeAprovada)}</td></tr>
+      <tr><td>HE Pendente (h)</td><td class="num mono" style="color:${cor.warn};">${fmtSaldo(somaHePendente)}</td></tr>
+      <tr><td>Solicitações Rejeitadas</td><td class="num mono" style="color:${cor.bad};">${qtdRejeitadas}</td></tr>
+    `;
+  }
+
+  renderBancoHorasTabela();
 }
 
 function exportarFcaPreenchidoCsv(){
