@@ -1372,8 +1372,8 @@ function renderHeadcount(){
   kpiRow.innerHTML = contratosOrdenados.map(k => {
     const qtd = porContrato[k];
     const pct = hcTotal > 0 ? (qtd/hcTotal*100).toFixed(0) : 0;
-    return `<div class="kpi"><div class="label">${k}</div><div class="value">${qtd}</div><div class="delta">${pct}%</div></div>`;
-  }).join('') + `<div class="kpi"><div class="label">HC Total</div><div class="value" style="color:${cor.accent}">${hcTotal}</div></div>`;
+    return `<div class="kpi"><div class="label">🏢 ${k}</div><div class="value">${qtd}</div><div class="delta">${pct}%</div></div>`;
+  }).join('') + `<div class="kpi"><div class="label">👥 HC Total</div><div class="value" style="color:${cor.accent}">${hcTotal}</div></div>`;
 
   const porArea = {};
   ativos.forEach(c => {
@@ -1868,12 +1868,12 @@ function renderVagas(){
   function pctDoTotal(n){ return total > 0 ? (n/total*100).toFixed(1) : '0.0'; }
 
   kpiRow.innerHTML = `
-    <div class="kpi"><div class="label">Total de Requisições</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div><div class="delta">100% do total</div></div>
-    <div class="kpi"><div class="label">Aprovadas</div><div class="value" style="color:${cor.good}">${aprovadas.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(aprovadas)}% do total</div></div>
-    <div class="kpi"><div class="label">Pendentes</div><div class="value" style="color:${cor.warn}">${pendentes.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(pendentes)}% do total</div></div>
-    <div class="kpi"><div class="label">Em Triagem</div><div class="value" style="color:#2563eb">${emTriagem.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(emTriagem)}% do total</div></div>
-    <div class="kpi"><div class="label">Aguardando Aprovação</div><div class="value" style="color:#5e34b5">${aguardandoAprovacao.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(aguardandoAprovacao)}% do total</div></div>
-    <div class="kpi"><div class="label">% de Aprovação</div><div class="value" style="color:${statusColorVagas(pctAprovacao)}">${(pctAprovacao*100).toFixed(1)}%</div><div class="delta">Meta ${(META_APROVACAO_VAGAS*100).toFixed(0)}%</div></div>
+    <div class="kpi"><div class="label">📋 Total de Requisições</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div><div class="delta">100% do total</div></div>
+    <div class="kpi"><div class="label">✅ Aprovadas</div><div class="value" style="color:${cor.good}">${aprovadas.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(aprovadas)}% do total</div></div>
+    <div class="kpi"><div class="label">⏳ Pendentes</div><div class="value" style="color:${cor.warn}">${pendentes.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(pendentes)}% do total</div></div>
+    <div class="kpi"><div class="label">🔍 Em Triagem</div><div class="value" style="color:#2563eb">${emTriagem.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(emTriagem)}% do total</div></div>
+    <div class="kpi"><div class="label">⏰ Aguardando Aprovação</div><div class="value" style="color:#5e34b5">${aguardandoAprovacao.toLocaleString('pt-BR')}</div><div class="delta">${pctDoTotal(aguardandoAprovacao)}% do total</div></div>
+    <div class="kpi"><div class="label">📈 % de Aprovação</div><div class="value" style="color:${statusColorVagas(pctAprovacao)}">${(pctAprovacao*100).toFixed(1)}%</div><div class="delta">Meta ${(META_APROVACAO_VAGAS*100).toFixed(0)}%</div></div>
   `;
 
   // ---- Motivo da Vaga (rosca) ----
@@ -2409,7 +2409,7 @@ function renderFrota(){
   if(operacaoKpiRow){
     const cardTotalAtivo = frotaOperacaoFiltroAtual === '';
     let html = `<div class="kpi" style="cursor:pointer; ${cardTotalAtivo ? `border-color:${cor.accent}; box-shadow:0 0 0 2px ${cor.accent} inset;` : ''}" onclick="filtrarFrotaPorOperacaoEKpi('')">
-      <div class="label">Total de Veículos</div>
+      <div class="label">🚗 Total de Veículos</div>
       <div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div>
     </div>`;
     html += operacoesOrdenadas.map((k, i) => {
@@ -2418,7 +2418,7 @@ function renderFrota(){
       const p = PALETA_FROTA[i % PALETA_FROTA.length];
       const ativo = frotaOperacaoFiltroAtual === k;
       return `<div class="kpi" style="cursor:pointer; background:${p.bg}; border-color:${p.border}; ${ativo ? `box-shadow:0 0 0 2px ${p.text} inset;` : ''}" onclick="filtrarFrotaPorOperacaoEKpi('${k}')">
-        <div class="label" style="color:${p.text};">${k}</div>
+        <div class="label" style="color:${p.text};">🏢 ${k}</div>
         <div class="value" style="color:${p.text};">${qtd}</div>
         <div class="delta" style="color:${p.text};">${pct}% do total</div>
       </div>`;
@@ -2490,13 +2490,21 @@ function renderFrota(){
   });
   const statusOrdenados = Object.keys(porStatus).sort((a,b)=> porStatus[b]-porStatus[a]);
 
+  function iconeStatusFrota(status){
+    const n = semAcentoHc(status);
+    if(n.includes('inativ') || n.includes('sinistr') || n.includes('roubad')) return '❌';
+    if(n.includes('manuten') || n.includes('oficina') || n.includes('funilaria')) return '🔧';
+    if(n.includes('ativo')) return '✅';
+    return '🚗';
+  }
+
   kpiRow.innerHTML =
     statusOrdenados.map((k, i) => {
       const qtd = porStatus[k];
       const pct = total > 0 ? (qtd/total*100).toFixed(1) : 0;
       const p = PALETA_FROTA[i % PALETA_FROTA.length];
       return `<div class="kpi" style="background:${p.bg}; border-color:${p.border};">
-        <div class="label" style="color:${p.text};">${k}</div>
+        <div class="label" style="color:${p.text};">${iconeStatusFrota(k)} ${k}</div>
         <div class="value" style="color:${p.text};">${qtd}</div>
         <div class="delta" style="color:${p.text};">${pct}% do total</div>
       </div>`;
@@ -3458,10 +3466,10 @@ function render(){
 
   const kpiRow = document.getElementById('kpiRow');
   kpiRow.innerHTML = `
-    <div class="kpi"><div class="label">Total Indisponibilidade</div><div class="value">${t.total.toLocaleString('pt-BR')}</div></div>
-    <div class="kpi"><div class="label">Dentro do Prazo</div><div class="value" style="color:${cor.good}">${t.dentro.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">📊 Total Indisponibilidade</div><div class="value">${t.total.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">✅ Dentro do Prazo</div><div class="value" style="color:${cor.good}">${t.dentro.toLocaleString('pt-BR')}</div></div>
     <div class="kpi">
-      <div class="label">Fora do Prazo</div>
+      <div class="label">⚠️ Fora do Prazo</div>
       <div class="value" style="display:flex; gap:10px; align-items:baseline; justify-content:center;">
         <span style="color:${cor.bad}">${t.fora.toLocaleString('pt-BR')}</span>
         <span style="color:${cor.line};">|</span>
@@ -3469,14 +3477,14 @@ function render(){
       </div>
     </div>
     <div class="kpi">
-      <div class="label">Dias do Mês (D-1)</div>
+      <div class="label">📅 Dias do Mês (D-1)</div>
       <div class="value" style="display:flex; gap:10px; justify-content:center; align-items:baseline;">
         <span>${diasCorridos}<span style="font-family:'Inter',sans-serif; font-size:10px; font-weight:600; color:${cor.muted}; text-transform:uppercase; margin-left:4px;">corridos</span></span>
         <span style="color:${cor.muted};">/</span>
         <span>${diasRestantes}<span style="font-family:'Inter',sans-serif; font-size:10px; font-weight:600; color:${cor.muted}; text-transform:uppercase; margin-left:4px;">restantes</span></span>
       </div>
     </div>
-    <div class="kpi"><div class="label">% Atendimento</div><div class="value" style="color:${statusColor(t.pct)}">${(t.pct*100).toFixed(1)}%</div>
+    <div class="kpi"><div class="label">📈 % Atendimento</div><div class="value" style="color:${statusColor(t.pct)}">${(t.pct*100).toFixed(1)}%</div>
       ${deltaPP!==null ? `<div class="delta ${deltaPP>=0?'up':'down'}">${deltaPP>=0?'▲ +':'▼ '}${deltaPP.toFixed(1)} p.p. vs mês anterior</div>` : ''}
     </div>
   `;
