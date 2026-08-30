@@ -771,15 +771,21 @@
           <div class="panel">
             <h2>Status do Banco de Horas</h2>
             <div class="hint">Positivo / Zerado / Negativo, por colaborador.</div>
-            <div style="position:relative; height:220px;">
-              <canvas id="bancoHorasStatusBancoChart"></canvas>
+            <div style="display:flex; align-items:center; gap:14px;">
+              <div style="position:relative; height:150px; width:150px; flex-shrink:0;">
+                <canvas id="bancoHorasStatusBancoChart"></canvas>
+              </div>
+              <div id="bancoHorasStatusBancoLegenda" style="flex:1;"></div>
             </div>
           </div>
           <div class="panel">
             <h2>Status da Aprovação</h2>
             <div class="hint">Distribuição por status de aprovação.</div>
-            <div style="position:relative; height:220px;">
-              <canvas id="bancoHorasStatusAprovacaoChart"></canvas>
+            <div style="display:flex; align-items:center; gap:14px;">
+              <div style="position:relative; height:150px; width:150px; flex-shrink:0;">
+                <canvas id="bancoHorasStatusAprovacaoChart"></canvas>
+              </div>
+              <div id="bancoHorasStatusAprovacaoLegenda" style="flex:1;"></div>
             </div>
           </div>
           <div class="panel">
@@ -2926,11 +2932,28 @@ function renderBancoHoras(){
       options: {
         responsive: true, maintainAspectRatio: false, cutout: '60%',
         plugins: {
-          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          legend: { display:false },
           datalabels: { display:false }
         }
       }
     });
+    const legendaBanco = document.getElementById('bancoHorasStatusBancoLegenda');
+    if(legendaBanco){
+      const totalBanco = positivos + zerados + negativos;
+      const itensBanco = [
+        { label:'Positivo', valor: positivos, cor: cor.good },
+        { label:'Zerado', valor: zerados, cor: '#2563eb' },
+        { label:'Negativo', valor: negativos, cor: cor.bad }
+      ];
+      legendaBanco.innerHTML = itensBanco.map(it => {
+        const pct = totalBanco > 0 ? (it.valor/totalBanco*100).toFixed(1) : '0.0';
+        return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <span style="width:10px; height:10px; border-radius:50%; background:${it.cor}; flex-shrink:0;"></span>
+          <span style="font-size:12px; color:${cor.text};">${it.label}</span>
+          <span class="mono" style="font-size:12px; color:${cor.muted}; margin-left:auto;">${it.valor} (${pct}%)</span>
+        </div>`;
+      }).join('');
+    }
   }
 
   // ---- Status da Aprovação (rosca) ----
@@ -2956,11 +2979,25 @@ function renderBancoHoras(){
       options: {
         responsive: true, maintainAspectRatio: false, cutout: '60%',
         plugins: {
-          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          legend: { display:false },
           datalabels: { display:false }
         }
       }
     });
+    const legendaAprov = document.getElementById('bancoHorasStatusAprovacaoLegenda');
+    if(legendaAprov){
+      const totalAprov = statusAprovOrd.reduce((s,k)=> s + porStatusAprov[k], 0);
+      legendaAprov.innerHTML = statusAprovOrd.map((k, i) => {
+        const p = PALETA_FROTA[i % PALETA_FROTA.length];
+        const qtd = porStatusAprov[k];
+        const pct = totalAprov > 0 ? (qtd/totalAprov*100).toFixed(1) : '0.0';
+        return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <span style="width:10px; height:10px; border-radius:50%; background:${p.text}; flex-shrink:0;"></span>
+          <span style="font-size:12px; color:${cor.text};">${k}</span>
+          <span class="mono" style="font-size:12px; color:${cor.muted}; margin-left:auto;">${qtd} (${pct}%)</span>
+        </div>`;
+      }).join('');
+    }
   }
 
   // ---- Colaboradores por Prioridade (barra) ----
@@ -3038,13 +3075,25 @@ function renderBancoHoras(){
     if(positivos.length === 0){
       rankingPositivoBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum saldo positivo</td></tr>`;
     } else {
-      rankingPositivoBody.innerHTML = positivos.map((v,i) => `<tr>
+      const maxPositivo = Math.max(...positivos.map(v => Number(v.saldoProjetadoBHH)||0), 1);
+      rankingPositivoBody.innerHTML = positivos.map((v,i) => {
+        const saldo = Number(v.saldoProjetadoBHH)||0;
+        const larguraBarra = Math.max(4, (saldo/maxPositivo*100));
+        return `<tr>
         <td class="num mono">${i+1}</td>
         <td>${esc(v.colaborador) || '—'}</td>
         <td>${esc(v.contrato) || '—'}</td>
-        <td class="num mono" style="font-weight:600; color:${cor.good};">${fmtSaldo(Number(v.saldoProjetadoBHH)||0)}</td>
+        <td class="num mono" style="font-weight:600; color:${cor.good};">
+          <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+            <div style="background:${cor.line}; border-radius:999px; height:6px; width:60px; overflow:hidden;">
+              <div style="width:${larguraBarra}%; background:${cor.good}; height:100%;"></div>
+            </div>
+            <span>${fmtSaldo(saldo)}</span>
+          </div>
+        </td>
         <td class="num mono">${fmtSaldo(Number(v.heIdentificadaH)||0)}</td>
-      </tr>`).join('');
+      </tr>`;
+      }).join('');
     }
   }
 
@@ -3057,13 +3106,25 @@ function renderBancoHoras(){
     if(negativos.length === 0){
       rankingNegativoBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum saldo negativo 🎉</td></tr>`;
     } else {
-      rankingNegativoBody.innerHTML = negativos.map((v,i) => `<tr>
+      const maxNegativo = Math.max(...negativos.map(v => Math.abs(Number(v.saldoProjetadoBHH)||0)), 1);
+      rankingNegativoBody.innerHTML = negativos.map((v,i) => {
+        const saldo = Number(v.saldoProjetadoBHH)||0;
+        const larguraBarra = Math.max(4, (Math.abs(saldo)/maxNegativo*100));
+        return `<tr>
         <td class="num mono">${i+1}</td>
         <td>${esc(v.colaborador) || '—'}</td>
         <td>${esc(v.contrato) || '—'}</td>
-        <td class="num mono" style="font-weight:600; color:${cor.bad};">${fmtSaldo(Number(v.saldoProjetadoBHH)||0)}</td>
+        <td class="num mono" style="font-weight:600; color:${cor.bad};">
+          <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+            <div style="background:${cor.line}; border-radius:999px; height:6px; width:60px; overflow:hidden;">
+              <div style="width:${larguraBarra}%; background:${cor.bad}; height:100%;"></div>
+            </div>
+            <span>${fmtSaldo(saldo)}</span>
+          </div>
+        </td>
         <td class="num mono">${fmtSaldo(Number(v.heIdentificadaH)||0)}</td>
-      </tr>`).join('');
+      </tr>`;
+      }).join('');
     }
   }
 
