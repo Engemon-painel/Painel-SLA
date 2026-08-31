@@ -1023,6 +1023,17 @@ const MESES_FORCADOS_CONSOLIDADO = [
   { mes: 'Jul/26', dentro: 598,  fora: 186 },
 ];
 
+// Mesmo esquema, mas com os números do SLA 6h.
+const MESES_FORCADOS_CONSOLIDADO_6H = [
+  { mes: 'Jan/26', dentro: 1168, fora: 302 },
+  { mes: 'Fev/26', dentro: 1244, fora: 260 },
+  { mes: 'Mar/26', dentro: 1042, fora: 245 },
+  { mes: 'Abr/26', dentro: 605,  fora: 132 },
+  { mes: 'Mai/26', dentro: 563,  fora: 130 },
+  { mes: 'Jun/26', dentro: 676,  fora: 113 },
+  { mes: 'Jul/26', dentro: 686,  fora: 98  },
+];
+
 function criarMesForcado(label, dentro, fora){
   return {
     mes: label,
@@ -1041,10 +1052,10 @@ function criarMesForcado(label, dentro, fora){
 // Insere os meses forçados no início da série, substituindo qualquer mês
 // da base real que tenha o mesmo rótulo (ex.: "Jul/26"), e reordena tudo
 // cronologicamente pelo rótulo "Mes/aa".
-function mesclarMesesForcados(mesesReais){
-  const labelsForcados = new Set(MESES_FORCADOS_CONSOLIDADO.map(m => m.mes));
+function mesclarMesesForcados(mesesReais, mesesForcados){
+  const labelsForcados = new Set(mesesForcados.map(m => m.mes));
   const semDuplicados = (mesesReais || []).filter(m => !labelsForcados.has(m.mes));
-  const forcados = MESES_FORCADOS_CONSOLIDADO.map(m => criarMesForcado(m.mes, m.dentro, m.fora));
+  const forcados = mesesForcados.map(m => criarMesForcado(m.mes, m.dentro, m.fora));
   const combinados = [...forcados, ...semDuplicados];
   combinados.sort((a, b) => {
     const [nomeA, anoA] = a.mes.split('/');
@@ -1062,8 +1073,8 @@ async function carregarDados(){
     const resp = await fetch('dados.json?_=' + Date.now());
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
-    DADOS_4H = { meta: data.meta, meses: mesclarMesesForcados(data.meses) };
-    DADOS_6H = { meta: data.meta, meses: data.meses6h && data.meses6h.length ? data.meses6h : data.meses };
+    DADOS_4H = { meta: data.meta, meses: mesclarMesesForcados(data.meses, MESES_FORCADOS_CONSOLIDADO) };
+    DADOS_6H = { meta: data.meta, meses: mesclarMesesForcados(data.meses6h && data.meses6h.length ? data.meses6h : data.meses, MESES_FORCADOS_CONSOLIDADO_6H) };
     SEMANAL_4H = data.semanal;
     SEMANAL_6H = data.semanal6h && data.semanal6h.length ? data.semanal6h : data.semanal;
     DIARIO_4H = data.diario || [];
