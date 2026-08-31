@@ -1006,13 +1006,63 @@ function trocarSla(sla){
   montarPagina();
 }
 
+// Meses históricos forçados manualmente (fora da base do Office Script) —
+// pedido explícito para sempre aparecerem na Visão Consolidada, mesmo que
+// a base ainda não tenha esse histórico. Cada um vira um mês "fake" com
+// uma única área (SPC1) carregando o total pedido, só pra entrar na soma
+// de totais() — não tem detalhamento por área real nem MTTR/sites, então
+// nas páginas "Por Área"/"Por Site"/"FCA" esses meses aparecem vazios
+// nesses detalhes (mas certos na Visão Consolidada, que é o pedido).
+const MESES_FORCADOS_CONSOLIDADO = [
+  { mes: 'Jan/26', dentro: 1050, fora: 420 },
+  { mes: 'Fev/26', dentro: 1127, fora: 377 },
+  { mes: 'Mar/26', dentro: 938,  fora: 349 },
+  { mes: 'Abr/26', dentro: 532,  fora: 205 },
+  { mes: 'Mai/26', dentro: 508,  fora: 185 },
+  { mes: 'Jun/26', dentro: 619,  fora: 170 },
+  { mes: 'Jul/26', dentro: 598,  fora: 186 },
+];
+
+function criarMesForcado(label, dentro, fora){
+  return {
+    mes: label,
+    areas: { SPC1: { dentro: dentro, fora: fora } },
+    mttrValores: [],
+    horasSubmit: [],
+    horasClear: [],
+    topSites: [],
+    totalSitesUnicos: 0,
+    genericTier2Top10: [],
+    genericTier3Top10: [],
+    resolucaoTop10: []
+  };
+}
+
+// Insere os meses forçados no início da série, substituindo qualquer mês
+// da base real que tenha o mesmo rótulo (ex.: "Jul/26"), e reordena tudo
+// cronologicamente pelo rótulo "Mes/aa".
+function mesclarMesesForcados(mesesReais){
+  const labelsForcados = new Set(MESES_FORCADOS_CONSOLIDADO.map(m => m.mes));
+  const semDuplicados = (mesesReais || []).filter(m => !labelsForcados.has(m.mes));
+  const forcados = MESES_FORCADOS_CONSOLIDADO.map(m => criarMesForcado(m.mes, m.dentro, m.fora));
+  const combinados = [...forcados, ...semDuplicados];
+  combinados.sort((a, b) => {
+    const [nomeA, anoA] = a.mes.split('/');
+    const [nomeB, anoB] = b.mes.split('/');
+    const anoNumA = Number(anoA), anoNumB = Number(anoB);
+    if(anoNumA !== anoNumB) return anoNumA - anoNumB;
+    return Number(NOME_MES[nomeA]) - Number(NOME_MES[nomeB]);
+  });
+  return combinados;
+}
+
 async function carregarDados(){
   const status = document.getElementById('loadStatus');
   try{
     const resp = await fetch('dados.json?_=' + Date.now());
     if(!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
-    DADOS_4H = { meta: data.meta, meses: data.meses };
+    DADOS_4H = { meta: data.meta, meses: mesclarMesesForcados(data.meses) };
     DADOS_6H = { meta: data.meta, meses: data.meses6h && data.meses6h.length ? data.meses6h : data.meses };
     SEMANAL_4H = data.semanal;
     SEMANAL_6H = data.semanal6h && data.semanal6h.length ? data.semanal6h : data.semanal;
