@@ -282,11 +282,20 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-bottom:16px;">
-        <h2>Top 15 Sites</h2>
-        <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
-        <div id="topSitesChartWrap" style="position:relative; height:460px;">
-          <canvas id="topSitesChart"></canvas>
+      <div class="grid" style="grid-template-columns: 1.6fr 1fr; margin-bottom:16px;">
+        <div class="panel">
+          <h2>Top 15 Sites</h2>
+          <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
+          <div id="topSitesChartWrap" style="position:relative; height:460px;">
+            <canvas id="topSitesChart"></canvas>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Sites que Mais Repetiram</h2>
+          <div class="hint">Incidentes por site, empilhado por mês (Jul + Ago/26).</div>
+          <div id="sitesRecorrentesChartWrap" style="position:relative; height:460px;">
+            <canvas id="sitesRecorrentesChart"></canvas>
+          </div>
         </div>
       </div>
 
@@ -1250,7 +1259,7 @@ function renderDiasRow(diarioFiltrado){
 let hcContratoPopulado = false;
 let hcStatusPopulado = false;
 let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
-let areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, genericTier2Chart, genericTier3Chart, resolucaoChart;
+let areaChart, gaugeChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, genericTier2Chart, genericTier3Chart, resolucaoChart, sitesRecorrentesChart;
 const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
@@ -3745,6 +3754,65 @@ function render(){
         scales: {
           x: { ticks:{color:cor.muted, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
           y: { ticks:{color:cor.muted, font:{size:11, weight:'bold'}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // ---- Sites que Mais Repetiram (soma de incidentes por site, em todos
+  // os meses carregados — hoje isso é Jul/26 e Ago/26, já que os demais
+  // meses forçados manualmente não têm topSites) ----
+  const sitesRecorrentesCanvas = document.getElementById('sitesRecorrentesChart');
+  if(sitesRecorrentesCanvas){
+    // Soma total por site (todos os meses carregados) só pra decidir o
+    // ranking/Top 15 exibido — a composição de cada barra vem por mês.
+    const somaPorSite = {};
+    DADOS.meses.forEach(m => {
+      (Array.isArray(m.topSites) ? m.topSites : []).forEach(s => {
+        somaPorSite[s.site] = (somaPorSite[s.site] || 0) + s.total;
+      });
+    });
+    const sitesOrdenados = Object.keys(somaPorSite)
+      .sort((a,b) => somaPorSite[b] - somaPorSite[a])
+      .slice(0, 15);
+
+    const alturaPorBarra = 24;
+    const alturaMinima = 260;
+    const wrapRecorrentes = document.getElementById('sitesRecorrentesChartWrap');
+    if(wrapRecorrentes) wrapRecorrentes.style.height = Math.max(alturaMinima, sitesOrdenados.length * alturaPorBarra) + 'px';
+
+    // Um dataset por mês que tenha dado de topSites (hoje: Jul/26 e Ago/26).
+    const mesesComSites = DADOS.meses.filter(m => Array.isArray(m.topSites) && m.topSites.length > 0);
+    const paletaMeses = [cor.accent, '#5e34b5', cor.warn, cor.good, '#2563eb'];
+    const datasetsPorMes = mesesComSites.map((m, i) => {
+      const mapaMes = {};
+      m.topSites.forEach(s => { mapaMes[s.site] = s.total; });
+      return {
+        label: m.mes,
+        data: sitesOrdenados.map(site => mapaMes[site] || 0),
+        backgroundColor: paletaMeses[i % paletaMeses.length],
+        borderRadius: 4,
+        datalabels: { display:false }
+      };
+    });
+
+    if(sitesRecorrentesChart) sitesRecorrentesChart.destroy();
+    sitesRecorrentesChart = new Chart(sitesRecorrentesCanvas, {
+      type: 'bar',
+      data: {
+        labels: sitesOrdenados,
+        datasets: datasetsPorMes
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { labels:{ color: cor.muted, font:{family:'Inter', size:10} } },
+          datalabels: { display:false }
+        },
+        scales: {
+          x: { stacked:true, ticks:{color:cor.muted, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
+          y: { stacked:true, ticks:{color:cor.muted, font:{size:11, weight:'bold'}}, grid:{display:false} }
         }
       }
     });
