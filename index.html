@@ -327,6 +327,12 @@
           </table>
         </div>
 
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Área mais Ofensora</h2>
+          <div class="hint">Incidentes fora do prazo por área · mês selecionado. Não é afetado pelos filtros de Supervisor/Status abaixo.</div>
+          <div id="areaOfensoraRow" class="kpi-row"></div>
+        </div>
+
         <div class="grid">
           <div class="panel">
             <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
@@ -3852,7 +3858,32 @@ function renderPendenciasFca(){
   // ---- Total x Fora do Prazo por Horário (mês atual) — compara SUBMIT_DATE x CLEAR_DATE ----
   // mesObj.horasSubmit / horasClear vêm do Office Script: array de 24
   // posições ({hora, total, fora}) já considerando o SLA ativo (4h/6h).
-  function renderHoraForaChart(canvasId, statsArray, chartAtual){
+  // Calcula, pra cada hora (0-23), qual área teve mais incidentes fora do
+  // prazo entrando naquele horário — usando o campo indicado (submit ou
+  // clear) dos incidentes de todosDoMes (só os "fora do prazo").
+  function calcularAreaOfensoraPorHora(campoData){
+    const porHora = Array.from({length:24}, () => ({}));
+    todosDoMes.forEach(p => {
+      const dataStr = p[campoData];
+      if(!dataStr) return;
+      const m = String(dataStr).match(/\s(\d{2}):/);
+      if(!m) return;
+      const h = Number(m[1]);
+      const area = p.area || 'Sem área';
+      porHora[h][area] = (porHora[h][area] || 0) + 1;
+    });
+    return porHora.map(contagem => {
+      const areas = Object.keys(contagem);
+      if(areas.length === 0) return null;
+      areas.sort((a,b) => contagem[b] - contagem[a]);
+      return { area: areas[0], qtd: contagem[areas[0]] };
+    });
+  }
+
+  const areaOfensoraPorHoraSubmit = calcularAreaOfensoraPorHora('submit');
+  const areaOfensoraPorHoraClear = calcularAreaOfensoraPorHora('clear');
+
+  function renderHoraForaChart(canvasId, statsArray, chartAtual, areaOfensoraPorHora){
     const canvasEl = document.getElementById(canvasId);
     if(!canvasEl) return chartAtual;
     const stats = (Array.isArray(statsArray) && statsArray.length === 24)
@@ -3895,7 +3926,12 @@ function renderPendenciasFca(){
                 const total = totalArr[idx];
                 const fora = foraArr[idx];
                 const pct = total > 0 ? (fora/total*100).toFixed(0) : 0;
-                return total > 0 ? [fora + ' de ' + total + ' fora do prazo (' + pct + '%)'] : [];
+                const linhas = total > 0 ? [fora + ' de ' + total + ' fora do prazo (' + pct + '%)'] : [];
+                const topArea = areaOfensoraPorHora && areaOfensoraPorHora[idx];
+                if(topArea){
+                  linhas.push('Área que mais entrou: ' + topArea.area + ' (' + topArea.qtd + ')');
+                }
+                return linhas;
               }
             }
           }
@@ -3909,8 +3945,32 @@ function renderPendenciasFca(){
     return novoChart;
   }
 
-  horaForaSubmitChart = renderHoraForaChart('horaForaSubmitChart', mesObj.horasSubmit, horaForaSubmitChart);
-  horaForaClearChart = renderHoraForaChart('horaForaClearChart', mesObj.horasClear, horaForaClearChart);
+  horaForaSubmitChart = renderHoraForaChart('horaForaSubmitChart', mesObj.horasSubmit, horaForaSubmitChart, areaOfensoraPorHoraSubmit);
+  horaForaClearChart = renderHoraForaChart('horaForaClearChart', mesObj.horasClear, horaForaClearChart, areaOfensoraPorHoraClear);
+
+  // ---- Área mais Ofensora (mês atual, sem aplicar os filtros de Supervisor/Status da tela) ----
+  const areaOfensoraRow = document.getElementById('areaOfensoraRow');
+  if(areaOfensoraRow){
+    const porAreaOfensora = {};
+    todosDoMes.forEach(p => {
+      const k = p.area || 'Sem área';
+      porAreaOfensora[k] = (porAreaOfensora[k] || 0) + 1;
+    });
+    const areasOfensorasOrd = Object.keys(porAreaOfensora).sort((a,b)=> porAreaOfensora[b]-porAreaOfensora[a]);
+    const totalOfensor = todosDoMes.length;
+    const paletaOfensora = [cor.bad, cor.warn, '#2563eb', cor.muted];
+    areaOfensoraRow.innerHTML = areasOfensorasOrd.map((k, i) => {
+      const qtd = porAreaOfensora[k];
+      const pct = totalOfensor > 0 ? (qtd/totalOfensor*100).toFixed(1) : '0.0';
+      const ehTop = i === 0;
+      const corDestaque = i === 0 ? cor.bad : cor.muted;
+      return `<div class="kpi" ${ehTop ? `style="border-color:${cor.bad}; box-shadow:0 0 0 2px ${cor.bad} inset;"` : ''}>
+        <div class="label">${ehTop ? '🔴' : '⚪'} ${k}</div>
+        <div class="value" style="color:${corDestaque};">${qtd}</div>
+        <div class="delta">${pct}% do total</div>
+      </div>`;
+    }).join('');
+  }
 
   // ---- Resumo por Supervisor (mês atual, sem aplicar os filtros de Supervisor/Status da tela) ----
   const resumoSupervisorBody = document.getElementById('resumoSupervisorBody');
