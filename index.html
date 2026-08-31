@@ -1064,13 +1064,29 @@ function criarMesForcado(label, dentro, fora){
   };
 }
 
-// Insere os meses forçados no início da série, substituindo qualquer mês
-// da base real que tenha o mesmo rótulo (ex.: "Jul/26"), e reordena tudo
-// cronologicamente pelo rótulo "Mes/aa".
+// Insere os meses forçados na série. Quando o mês já existe na base real
+// (ex.: "Jul/26"), preserva TODO o detalhamento real daquele mês (sites,
+// área, MTTR, FCA etc.) e só sobrescreve o total Dentro/Fora mostrado na
+// Visão Consolidada, via o campo "totalForcado" (ver totais()). Quando o
+// mês não existe na base real (Jan a Jun), cria um mês "fake" simples,
+// sem detalhamento (não tem como ter, a base não tem esses meses ainda).
 function mesclarMesesForcados(mesesReais, mesesForcados){
   const labelsForcados = new Set(mesesForcados.map(m => m.mes));
+  const mapaReais = {};
+  (mesesReais || []).forEach(m => { mapaReais[m.mes] = m; });
   const semDuplicados = (mesesReais || []).filter(m => !labelsForcados.has(m.mes));
-  const forcados = mesesForcados.map(m => criarMesForcado(m.mes, m.dentro, m.fora));
+
+  const forcados = mesesForcados.map(m => {
+    const mesRealExistente = mapaReais[m.mes];
+    if(mesRealExistente){
+      // Mês já existe na base real — mantém tudo (sites, área, MTTR...) e
+      // só adiciona o total forçado pra Visão Consolidada usar.
+      return { ...mesRealExistente, totalForcado: { dentro: m.dentro, fora: m.fora } };
+    }
+    // Mês sem dado real (Jan-Jun) — cria versão simples só com o total.
+    return criarMesForcado(m.mes, m.dentro, m.fora);
+  });
+
   const combinados = [...forcados, ...semDuplicados];
   combinados.sort((a, b) => {
     const [nomeA, anoA] = a.mes.split('/');
@@ -1121,6 +1137,10 @@ function areasValidas(areasObj){
 }
 
 function totais(mesObj){
+  if(mesObj.totalForcado){
+    const { dentro, fora } = mesObj.totalForcado;
+    return { dentro, fora, total: dentro+fora, pct: dentro/(dentro+fora) };
+  }
   const areas = areasValidas(mesObj.areas);
   let dentro=0, fora=0;
   Object.values(areas).forEach(a=>{ dentro+=a.dentro; fora+=a.fora; });
