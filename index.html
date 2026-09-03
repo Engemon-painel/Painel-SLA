@@ -788,7 +788,7 @@
         </div>
 
         <div class="panel" style="margin-bottom:16px;">
-          <h2>Evolução de Horas por Mês</h2>
+          <h2>Evolução do Saldo Atual por Período</h2>
           <canvas id="bancoHorasEvolucaoChart" height="90"></canvas>
         </div>
 
@@ -3032,10 +3032,12 @@ function renderBancoHoras(){
     saldoCcBody.innerHTML = html;
   }
 
-  // ---- Evolução de Horas por Mês (todas as competências, respeitando
-  // apenas os filtros de C.C./Situação/Confere — não o mês selecionado
-  // nos chips, já que o objetivo aqui é mostrar a tendência ao longo do
-  // tempo) ----
+  // ---- Evolução do Saldo Atual por Mês (todas as competências,
+  // respeitando apenas os filtros de C.C./Situação/Confere — não o mês
+  // selecionado nos chips, já que o objetivo aqui é mostrar a tendência
+  // ao longo do tempo). Eixo X usa o Período (ex.: "15/01/2025 a
+  // 14/02/2025") em vez do nome do mês, mas a ordenação continua
+  // cronológica pela Competência. ----
   const evolucaoCanvas = document.getElementById('bancoHorasEvolucaoChart');
   if(evolucaoCanvas){
     const baseEvolucao = BANCO_HORAS.filter(v => {
@@ -3050,34 +3052,24 @@ function renderBancoHoras(){
     baseEvolucao.forEach(v => {
       const k = normFrota(v.competencia);
       if(!k) return;
-      if(!porCompetencia[k]) porCompetencia[k] = { saldo: 0, debito: 0, credito: 0 };
+      if(!porCompetencia[k]) porCompetencia[k] = { saldo: 0, periodo: normFrota(v.periodo) };
       porCompetencia[k].saldo += Number(v.saldoAtualNum) || 0;
-      porCompetencia[k].debito += Number(v.debitoNum) || 0;
-      porCompetencia[k].credito += Number(v.creditoNum) || 0;
+      if(!porCompetencia[k].periodo) porCompetencia[k].periodo = normFrota(v.periodo);
     });
+
+    const labelsEvolucao = competenciasEvolucao.map(k => (porCompetencia[k] && porCompetencia[k].periodo) || k);
 
     if(bancoHorasEvolucaoChartInst) bancoHorasEvolucaoChartInst.destroy();
     bancoHorasEvolucaoChartInst = new Chart(evolucaoCanvas, {
+      type: 'line',
       data: {
-        labels: competenciasEvolucao,
+        labels: labelsEvolucao,
         datasets: [
           {
-            type:'line', label:'Saldo Atual (h)',
+            label:'Saldo Atual (h)',
             data: competenciasEvolucao.map(k => (porCompetencia[k] || {saldo:0}).saldo),
             borderColor: cor.accent, backgroundColor: cor.accent,
             tension:.3, pointRadius:3,
-            datalabels:{ display:false }
-          },
-          {
-            type:'bar', label:'Débito (h)',
-            data: competenciasEvolucao.map(k => (porCompetencia[k] || {debito:0}).debito),
-            backgroundColor: cor.bad, borderRadius:4,
-            datalabels:{ display:false }
-          },
-          {
-            type:'bar', label:'Crédito (h)',
-            data: competenciasEvolucao.map(k => (porCompetencia[k] || {credito:0}).credito),
-            backgroundColor: cor.good, borderRadius:4,
             datalabels:{ display:false }
           }
         ]
@@ -3089,7 +3081,7 @@ function renderBancoHoras(){
           datalabels: { display:false }
         },
         scales: {
-          x: { ticks: {color: cor.muted, font:{weight:'bold'}}, grid: {display:false} },
+          x: { ticks: {color: cor.muted, font:{weight:'bold', size:10}}, grid: {display:false} },
           y: { ticks: {color: cor.muted, font:{weight:'bold'}}, grid: {color: cor.line} }
         }
       }
