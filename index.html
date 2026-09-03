@@ -729,7 +729,11 @@
         <div class="month-strip" id="bancoHorasCompetenciaStrip" style="margin:10px 0 14px;"></div>
 
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <label for="bancoHorasCcFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Centro de Custo</label>
+          <label for="bancoHorasContratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
+          <select id="bancoHorasContratoFiltro" class="mono" onchange="filtrarBancoHorasPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+            <option value="">Todos</option>
+          </select>
+          <label for="bancoHorasCcFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Centro de Custo</label>
           <select id="bancoHorasCcFiltro" class="mono" onchange="filtrarBancoHorasPorCc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:180px;">
             <option value="">Todos</option>
           </select>
@@ -742,6 +746,8 @@
             <option value="">Todos</option>
           </select>
         </div>
+
+        <div class="kpi-row" id="bancoHorasContratoKpiRow" style="margin-bottom:14px;"></div>
 
         <div class="kpi-row" id="bancoHorasKpiRow" style="margin-bottom:20px;"></div>
 
@@ -2534,6 +2540,7 @@ function renderFrota(){
   renderFrotaTabela();
 }
 
+let bancoHorasContratoFiltroAtual = '';
 let bancoHorasCcFiltroAtual = '';
 let bancoHorasSituacaoFiltroAtual = '';
 let bancoHorasConfereFiltroAtual = '';
@@ -2543,6 +2550,11 @@ let bancoHorasCompetenciaPopulada = false;
 let bancoHorasPaginaAtual = 1;
 const BANCO_HORAS_POR_PAGINA = 10;
 
+function filtrarBancoHorasPorContrato(valor){
+  bancoHorasContratoFiltroAtual = valor;
+  bancoHorasPaginaAtual = 1;
+  renderBancoHoras();
+}
 function filtrarBancoHorasPorCc(valor){
   bancoHorasCcFiltroAtual = valor;
   bancoHorasPaginaAtual = 1;
@@ -2572,6 +2584,19 @@ function bancoHorasRotuloCc(v){
   const desc = normFrota(v.descricaoCC);
   if(cc && desc) return cc + ' — ' + desc;
   return cc || desc || 'Sem C.C.';
+}
+
+// Deduz o contrato (Claro/Cirion/etc.) a partir da Descrição C.C. — o
+// nome do cliente costuma aparecer embutido nesse texto (ex.: "CLARO
+// SP CAPITAL", "CIRION - BACKBONE"). Se não reconhecer nenhum contrato
+// conhecido, usa a própria Descrição C.C. como contrato (ou "Sem
+// contrato" se estiver vazia).
+function bancoHorasContratoDeCc(v){
+  const desc = semAcentoHc(v.descricaoCC);
+  if(desc.includes('claro')) return 'CLARO';
+  if(desc.includes('cirion')) return 'CIRION';
+  const bruto = normFrota(v.descricaoCC);
+  return bruto || 'Sem contrato';
 }
 
 // Todas as competências presentes na base, ordenadas cronologicamente:
@@ -2618,6 +2643,7 @@ function bancoHorasCompetenciasOrdenadas(){
 function bancoHorasFiltradaGeral(){
   return BANCO_HORAS.filter(v => {
     if(bancoHorasCompetenciaAtual && normFrota(v.competencia) !== bancoHorasCompetenciaAtual) return false;
+    if(bancoHorasContratoFiltroAtual && bancoHorasContratoDeCc(v) !== bancoHorasContratoFiltroAtual) return false;
     if(bancoHorasCcFiltroAtual && bancoHorasRotuloCc(v) !== bancoHorasCcFiltroAtual) return false;
     if(bancoHorasSituacaoFiltroAtual && normFrota(v.situacao) !== bancoHorasSituacaoFiltroAtual) return false;
     if(bancoHorasConfereFiltroAtual && normFrota(v.confere) !== bancoHorasConfereFiltroAtual) return false;
@@ -2765,14 +2791,17 @@ function renderBancoHoras(){
 
   // ---- Popula os filtros (uma única vez) ----
   if(!bancoHorasFiltrosPopulados){
+    const selectContrato = document.getElementById('bancoHorasContratoFiltro');
     const selectCc = document.getElementById('bancoHorasCcFiltro');
     const selectSituacao = document.getElementById('bancoHorasSituacaoFiltro');
     const selectConfere = document.getElementById('bancoHorasConfereFiltro');
 
+    const contratosUnicos = Array.from(new Set(BANCO_HORAS.map(v => bancoHorasContratoDeCc(v)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const ccUnicos = Array.from(new Set(BANCO_HORAS.map(v => bancoHorasRotuloCc(v)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const situacoesUnicas = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.situacao)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const confereUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.confere)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
 
+    if(selectContrato) selectContrato.innerHTML = '<option value="">Todos</option>' + contratosUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
     if(selectCc) selectCc.innerHTML = '<option value="">Todos</option>' + ccUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
     if(selectSituacao) selectSituacao.innerHTML = '<option value="">Todos</option>' + situacoesUnicas.map(s => `<option value="${s}">${s}</option>`).join('');
     if(selectConfere) selectConfere.innerHTML = '<option value="">Todos</option>' + confereUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -2788,9 +2817,42 @@ function renderBancoHoras(){
     bancoHorasFiltrosPopulados = true;
   }
 
-  // Conjunto filtrado (Competência/C.C./Situação/Confere) usado em todos
-  // os KPIs e gráficos abaixo — a busca de texto livre só afeta a tabela
-  // detalhada no final da página.
+  // ---- Cards por Contrato (Claro/Cirion/...) — clicáveis, aplicam o
+  // filtro "Contrato" acima. Baseados apenas na competência selecionada
+  // (ignoram os demais filtros), pra sempre mostrar todas as opções de
+  // contrato disponíveis naquele mês. ----
+  const contratoKpiRow = document.getElementById('bancoHorasContratoKpiRow');
+  if(contratoKpiRow){
+    const baseContrato = BANCO_HORAS.filter(v => !bancoHorasCompetenciaAtual || normFrota(v.competencia) === bancoHorasCompetenciaAtual);
+    const totalContrato = baseContrato.length;
+    const porContratoKpi = {};
+    baseContrato.forEach(v => {
+      const k = bancoHorasContratoDeCc(v);
+      porContratoKpi[k] = (porContratoKpi[k] || 0) + 1;
+    });
+    const contratosKpiOrd = Object.keys(porContratoKpi).sort((a,b)=> porContratoKpi[b]-porContratoKpi[a]);
+    const totalAtivo = bancoHorasContratoFiltroAtual === '';
+    let htmlContratoKpi = `<div class="kpi" style="cursor:pointer; ${totalAtivo ? `border-color:${cor.accent}; box-shadow:0 0 0 2px ${cor.accent} inset;` : ''}" onclick="filtrarBancoHorasPorContrato('')">
+      <div class="label">Todos os Colaboradores</div>
+      <div class="value" style="color:${cor.accent}">${totalContrato.toLocaleString('pt-BR')}</div>
+    </div>`;
+    htmlContratoKpi += contratosKpiOrd.map((k, i) => {
+      const qtd = porContratoKpi[k];
+      const pct = totalContrato > 0 ? (qtd/totalContrato*100).toFixed(1) : 0;
+      const p = PALETA_FROTA[i % PALETA_FROTA.length];
+      const ativo = bancoHorasContratoFiltroAtual === k;
+      return `<div class="kpi" style="cursor:pointer; background:${p.bg}; border-color:${p.border}; ${ativo ? `box-shadow:0 0 0 2px ${p.text} inset;` : ''}" onclick="filtrarBancoHorasPorContrato('${k}')">
+        <div class="label" style="color:${p.text};">🏢 ${k}</div>
+        <div class="value" style="color:${p.text};">${qtd}</div>
+        <div class="delta" style="color:${p.text};">${pct}% do total</div>
+      </div>`;
+    }).join('');
+    contratoKpiRow.innerHTML = htmlContratoKpi;
+  }
+
+  // Conjunto filtrado (Contrato/Competência/C.C./Situação/Confere) usado
+  // em todos os KPIs e gráficos abaixo — a busca de texto livre só afeta
+  // a tabela detalhada no final da página.
   const BH_FILTRO = bancoHorasFiltradaGeral();
 
   const total = BH_FILTRO.length;
