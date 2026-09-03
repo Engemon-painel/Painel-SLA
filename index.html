@@ -726,25 +726,19 @@
       <div class="panel" id="bancoHorasSecao">
         <h2>Gestão de BH/Extra</h2>
 
+        <div class="month-strip" id="bancoHorasCompetenciaStrip" style="margin:10px 0 14px;"></div>
+
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <label for="bancoHorasContratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
-          <select id="bancoHorasContratoFiltro" class="mono" onchange="filtrarBancoHorasPorContrato(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
+          <label for="bancoHorasCcFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Centro de Custo</label>
+          <select id="bancoHorasCcFiltro" class="mono" onchange="filtrarBancoHorasPorCc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:180px;">
             <option value="">Todos</option>
           </select>
-          <label for="bancoHorasAreaFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Área</label>
-          <select id="bancoHorasAreaFiltro" class="mono" onchange="filtrarBancoHorasPorArea(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+          <label for="bancoHorasSituacaoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Situação</label>
+          <select id="bancoHorasSituacaoFiltro" class="mono" onchange="filtrarBancoHorasPorSituacao(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:150px;">
             <option value="">Todos</option>
           </select>
-          <label for="bancoHorasUnidadeFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Unidade</label>
-          <select id="bancoHorasUnidadeFiltro" class="mono" onchange="filtrarBancoHorasPorUnidade(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
-            <option value="">Todos</option>
-          </select>
-          <label for="bancoHorasSupervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Gestor (Supervisor)</label>
-          <select id="bancoHorasSupervisorFiltro" class="mono" onchange="filtrarBancoHorasPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
-            <option value="">Todos</option>
-          </select>
-          <label for="bancoHorasStatusAprovFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status Aprovação</label>
-          <select id="bancoHorasStatusAprovFiltro" class="mono" onchange="filtrarBancoHorasPorStatusAprov(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:150px;">
+          <label for="bancoHorasConfereFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Confere</label>
+          <select id="bancoHorasConfereFiltro" class="mono" onchange="filtrarBancoHorasPorConfere(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
             <option value="">Todos</option>
           </select>
         </div>
@@ -762,27 +756,27 @@
             </div>
           </div>
           <div class="panel">
-            <h2>Status da Aprovação</h2>
+            <h2>Confere</h2>
             <div style="display:flex; align-items:center; gap:14px;">
               <div style="position:relative; height:150px; width:150px; flex-shrink:0;">
-                <canvas id="bancoHorasStatusAprovacaoChart"></canvas>
+                <canvas id="bancoHorasConfereChart"></canvas>
               </div>
-              <div id="bancoHorasStatusAprovacaoLegenda" style="flex:1;"></div>
+              <div id="bancoHorasConfereLegenda" style="flex:1;"></div>
             </div>
           </div>
           <div class="panel">
-            <h2>Colaboradores por Prioridade</h2>
+            <h2>Colaboradores por Centro de Custo</h2>
             <div style="position:relative; height:220px;">
-              <canvas id="bancoHorasPrioridadeChart"></canvas>
+              <canvas id="bancoHorasCcChart"></canvas>
             </div>
           </div>
           <div class="panel">
-            <h2>Saldo por Contrato</h2>
+            <h2>Saldo por Centro de Custo</h2>
             <table>
               <thead>
-                <tr><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
+                <tr><th>C.C.</th><th class="num">Saldo Atual (h)</th><th class="num">Débito (h)</th><th class="num">Crédito (h)</th></tr>
               </thead>
-              <tbody id="bancoHorasSaldoContratoBody"></tbody>
+              <tbody id="bancoHorasSaldoCcBody"></tbody>
             </table>
           </div>
         </div>
@@ -792,7 +786,7 @@
             <h2>Top 10 — Maiores Saldos Positivos (h)</h2>
             <table>
               <thead>
-                <tr><th class="num">#</th><th>Colaborador</th><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
+                <tr><th class="num">#</th><th>Colaborador</th><th>C.C.</th><th class="num">Saldo Atual (h)</th><th class="num">Variação (h)</th></tr>
               </thead>
               <tbody id="bancoHorasRankingPositivoBody"></tbody>
             </table>
@@ -801,7 +795,7 @@
             <h2>Top 10 — Maiores Saldos Negativos (h)</h2>
             <table>
               <thead>
-                <tr><th class="num">#</th><th>Colaborador</th><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
+                <tr><th class="num">#</th><th>Colaborador</th><th>C.C.</th><th class="num">Saldo Atual (h)</th><th class="num">Variação (h)</th></tr>
               </thead>
               <tbody id="bancoHorasRankingNegativoBody"></tbody>
             </table>
@@ -818,21 +812,13 @@
           <h2>Colaboradores</h2>
 
           <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <label for="bancoHorasStatusColabFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Status Colaborador</label>
-            <select id="bancoHorasStatusColabFiltro" class="mono" onchange="filtrarBancoHorasPorStatusColab(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
-              <option value="">Todos</option>
-            </select>
-            <label for="bancoHorasStatusBancoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status Banco</label>
-            <select id="bancoHorasStatusBancoFiltro" class="mono" onchange="filtrarBancoHorasPorStatusBanco(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
-              <option value="">Todos</option>
-            </select>
             <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarBancoHorasCsv()">⬇ Exportar (CSV)</button>
           </div>
 
           <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
-            <div class="search" title="Buscar por colaborador, matrícula, supervisor, coordenador ou centro de custo">
+            <div class="search" title="Buscar por colaborador, matrícula ou centro de custo">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <input id="bancoHoras-search" type="search" placeholder="Buscar por colaborador, matrícula, supervisor, coordenador ou centro de custo..." aria-label="Buscar colaboradores" />
+              <input id="bancoHoras-search" type="search" placeholder="Buscar por colaborador, matrícula ou centro de custo..." aria-label="Buscar colaboradores" />
             </div>
           </div>
 
@@ -840,49 +826,19 @@
             <table id="bancoHorasTable" role="table" aria-label="Tabela de banco de horas">
               <thead>
                 <tr>
-                  <th>Prioridade</th>
-                  <th>Colaborador</th>
+                  <th>Competência</th>
+                  <th>Período</th>
                   <th>Matrícula</th>
-                  <th>Centro de Custo</th>
-                  <th>Turno</th>
-                  <th>Contrato</th>
-                  <th>Área Técnica</th>
-                  <th>Supervisor</th>
-                  <th>Coordenador</th>
-                  <th>Gerente</th>
-                  <th>Unidade de Negócio</th>
-                  <th>Status Colaborador</th>
-                  <th>Situação do Cadastro</th>
-                  <th class="num">Qtd. Dias Espelho</th>
-                  <th class="num">Qtd. Pendências</th>
-                  <th class="num">Qtd. HE</th>
-                  <th class="num">Qtd. IJ</th>
-                  <th class="num">Qtd. PA</th>
-                  <th class="num">Qtd. SM</th>
-                  <th class="num">Qtd. FNC</th>
-                  <th class="num">Qtd. Respondidas</th>
-                  <th class="num">Qtd. Pendentes Resposta</th>
-                  <th>HE Identificada</th>
-                  <th>HE Aprovada</th>
-                  <th>BH Aprovado</th>
-                  <th>HE Pendente</th>
-                  <th>Ausência Líquida</th>
-                  <th>Saldo Anterior BH</th>
-                  <th>Movimento BH</th>
-                  <th>Saldo Projetado BH</th>
-                  <th class="num">HE Identificada (h)</th>
-                  <th class="num">HE Aprovada (h)</th>
-                  <th class="num">BH Aprovado (h)</th>
-                  <th class="num">HE Pendente (h)</th>
-                  <th class="num">Ausência Líquida (h)</th>
-                  <th class="num">Saldo Anterior BH (h)</th>
-                  <th class="num">Movimento BH (h)</th>
-                  <th class="num">Saldo Projetado BH (h)</th>
-                  <th class="num">Qtd. Dias Almoço Conferir</th>
-                  <th>Status Aprovação</th>
-                  <th>Status Banco</th>
-                  <th>Status Almoço</th>
-                  <th class="num">Qtd. Saldos Diferentes</th>
+                  <th>Nome</th>
+                  <th>C.C.</th>
+                  <th>Descrição C.C.</th>
+                  <th>Situação</th>
+                  <th class="num">Saldo Anterior</th>
+                  <th class="num">Débito</th>
+                  <th class="num">Crédito</th>
+                  <th class="num">Saldo Atual</th>
+                  <th class="num">Variação</th>
+                  <th>Confere</th>
                 </tr>
               </thead>
               <tbody id="bancoHorasTableBody"></tbody>
@@ -2122,7 +2078,7 @@ let frotaFiltrosPopulados = false;
 let frotaPaginaAtual = 1;
 const FROTA_POR_PAGINA = 10;
 let frotaModeloChartInst, frotaStatusChartInst, frotaTipoChartInst;
-let bancoHorasStatusBancoChartInst, bancoHorasStatusAprovacaoChartInst, bancoHorasPrioridadeChartInst;
+let bancoHorasStatusBancoChartInst, bancoHorasConfereChartInst, bancoHorasCcChartInst;
 
 function filtrarFrotaPorOperacaoEKpi(valor){
   frotaOperacaoFiltroAtual = valor;
@@ -2573,62 +2529,67 @@ function renderFrota(){
   renderFrotaTabela();
 }
 
-let bancoHorasContratoFiltroAtual = '';
-let bancoHorasAreaFiltroAtual = '';
-let bancoHorasUnidadeFiltroAtual = '';
-let bancoHorasSupervisorFiltroAtual = '';
-let bancoHorasStatusColabFiltroAtual = '';
-let bancoHorasStatusAprovFiltroAtual = '';
-let bancoHorasStatusBancoFiltroAtual = '';
+let bancoHorasCcFiltroAtual = '';
+let bancoHorasSituacaoFiltroAtual = '';
+let bancoHorasConfereFiltroAtual = '';
+let bancoHorasCompetenciaAtual = '';
 let bancoHorasFiltrosPopulados = false;
+let bancoHorasCompetenciaPopulada = false;
 let bancoHorasPaginaAtual = 1;
 const BANCO_HORAS_POR_PAGINA = 10;
 
-function filtrarBancoHorasPorContrato(valor){
-  bancoHorasContratoFiltroAtual = valor;
+function filtrarBancoHorasPorCc(valor){
+  bancoHorasCcFiltroAtual = valor;
   bancoHorasPaginaAtual = 1;
   renderBancoHoras();
 }
-function filtrarBancoHorasPorArea(valor){
-  bancoHorasAreaFiltroAtual = valor;
+function filtrarBancoHorasPorSituacao(valor){
+  bancoHorasSituacaoFiltroAtual = valor;
   bancoHorasPaginaAtual = 1;
   renderBancoHoras();
 }
-function filtrarBancoHorasPorUnidade(valor){
-  bancoHorasUnidadeFiltroAtual = valor;
+function filtrarBancoHorasPorConfere(valor){
+  bancoHorasConfereFiltroAtual = valor;
   bancoHorasPaginaAtual = 1;
   renderBancoHoras();
 }
-function filtrarBancoHorasPorSupervisor(valor){
-  bancoHorasSupervisorFiltroAtual = valor;
+
+function selecionarCompetenciaBancoHoras(competencia){
+  bancoHorasCompetenciaAtual = competencia;
   bancoHorasPaginaAtual = 1;
   renderBancoHoras();
 }
-function filtrarBancoHorasPorStatusColab(valor){
-  bancoHorasStatusColabFiltroAtual = valor;
-  bancoHorasPaginaAtual = 1;
-  renderBancoHoras();
+
+// Rótulo combinado "CC — Descrição" usado nos filtros e nos agrupamentos,
+// já que o mesmo código de C.C. deve sempre ter a mesma descrição.
+function bancoHorasRotuloCc(v){
+  const cc = normFrota(v.cc);
+  const desc = normFrota(v.descricaoCC);
+  if(cc && desc) return cc + ' — ' + desc;
+  return cc || desc || 'Sem C.C.';
 }
-function filtrarBancoHorasPorStatusAprov(valor){
-  bancoHorasStatusAprovFiltroAtual = valor;
-  bancoHorasPaginaAtual = 1;
-  renderBancoHoras();
-}
-function filtrarBancoHorasPorStatusBanco(valor){
-  bancoHorasStatusBancoFiltroAtual = valor;
-  bancoHorasPaginaAtual = 1;
-  renderBancoHoras();
+
+// Todas as competências presentes na base, ordenadas cronologicamente
+// quando possível (aceita "aaaa-mm", "mm/aaaa" ou texto livre — nesse
+// último caso cai para ordenação alfabética).
+function bancoHorasCompetenciasOrdenadas(){
+  const unicas = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.competencia)).filter(Boolean)));
+  function chaveOrdenacao(c){
+    let m = c.match(/^(\d{4})-(\d{1,2})$/);
+    if(m) return m[1] + m[2].padStart(2,'0');
+    m = c.match(/^(\d{1,2})\/(\d{4})$/);
+    if(m) return m[2] + m[1].padStart(2,'0');
+    return c;
+  }
+  return unicas.sort((a,b) => chaveOrdenacao(a).localeCompare(chaveOrdenacao(b)));
 }
 
 function bancoHorasFiltradaGeral(){
   return BANCO_HORAS.filter(v => {
-    if(bancoHorasContratoFiltroAtual && normFrota(v.contrato) !== bancoHorasContratoFiltroAtual) return false;
-    if(bancoHorasAreaFiltroAtual && normFrota(v.areaTecnica) !== bancoHorasAreaFiltroAtual) return false;
-    if(bancoHorasUnidadeFiltroAtual && normFrota(v.unidadeNegocio) !== bancoHorasUnidadeFiltroAtual) return false;
-    if(bancoHorasSupervisorFiltroAtual && normFrota(v.supervisor) !== bancoHorasSupervisorFiltroAtual) return false;
-    if(bancoHorasStatusColabFiltroAtual && normFrota(v.statusColaborador) !== bancoHorasStatusColabFiltroAtual) return false;
-    if(bancoHorasStatusAprovFiltroAtual && normFrota(v.statusAprovacao) !== bancoHorasStatusAprovFiltroAtual) return false;
-    if(bancoHorasStatusBancoFiltroAtual && normFrota(v.statusBanco) !== bancoHorasStatusBancoFiltroAtual) return false;
+    if(bancoHorasCompetenciaAtual && normFrota(v.competencia) !== bancoHorasCompetenciaAtual) return false;
+    if(bancoHorasCcFiltroAtual && bancoHorasRotuloCc(v) !== bancoHorasCcFiltroAtual) return false;
+    if(bancoHorasSituacaoFiltroAtual && normFrota(v.situacao) !== bancoHorasSituacaoFiltroAtual) return false;
+    if(bancoHorasConfereFiltroAtual && normFrota(v.confere) !== bancoHorasConfereFiltroAtual) return false;
     return true;
   });
 }
@@ -2637,7 +2598,7 @@ function bancoHorasFiltrada(){
   const q = (document.getElementById('bancoHoras-search')?.value || '').toLowerCase().trim();
   return bancoHorasFiltradaGeral().filter(v => {
     if(q){
-      const hay = [v.colaborador, v.matricula, v.supervisor, v.coordenador, v.centroCusto]
+      const hay = [v.nome, v.matricula, v.cc, v.descricaoCC]
         .map(x => normFrota(x).toLowerCase()).join(' ');
       if(!hay.includes(q)) return false;
     }
@@ -2670,52 +2631,28 @@ function renderBancoHorasTabela(){
 
   function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function cel(v){ return esc(v) || '—'; }
-  function celNum(v){ return (v === null || v === undefined) ? '—' : esc(v); }
+
+  function pillConfere(valor){
+    const n = semAcentoHc(valor);
+    if(n.includes('sim')) return `<span class="pill good">${esc(valor) || '—'}</span>`;
+    if(n.includes('nao')) return `<span class="pill bad">${esc(valor) || '—'}</span>`;
+    return cel(valor);
+  }
 
   tbody.innerHTML = pagina.map(v => `<tr>
-    <td>${cel(v.prioridade)}</td>
-    <td>${cel(v.colaborador)}</td>
+    <td class="mono" style="font-size:12px;">${cel(v.competencia)}</td>
+    <td>${cel(v.periodo)}</td>
     <td class="mono">${cel(v.matricula)}</td>
-    <td>${cel(v.centroCusto)}</td>
-    <td>${cel(v.turno)}</td>
-    <td>${cel(v.contrato)}</td>
-    <td>${cel(v.areaTecnica)}</td>
-    <td>${cel(v.supervisor)}</td>
-    <td>${cel(v.coordenador)}</td>
-    <td>${cel(v.gerente)}</td>
-    <td>${cel(v.unidadeNegocio)}</td>
-    <td>${cel(v.statusColaborador)}</td>
-    <td>${cel(v.situacaoCadastro)}</td>
-    <td class="num mono">${celNum(v.qtdDiasEspelho)}</td>
-    <td class="num mono">${celNum(v.qtdPendencias)}</td>
-    <td class="num mono">${celNum(v.qtdHE)}</td>
-    <td class="num mono">${celNum(v.qtdIJ)}</td>
-    <td class="num mono">${celNum(v.qtdPA)}</td>
-    <td class="num mono">${celNum(v.qtdSM)}</td>
-    <td class="num mono">${celNum(v.qtdFNC)}</td>
-    <td class="num mono">${celNum(v.qtdRespondidas)}</td>
-    <td class="num mono">${celNum(v.qtdPendentesResposta)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.heIdentificada)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.heAprovada)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.bhAprovado)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.hePendente)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.ausenciaLiquida)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.saldoAnteriorBH)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.movimentoBH)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.saldoProjetadoBH)}</td>
-    <td class="num mono">${celNum(v.heIdentificadaH)}</td>
-    <td class="num mono">${celNum(v.heAprovadaH)}</td>
-    <td class="num mono">${celNum(v.bhAprovadoH)}</td>
-    <td class="num mono">${celNum(v.hePendenteH)}</td>
-    <td class="num mono">${celNum(v.ausenciaLiquidaH)}</td>
-    <td class="num mono">${celNum(v.saldoAnteriorBHH)}</td>
-    <td class="num mono">${celNum(v.movimentoBHH)}</td>
-    <td class="num mono" style="font-weight:600;">${celNum(v.saldoProjetadoBHH)}</td>
-    <td class="num mono">${celNum(v.qtdDiasAlmocoConferir)}</td>
-    <td>${cel(v.statusAprovacao)}</td>
-    <td>${cel(v.statusBanco)}</td>
-    <td>${cel(v.statusAlmoco)}</td>
-    <td class="num mono">${celNum(v.qtdSaldosDiferentes)}</td>
+    <td>${cel(v.nome)}</td>
+    <td class="mono">${cel(v.cc)}</td>
+    <td>${cel(v.descricaoCC)}</td>
+    <td>${cel(v.situacao)}</td>
+    <td class="num mono">${cel(v.saldoAnterior)}</td>
+    <td class="num mono">${cel(v.debito)}</td>
+    <td class="num mono">${cel(v.credito)}</td>
+    <td class="num mono" style="font-weight:600;">${cel(v.saldoAtual)}</td>
+    <td class="num mono">${cel(v.variacao)}</td>
+    <td>${pillConfere(v.confere)}</td>
   </tr>`).join('');
 
   if(paginacao){
@@ -2745,7 +2682,7 @@ function exportarBancoHorasCsv(){
       alert('Nenhum colaborador para exportar com os filtros atuais.');
       return;
     }
-    const colunas = ['Prioridade','Colaborador','Matricula','CentroCusto','Turno','Contrato','AreaTecnica','Supervisor','Coordenador','Gerente','UnidadeNegocio','StatusColaborador','SituacaoCadastro','QtdDiasEspelho','QtdPendencias','QtdHE','QtdIJ','QtdPA','QtdSM','QtdFNC','QtdRespondidas','QtdPendentesResposta','HEIdentificada','HEAprovada','BHAprovado','HEPendente','AusenciaLiquida','SaldoAnteriorBH','MovimentoBH','SaldoProjetadoBH','HEIdentificadaH','HEAprovadaH','BHAprovadoH','HEPendenteH','AusenciaLiquidaH','SaldoAnteriorBHH','MovimentoBHH','SaldoProjetadoBHH','QtdDiasAlmocoConferir','StatusAprovacao','StatusBanco','StatusAlmoco','QtdSaldosDiferentes'];
+    const colunas = ['Competencia','Periodo','Matricula','Nome','CC','DescricaoCC','Situacao','SaldoAnterior','Debito','Credito','SaldoAtual','Variacao','Confere'];
     function csvEsc(v){
       const s = String(v ?? '');
       if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
@@ -2754,13 +2691,8 @@ function exportarBancoHorasCsv(){
     const linhas = [colunas.map(csvEsc).join(';')];
     itens.forEach(v => {
       linhas.push([
-        v.prioridade, v.colaborador, v.matricula, v.centroCusto, v.turno, v.contrato, v.areaTecnica,
-        v.supervisor, v.coordenador, v.gerente, v.unidadeNegocio, v.statusColaborador, v.situacaoCadastro,
-        v.qtdDiasEspelho, v.qtdPendencias, v.qtdHE, v.qtdIJ, v.qtdPA, v.qtdSM, v.qtdFNC, v.qtdRespondidas,
-        v.qtdPendentesResposta, v.heIdentificada, v.heAprovada, v.bhAprovado, v.hePendente, v.ausenciaLiquida,
-        v.saldoAnteriorBH, v.movimentoBH, v.saldoProjetadoBH, v.heIdentificadaH, v.heAprovadaH, v.bhAprovadoH,
-        v.hePendenteH, v.ausenciaLiquidaH, v.saldoAnteriorBHH, v.movimentoBHH, v.saldoProjetadoBHH,
-        v.qtdDiasAlmocoConferir, v.statusAprovacao, v.statusBanco, v.statusAlmoco, v.qtdSaldosDiferentes
+        v.competencia, v.periodo, v.matricula, v.nome, v.cc, v.descricaoCC, v.situacao,
+        v.saldoAnterior, v.debito, v.credito, v.saldoAtual, v.variacao, v.confere
       ].map(csvEsc).join(';'));
     });
     const csvContent = '\uFEFF' + linhas.join('\r\n');
@@ -2784,30 +2716,35 @@ function renderBancoHoras(){
   const kpiRow = document.getElementById('bancoHorasKpiRow');
   if(!kpiRow) return;
 
+  // ---- Chips de competência (igual ao seletor de mês da Visão Consolidada) ----
+  const competenciaStrip = document.getElementById('bancoHorasCompetenciaStrip');
+  if(competenciaStrip){
+    const competencias = bancoHorasCompetenciasOrdenadas();
+    if(!bancoHorasCompetenciaPopulada){
+      if(competencias.length){
+        bancoHorasCompetenciaAtual = competencias[competencias.length - 1];
+      }
+      bancoHorasCompetenciaPopulada = true;
+    }
+    competenciaStrip.innerHTML = competencias.map(c => {
+      const ativo = c === bancoHorasCompetenciaAtual;
+      return `<div class="chip${ativo ? ' active' : ''}" onclick="selecionarCompetenciaBancoHoras('${c}')">${c}</div>`;
+    }).join('');
+  }
+
+  // ---- Popula os filtros (uma única vez) ----
   if(!bancoHorasFiltrosPopulados){
-    const selectContrato = document.getElementById('bancoHorasContratoFiltro');
-    const selectArea = document.getElementById('bancoHorasAreaFiltro');
-    const selectUnidade = document.getElementById('bancoHorasUnidadeFiltro');
-    const selectSupervisor = document.getElementById('bancoHorasSupervisorFiltro');
-    const selectStatusColab = document.getElementById('bancoHorasStatusColabFiltro');
-    const selectStatusAprov = document.getElementById('bancoHorasStatusAprovFiltro');
-    const selectStatusBanco = document.getElementById('bancoHorasStatusBancoFiltro');
+    const selectCc = document.getElementById('bancoHorasCcFiltro');
+    const selectSituacao = document.getElementById('bancoHorasSituacaoFiltro');
+    const selectConfere = document.getElementById('bancoHorasConfereFiltro');
 
-    const contratosUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.contrato)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    const areasUnicas = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.areaTecnica)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    const unidadesUnicas = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.unidadeNegocio)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    const supervisoresUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.supervisor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    const statusColabUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.statusColaborador)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    const statusAprovUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.statusAprovacao)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    const statusBancoUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.statusBanco)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const ccUnicos = Array.from(new Set(BANCO_HORAS.map(v => bancoHorasRotuloCc(v)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const situacoesUnicas = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.situacao)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const confereUnicos = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.confere)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
 
-    if(selectContrato) selectContrato.innerHTML = '<option value="">Todos</option>' + contratosUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
-    if(selectArea) selectArea.innerHTML = '<option value="">Todos</option>' + areasUnicas.map(s => `<option value="${s}">${s}</option>`).join('');
-    if(selectUnidade) selectUnidade.innerHTML = '<option value="">Todos</option>' + unidadesUnicas.map(s => `<option value="${s}">${s}</option>`).join('');
-    if(selectSupervisor) selectSupervisor.innerHTML = '<option value="">Todos</option>' + supervisoresUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
-    if(selectStatusColab) selectStatusColab.innerHTML = '<option value="">Todos</option>' + statusColabUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
-    if(selectStatusAprov) selectStatusAprov.innerHTML = '<option value="">Todos</option>' + statusAprovUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
-    if(selectStatusBanco) selectStatusBanco.innerHTML = '<option value="">Todos</option>' + statusBancoUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectCc) selectCc.innerHTML = '<option value="">Todos</option>' + ccUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectSituacao) selectSituacao.innerHTML = '<option value="">Todos</option>' + situacoesUnicas.map(s => `<option value="${s}">${s}</option>`).join('');
+    if(selectConfere) selectConfere.innerHTML = '<option value="">Todos</option>' + confereUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
 
     const inputBusca = document.getElementById('bancoHoras-search');
     if(inputBusca){
@@ -2820,34 +2757,36 @@ function renderBancoHoras(){
     bancoHorasFiltrosPopulados = true;
   }
 
+  // Conjunto filtrado (Competência/C.C./Situação/Confere) usado em todos
+  // os KPIs e gráficos abaixo — a busca de texto livre só afeta a tabela
+  // detalhada no final da página.
   const BH_FILTRO = bancoHorasFiltradaGeral();
 
   const total = BH_FILTRO.length;
-  const somaHeIdentificada = BH_FILTRO.reduce((s,v)=> s + (Number(v.heIdentificadaH)||0), 0);
-  const somaHeAprovada = BH_FILTRO.reduce((s,v)=> s + (Number(v.heAprovadaH)||0), 0);
-  const somaBhAprovado = BH_FILTRO.reduce((s,v)=> s + (Number(v.bhAprovadoH)||0), 0);
-  const somaHePendente = BH_FILTRO.reduce((s,v)=> s + (Number(v.hePendenteH)||0), 0);
-  const somaPendencias = BH_FILTRO.reduce((s,v)=> s + (Number(v.qtdPendencias)||0), 0);
-  const somaSaldoProjetado = BH_FILTRO.reduce((s,v)=> s + (Number(v.saldoProjetadoBHH)||0), 0);
-  const colaboradoresAtivos = BH_FILTRO.filter(v => semAcentoHc(v.statusColaborador).includes('ativo')).length;
-  const mediaSaldoPorColab = total > 0 ? (somaSaldoProjetado/total) : 0;
+  const somaDebito = BH_FILTRO.reduce((s,v)=> s + (Number(v.debitoNum)||0), 0);
+  const somaCredito = BH_FILTRO.reduce((s,v)=> s + (Number(v.creditoNum)||0), 0);
+  const somaSaldoAtual = BH_FILTRO.reduce((s,v)=> s + (Number(v.saldoAtualNum)||0), 0);
+  const somaVariacao = BH_FILTRO.reduce((s,v)=> s + (Number(v.variacaoNum)||0), 0);
+  const mediaSaldoPorColab = total > 0 ? (somaSaldoAtual/total) : 0;
+  const qtdNaoConfere = BH_FILTRO.filter(v => semAcentoHc(v.confere).includes('nao')).length;
 
   function fmtH(n){ return n.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) + 'h'; }
 
   kpiRow.innerHTML = `
     <div class="kpi"><div class="label">🧑‍🤝‍🧑 Colaboradores</div><div class="value" style="color:${cor.accent}">${total.toLocaleString('pt-BR')}</div></div>
-    <div class="kpi"><div class="label">✅ Colaboradores Ativos</div><div class="value" style="color:${cor.good}">${colaboradoresAtivos.toLocaleString('pt-BR')}</div></div>
-    <div class="kpi"><div class="label">⏱️ HE Identificada (h)</div><div class="value" style="color:#2563eb">${fmtH(somaHeIdentificada)}</div></div>
-    <div class="kpi"><div class="label">📈 Saldo Projetado BH (h)</div><div class="value" style="color:${somaSaldoProjetado >= 0 ? cor.good : cor.bad}">${fmtH(somaSaldoProjetado)}</div></div>
-    <div class="kpi"><div class="label">⚠️ HE Pendente (h)</div><div class="value" style="color:${cor.warn}">${fmtH(somaHePendente)}</div></div>
-    <div class="kpi"><div class="label">📊 Média Saldo BH (h) / Colab.</div><div class="value" style="color:${mediaSaldoPorColab >= 0 ? cor.good : cor.bad}">${fmtH(mediaSaldoPorColab)}</div></div>
+    <div class="kpi"><div class="label">➖ Débito Total (h)</div><div class="value" style="color:${cor.bad}">${fmtH(somaDebito)}</div></div>
+    <div class="kpi"><div class="label">➕ Crédito Total (h)</div><div class="value" style="color:${cor.good}">${fmtH(somaCredito)}</div></div>
+    <div class="kpi"><div class="label">📈 Saldo Atual Total (h)</div><div class="value" style="color:${somaSaldoAtual >= 0 ? cor.good : cor.bad}">${fmtH(somaSaldoAtual)}</div></div>
+    <div class="kpi"><div class="label">🔀 Variação Total (h)</div><div class="value" style="color:${somaVariacao >= 0 ? cor.good : cor.bad}">${fmtH(somaVariacao)}</div></div>
+    <div class="kpi"><div class="label">⚠️ Não Confere</div><div class="value" style="color:${cor.warn}">${qtdNaoConfere.toLocaleString('pt-BR')}</div></div>
   `;
 
+  // ---- Status do Banco de Horas (Positivo/Zerado/Negativo, pelo sinal do Saldo Atual) ----
   const statusBancoCanvas = document.getElementById('bancoHorasStatusBancoChart');
   if(statusBancoCanvas){
     let positivos = 0, zerados = 0, negativos = 0;
     BH_FILTRO.forEach(v => {
-      const saldo = Number(v.saldoProjetadoBHH) || 0;
+      const saldo = Number(v.saldoAtualNum) || 0;
       if(saldo > 0) positivos++;
       else if(saldo < 0) negativos++;
       else zerados++;
@@ -2890,22 +2829,23 @@ function renderBancoHoras(){
     }
   }
 
-  const statusAprovCanvas = document.getElementById('bancoHorasStatusAprovacaoChart');
-  if(statusAprovCanvas){
-    const porStatusAprov = {};
+  // ---- Confere (Sim/Não) ----
+  const confereCanvas = document.getElementById('bancoHorasConfereChart');
+  if(confereCanvas){
+    const porConfere = {};
     BH_FILTRO.forEach(v => {
-      const k = normFrota(v.statusAprovacao) || 'Sem status';
-      porStatusAprov[k] = (porStatusAprov[k] || 0) + 1;
+      const k = normFrota(v.confere) || 'Sem status';
+      porConfere[k] = (porConfere[k] || 0) + 1;
     });
-    const statusAprovOrd = Object.keys(porStatusAprov).sort((a,b)=> porStatusAprov[b]-porStatusAprov[a]);
-    if(bancoHorasStatusAprovacaoChartInst) bancoHorasStatusAprovacaoChartInst.destroy();
-    bancoHorasStatusAprovacaoChartInst = new Chart(statusAprovCanvas, {
+    const confereOrd = Object.keys(porConfere).sort((a,b)=> porConfere[b]-porConfere[a]);
+    if(bancoHorasConfereChartInst) bancoHorasConfereChartInst.destroy();
+    bancoHorasConfereChartInst = new Chart(confereCanvas, {
       type: 'doughnut',
       data: {
-        labels: statusAprovOrd,
+        labels: confereOrd,
         datasets: [{
-          data: statusAprovOrd.map(k => porStatusAprov[k]),
-          backgroundColor: statusAprovOrd.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
+          data: confereOrd.map(k => porConfere[k]),
+          backgroundColor: confereOrd.map(k => semAcentoHc(k).includes('sim') ? cor.good : (semAcentoHc(k).includes('nao') ? cor.bad : cor.muted)),
           borderWidth: 0
         }]
       },
@@ -2917,15 +2857,15 @@ function renderBancoHoras(){
         }
       }
     });
-    const legendaAprov = document.getElementById('bancoHorasStatusAprovacaoLegenda');
-    if(legendaAprov){
-      const totalAprov = statusAprovOrd.reduce((s,k)=> s + porStatusAprov[k], 0);
-      legendaAprov.innerHTML = statusAprovOrd.map((k, i) => {
-        const p = PALETA_FROTA[i % PALETA_FROTA.length];
-        const qtd = porStatusAprov[k];
-        const pct = totalAprov > 0 ? (qtd/totalAprov*100).toFixed(1) : '0.0';
+    const legendaConfere = document.getElementById('bancoHorasConfereLegenda');
+    if(legendaConfere){
+      const totalConfere = confereOrd.reduce((s,k)=> s + porConfere[k], 0);
+      legendaConfere.innerHTML = confereOrd.map(k => {
+        const corPill = semAcentoHc(k).includes('sim') ? cor.good : (semAcentoHc(k).includes('nao') ? cor.bad : cor.muted);
+        const qtd = porConfere[k];
+        const pct = totalConfere > 0 ? (qtd/totalConfere*100).toFixed(1) : '0.0';
         return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-          <span style="width:10px; height:10px; border-radius:50%; background:${p.text}; flex-shrink:0;"></span>
+          <span style="width:10px; height:10px; border-radius:50%; background:${corPill}; flex-shrink:0;"></span>
           <span style="font-size:12px; color:${cor.text};">${k}</span>
           <span class="mono" style="font-size:12px; color:${cor.muted}; margin-left:auto;">${qtd} (${pct}%)</span>
         </div>`;
@@ -2933,23 +2873,23 @@ function renderBancoHoras(){
     }
   }
 
-  const prioridadeCanvas = document.getElementById('bancoHorasPrioridadeChart');
-  if(prioridadeCanvas){
-    const porPrioridade = {};
+  // ---- Colaboradores por Centro de Custo (barra) ----
+  const ccCanvas = document.getElementById('bancoHorasCcChart');
+  if(ccCanvas){
+    const porCc = {};
     BH_FILTRO.forEach(v => {
-      const k = normFrota(v.prioridade) || 'Sem prioridade';
-      porPrioridade[k] = (porPrioridade[k] || 0) + 1;
+      const k = bancoHorasRotuloCc(v);
+      porCc[k] = (porCc[k] || 0) + 1;
     });
-    const prioridadesOrd = Object.keys(porPrioridade).sort((a,b)=> porPrioridade[b]-porPrioridade[a]);
-    if(bancoHorasPrioridadeChartInst) bancoHorasPrioridadeChartInst.destroy();
-    bancoHorasPrioridadeChartInst = new Chart(prioridadeCanvas, {
+    const ccOrd = Object.keys(porCc).sort((a,b)=> porCc[b]-porCc[a]).slice(0, 15);
+    if(bancoHorasCcChartInst) bancoHorasCcChartInst.destroy();
+    bancoHorasCcChartInst = new Chart(ccCanvas, {
       type: 'bar',
       data: {
-        labels: prioridadesOrd,
+        labels: ccOrd,
         datasets: [{
-          label: 'Colaboradores', data: prioridadesOrd.map(k => porPrioridade[k]),
-          backgroundColor: prioridadesOrd.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
-          borderRadius: 4,
+          label: 'Colaboradores', data: ccOrd.map(k => porCc[k]),
+          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
           datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
         }]
       },
@@ -2959,60 +2899,66 @@ function renderBancoHoras(){
         plugins: { legend: { display:false }, datalabels: { display:true } },
         scales: {
           x: { ticks:{color:cor.muted, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
-          y: { ticks:{color:cor.muted, font:{size:11, weight:'bold'}}, grid:{display:false} }
+          y: { ticks:{color:cor.muted, font:{size:10, weight:'bold'}}, grid:{display:false} }
         }
       }
     });
   }
 
-  const saldoContratoBody = document.getElementById('bancoHorasSaldoContratoBody');
-  if(saldoContratoBody){
-    const porContrato = {};
+  // ---- Saldo por Centro de Custo (tabela) ----
+  const saldoCcBody = document.getElementById('bancoHorasSaldoCcBody');
+  if(saldoCcBody){
+    const porCc = {};
     BH_FILTRO.forEach(v => {
-      const k = normFrota(v.contrato) || 'Sem contrato';
-      if(!porContrato[k]) porContrato[k] = { saldo: 0, heIdent: 0 };
-      porContrato[k].saldo += Number(v.saldoProjetadoBHH) || 0;
-      porContrato[k].heIdent += Number(v.heIdentificadaH) || 0;
+      const k = bancoHorasRotuloCc(v);
+      if(!porCc[k]) porCc[k] = { saldo: 0, debito: 0, credito: 0 };
+      porCc[k].saldo += Number(v.saldoAtualNum) || 0;
+      porCc[k].debito += Number(v.debitoNum) || 0;
+      porCc[k].credito += Number(v.creditoNum) || 0;
     });
-    const contratosOrd = Object.keys(porContrato).sort((a,b)=> porContrato[b].saldo - porContrato[a].saldo);
-    let totalSaldo = 0, totalHeIdent = 0;
-    let html = contratosOrd.map(k => {
-      const c = porContrato[k];
+    const ccOrd = Object.keys(porCc).sort((a,b)=> porCc[b].saldo - porCc[a].saldo);
+    let totalSaldo = 0, totalDebito = 0, totalCredito = 0;
+    let html = ccOrd.map(k => {
+      const c = porCc[k];
       totalSaldo += c.saldo;
-      totalHeIdent += c.heIdent;
+      totalDebito += c.debito;
+      totalCredito += c.credito;
       return `<tr>
         <td>${k}</td>
         <td class="num mono" style="color:${c.saldo >= 0 ? cor.good : cor.bad};">${c.saldo.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
-        <td class="num mono">${c.heIdent.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
+        <td class="num mono">${c.debito.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
+        <td class="num mono">${c.credito.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
       </tr>`;
     }).join('');
     html += `<tr style="font-weight:700; border-top:2px solid ${cor.line};">
       <td>Total</td>
       <td class="num mono" style="color:${totalSaldo >= 0 ? cor.good : cor.bad};">${totalSaldo.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
-      <td class="num mono">${totalHeIdent.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
+      <td class="num mono">${totalDebito.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
+      <td class="num mono">${totalCredito.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
     </tr>`;
-    saldoContratoBody.innerHTML = html;
+    saldoCcBody.innerHTML = html;
   }
 
   function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function fmtSaldo(n){ return n.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}); }
 
+  // ---- Top 10 Maiores Saldos Positivos ----
   const rankingPositivoBody = document.getElementById('bancoHorasRankingPositivoBody');
   if(rankingPositivoBody){
-    const positivos = BH_FILTRO.filter(v => (Number(v.saldoProjetadoBHH)||0) > 0)
-      .sort((a,b) => (Number(b.saldoProjetadoBHH)||0) - (Number(a.saldoProjetadoBHH)||0))
+    const positivos = BH_FILTRO.filter(v => (Number(v.saldoAtualNum)||0) > 0)
+      .sort((a,b) => (Number(b.saldoAtualNum)||0) - (Number(a.saldoAtualNum)||0))
       .slice(0, 10);
     if(positivos.length === 0){
       rankingPositivoBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum saldo positivo</td></tr>`;
     } else {
-      const maxPositivo = Math.max(...positivos.map(v => Number(v.saldoProjetadoBHH)||0), 1);
+      const maxPositivo = Math.max(...positivos.map(v => Number(v.saldoAtualNum)||0), 1);
       rankingPositivoBody.innerHTML = positivos.map((v,i) => {
-        const saldo = Number(v.saldoProjetadoBHH)||0;
+        const saldo = Number(v.saldoAtualNum)||0;
         const larguraBarra = Math.max(4, (saldo/maxPositivo*100));
         return `<tr>
         <td class="num mono">${i+1}</td>
-        <td>${esc(v.colaborador) || '—'}</td>
-        <td>${esc(v.contrato) || '—'}</td>
+        <td>${esc(v.nome) || '—'}</td>
+        <td>${esc(bancoHorasRotuloCc(v)) || '—'}</td>
         <td class="num mono" style="font-weight:600; color:${cor.good};">
           <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
             <div style="background:${cor.line}; border-radius:999px; height:6px; width:60px; overflow:hidden;">
@@ -3021,28 +2967,29 @@ function renderBancoHoras(){
             <span>${fmtSaldo(saldo)}</span>
           </div>
         </td>
-        <td class="num mono">${fmtSaldo(Number(v.heIdentificadaH)||0)}</td>
+        <td class="num mono">${fmtSaldo(Number(v.variacaoNum)||0)}</td>
       </tr>`;
       }).join('');
     }
   }
 
+  // ---- Top 10 Maiores Saldos Negativos ----
   const rankingNegativoBody = document.getElementById('bancoHorasRankingNegativoBody');
   if(rankingNegativoBody){
-    const negativos = BH_FILTRO.filter(v => (Number(v.saldoProjetadoBHH)||0) < 0)
-      .sort((a,b) => (Number(a.saldoProjetadoBHH)||0) - (Number(b.saldoProjetadoBHH)||0))
+    const negativos = BH_FILTRO.filter(v => (Number(v.saldoAtualNum)||0) < 0)
+      .sort((a,b) => (Number(a.saldoAtualNum)||0) - (Number(b.saldoAtualNum)||0))
       .slice(0, 10);
     if(negativos.length === 0){
       rankingNegativoBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum saldo negativo 🎉</td></tr>`;
     } else {
-      const maxNegativo = Math.max(...negativos.map(v => Math.abs(Number(v.saldoProjetadoBHH)||0)), 1);
+      const maxNegativo = Math.max(...negativos.map(v => Math.abs(Number(v.saldoAtualNum)||0)), 1);
       rankingNegativoBody.innerHTML = negativos.map((v,i) => {
-        const saldo = Number(v.saldoProjetadoBHH)||0;
+        const saldo = Number(v.saldoAtualNum)||0;
         const larguraBarra = Math.max(4, (Math.abs(saldo)/maxNegativo*100));
         return `<tr>
         <td class="num mono">${i+1}</td>
-        <td>${esc(v.colaborador) || '—'}</td>
-        <td>${esc(v.contrato) || '—'}</td>
+        <td>${esc(v.nome) || '—'}</td>
+        <td>${esc(bancoHorasRotuloCc(v)) || '—'}</td>
         <td class="num mono" style="font-weight:600; color:${cor.bad};">
           <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
             <div style="background:${cor.line}; border-radius:999px; height:6px; width:60px; overflow:hidden;">
@@ -3051,32 +2998,31 @@ function renderBancoHoras(){
             <span>${fmtSaldo(saldo)}</span>
           </div>
         </td>
-        <td class="num mono">${fmtSaldo(Number(v.heIdentificadaH)||0)}</td>
+        <td class="num mono">${fmtSaldo(Number(v.variacaoNum)||0)}</td>
       </tr>`;
       }).join('');
     }
   }
 
+  // ---- Resumo Geral ----
   const resumoBody = document.getElementById('bancoHorasResumoGeralBody');
   if(resumoBody){
-    const saldoTotalPositivo = BH_FILTRO.reduce((s,v)=>{ const n = Number(v.saldoProjetadoBHH)||0; return s + (n>0?n:0); }, 0);
-    const saldoTotalNegativo = BH_FILTRO.reduce((s,v)=>{ const n = Number(v.saldoProjetadoBHH)||0; return s + (n<0?n:0); }, 0);
-    const qtdZerados = BH_FILTRO.filter(v => (Number(v.saldoProjetadoBHH)||0) === 0).length;
-    const qtdRejeitadas = BH_FILTRO.filter(v => semAcentoHc(v.statusAprovacao).includes('rejeit')).length;
+    const saldoTotalPositivo = BH_FILTRO.reduce((s,v)=>{ const n = Number(v.saldoAtualNum)||0; return s + (n>0?n:0); }, 0);
+    const saldoTotalNegativo = BH_FILTRO.reduce((s,v)=>{ const n = Number(v.saldoAtualNum)||0; return s + (n<0?n:0); }, 0);
+    const qtdZerados = BH_FILTRO.filter(v => (Number(v.saldoAtualNum)||0) === 0).length;
     resumoBody.innerHTML = `
       <tr><td>Saldo Total Positivo (h)</td><td class="num mono" style="color:${cor.good}; font-weight:600;">${fmtSaldo(saldoTotalPositivo)}</td></tr>
       <tr><td>Saldo Total Negativo (h)</td><td class="num mono" style="color:${cor.bad}; font-weight:600;">${fmtSaldo(saldoTotalNegativo)}</td></tr>
       <tr><td>Colaboradores com Saldo Zerado</td><td class="num mono">${qtdZerados}</td></tr>
-      <tr><td>HE Identificada (h)</td><td class="num mono">${fmtSaldo(somaHeIdentificada)}</td></tr>
-      <tr><td>HE Aprovada (h)</td><td class="num mono" style="color:${cor.good};">${fmtSaldo(somaHeAprovada)}</td></tr>
-      <tr><td>HE Pendente (h)</td><td class="num mono" style="color:${cor.warn};">${fmtSaldo(somaHePendente)}</td></tr>
-      <tr><td>Solicitações Rejeitadas</td><td class="num mono" style="color:${cor.bad};">${qtdRejeitadas}</td></tr>
+      <tr><td>Débito Total (h)</td><td class="num mono" style="color:${cor.bad};">${fmtSaldo(somaDebito)}</td></tr>
+      <tr><td>Crédito Total (h)</td><td class="num mono" style="color:${cor.good};">${fmtSaldo(somaCredito)}</td></tr>
+      <tr><td>Variação Total (h)</td><td class="num mono">${fmtSaldo(somaVariacao)}</td></tr>
+      <tr><td>Não Confere</td><td class="num mono" style="color:${cor.warn};">${qtdNaoConfere}</td></tr>
     `;
   }
 
   renderBancoHorasTabela();
 }
-
 function exportarFcaPreenchidoCsv(){
   try {
     if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
