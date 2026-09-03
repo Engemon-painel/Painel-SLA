@@ -769,12 +769,6 @@
             </div>
           </div>
           <div class="panel">
-            <h2>Colaboradores por Centro de Custo</h2>
-            <div style="position:relative; height:220px;">
-              <canvas id="bancoHorasCcChart"></canvas>
-            </div>
-          </div>
-          <div class="panel">
             <h2>Saldo por Centro de Custo</h2>
             <table>
               <thead>
@@ -2087,7 +2081,7 @@ let frotaFiltrosPopulados = false;
 let frotaPaginaAtual = 1;
 const FROTA_POR_PAGINA = 10;
 let frotaModeloChartInst, frotaStatusChartInst, frotaTipoChartInst;
-let bancoHorasStatusBancoChartInst, bancoHorasCcChartInst, bancoHorasEvolucaoChartInst, bancoHorasSaldoPorCompetenciaChartInst;
+let bancoHorasStatusBancoChartInst, bancoHorasEvolucaoChartInst, bancoHorasSaldoPorCompetenciaChartInst;
 
 function filtrarFrotaPorOperacaoEKpi(valor){
   frotaOperacaoFiltroAtual = valor;
@@ -2923,12 +2917,17 @@ function renderBancoHoras(){
   // ---- Saldo Atual por Competência (barras) — histórico completo,
   // respeitando apenas os filtros de C.C./Situação/Confere (não o mês
   // selecionado nos chips). Mostra abaixo do título o Período da folha
-  // correspondente à competência atualmente selecionada, como referência.
+  // ATUAL (a competência mais recente da base), sempre — independente
+  // da competência selecionada nos chips.
   const periodoCompetenciaEl = document.getElementById('bancoHorasPeriodoCompetencia');
   if(periodoCompetenciaEl){
-    const registroCompetencia = BANCO_HORAS.find(v => normFrota(v.competencia) === bancoHorasCompetenciaAtual && normFrota(v.periodo));
+    const competenciasParaPeriodoAtual = bancoHorasCompetenciasOrdenadas();
+    const competenciaAtualReal = competenciasParaPeriodoAtual.length
+      ? competenciasParaPeriodoAtual[competenciasParaPeriodoAtual.length - 1]
+      : '';
+    const registroCompetencia = BANCO_HORAS.find(v => normFrota(v.competencia) === competenciaAtualReal && normFrota(v.periodo));
     const periodoTexto = registroCompetencia ? normFrota(registroCompetencia.periodo) : '—';
-    periodoCompetenciaEl.textContent = bancoHorasCompetenciaAtual ? (bancoHorasCompetenciaAtual + ' · ' + periodoTexto) : '—';
+    periodoCompetenciaEl.textContent = competenciaAtualReal ? (competenciaAtualReal + ' · ' + periodoTexto) : '—';
   }
 
   const saldoPorCompetenciaCanvas = document.getElementById('bancoHorasSaldoPorCompetenciaChart');
@@ -2950,7 +2949,7 @@ function renderBancoHoras(){
           label: 'Saldo Atual (h)',
           data: competenciasSaldo.map(k => porCompetenciaSaldo[k] || 0),
           backgroundColor: cor.accent, borderRadius: 4,
-          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) }
         }]
       },
       plugins: [ChartDataLabels],
@@ -2963,38 +2962,6 @@ function renderBancoHoras(){
         scales: {
           x: { ticks: {color: cor.muted, font:{weight:'bold', size:9}}, grid: {display:false} },
           y: { ticks: {color: cor.muted, font:{weight:'bold'}}, grid: {color: cor.line} }
-        }
-      }
-    });
-  }
-
-  // ---- Colaboradores por Centro de Custo (barra) ----
-  const ccCanvas = document.getElementById('bancoHorasCcChart');
-  if(ccCanvas){
-    const porCc = {};
-    BH_FILTRO.forEach(v => {
-      const k = bancoHorasRotuloCc(v);
-      porCc[k] = (porCc[k] || 0) + 1;
-    });
-    const ccOrd = Object.keys(porCc).sort((a,b)=> porCc[b]-porCc[a]).slice(0, 15);
-    if(bancoHorasCcChartInst) bancoHorasCcChartInst.destroy();
-    bancoHorasCcChartInst = new Chart(ccCanvas, {
-      type: 'bar',
-      data: {
-        labels: ccOrd,
-        datasets: [{
-          label: 'Colaboradores', data: ccOrd.map(k => porCc[k]),
-          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
-          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
-        }]
-      },
-      plugins: [ChartDataLabels],
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display:false }, datalabels: { display:true } },
-        scales: {
-          x: { ticks:{color:cor.muted, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
-          y: { ticks:{color:cor.muted, font:{size:10, weight:'bold'}}, grid:{display:false} }
         }
       }
     });
@@ -3083,7 +3050,7 @@ function renderBancoHoras(){
             label:'Saldo Atual (h)',
             data: competenciasEvolucao.map(k => (porCompetencia[k] || {saldo:0}).saldo),
             backgroundColor: cor.accent, borderRadius: 4,
-            datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+            datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) }
           }
         ]
       },
