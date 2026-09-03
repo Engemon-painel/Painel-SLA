@@ -64,6 +64,15 @@
   .nav-item:hover{ background:rgba(14,124,134,.10); }
   .nav-item.active{ background:rgba(14,124,134,.14); color:var(--accent); }
   .nav-item .nav-icon{ font-size:15px; width:18px; text-align:center; flex-shrink:0; }
+  .nav-group{
+    border:1px solid var(--line); border-radius:10px; padding:8px 6px 6px;
+    margin-bottom:8px; background:var(--panel-2);
+  }
+  .nav-group .nav-item{ background:var(--panel); }
+  .nav-group-label{
+    font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted); padding:2px 6px 8px;
+  }
   .main-content{ flex:1; min-width:0; }
   @media (max-width: 860px){
     .app-shell{ flex-direction:column; }
@@ -201,9 +210,12 @@
 <div class="app-shell">
   <nav class="sidebar">
     <div class="nav-item active" id="nav-consolidado" onclick="mostrarPagina('consolidado')"><span class="nav-icon">📊</span> Consolidado</div>
-    <div class="nav-item" id="nav-area" onclick="mostrarPagina('area')"><span class="nav-icon">🗺️</span> Por Área</div>
-    <div class="nav-item" id="nav-site" onclick="mostrarPagina('site')"><span class="nav-icon">📡</span> Por Site</div>
-    <div class="nav-item" id="nav-fca" onclick="mostrarPagina('fca')"><span class="nav-icon">⚠️</span> FCA<span id="fcaCountNav" style="margin-left:4px;"></span></div>
+    <div class="nav-group">
+      <div class="nav-group-label">Eser</div>
+      <div class="nav-item" id="nav-area" onclick="mostrarPagina('area')"><span class="nav-icon">🗺️</span> Por Área</div>
+      <div class="nav-item" id="nav-site" onclick="mostrarPagina('site')"><span class="nav-icon">📡</span> Por Site</div>
+      <div class="nav-item" id="nav-fca" onclick="mostrarPagina('fca')"><span class="nav-icon">⚠️</span> FCA<span id="fcaCountNav" style="margin-left:4px;"></span></div>
+    </div>
     <div class="nav-item" id="nav-organograma" onclick="mostrarPagina('organograma')"><span class="nav-icon">👥</span> Organograma</div>
     <div class="nav-item" id="nav-vagas" onclick="mostrarPagina('vagas')"><span class="nav-icon">🧑‍💼</span> Gestão de Vagas</div>
     <div class="nav-item" id="nav-frota" onclick="mostrarPagina('frota')"><span class="nav-icon">🚗</span> Gestão de Frotas</div>
@@ -220,12 +232,10 @@
       <div class="grid">
         <div class="panel">
           <h2>Visão mensal</h2>
-          <div class="hint">Dentro / fora do prazo por mês, com a linha de % mostrando a tendência de um mês pro outro.</div>
           <canvas id="monthlyChart" height="90"></canvas>
         </div>
         <div class="panel">
           <h2>Visão diarizada</h2>
-          <div class="hint">Dentro / fora do prazo por dia · mês selecionado.</div>
           <canvas id="dailyChart" height="150"></canvas>
         </div>
       </div>
@@ -233,7 +243,6 @@
       <div class="grid" style="grid-template-columns: 1fr;">
         <div class="panel">
           <h2>Visão semanal</h2>
-          <div class="hint">Dentro / fora do prazo por semana · últimas 8 semanas.</div>
           <canvas id="weeklyChart" height="90"></canvas>
         </div>
       </div>
@@ -242,7 +251,6 @@
     <div class="pagina" id="pagina-area" style="display:none;">
       <div class="panel" style="margin-bottom:16px;">
         <h2>Dentro vs. Fora do prazo — por Área</h2>
-        <div class="hint">Incidentes de indisponibilidade agrupados por área, mês selecionado.</div>
         <canvas id="areaChart" height="230"></canvas>
       </div>
 
@@ -269,14 +277,12 @@
       <div class="grid" style="grid-template-columns: 1.6fr 1fr; margin-bottom:16px;">
         <div class="panel">
           <h2>Top 15 Sites</h2>
-          <div class="hint">Sites com mais incidentes (SITE_CI) · mês selecionado.</div>
           <div id="topSitesChartWrap" style="position:relative; height:460px;">
             <canvas id="topSitesChart"></canvas>
           </div>
         </div>
         <div class="panel">
           <h2>Sites que Mais Repetiram</h2>
-          <div class="hint">Incidentes por site, empilhado por mês (Jul + Ago/26).</div>
           <div id="sitesRecorrentesChartWrap" style="position:relative; height:460px;">
             <canvas id="sitesRecorrentesChart"></canvas>
           </div>
@@ -286,18 +292,15 @@
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
         <div class="panel">
           <h2>Tier 2 (Top 10)</h2>
-          <div class="hint">GENERIC_CATEGORIZATION_TIER_2 · mês selecionado.</div>
           <canvas id="genericTier2Chart" height="200"></canvas>
         </div>
         <div class="panel">
           <h2>Tier 3 (Top 10)</h2>
-          <div class="hint">GENERIC_CATEGORIZATION_TIER_3 · mês selecionado.</div>
           <canvas id="genericTier3Chart" height="200"></canvas>
         </div>
       </div>
       <div class="panel">
         <h2>Resolução (Top 10)</h2>
-        <div class="hint">Ações de resolução mais frequentes (RESOLUTION_CATEGORY_TIER_1) · mês selecionado.</div>
         <canvas id="resolucaoChart" height="200"></canvas>
       </div>
     </div>
@@ -305,13 +308,11 @@
     <div class="pagina" id="pagina-fca" style="display:none;">
       <div class="panel" id="pendenciasFca">
         <h2>Fora do Prazo — Justificativas (FCA)</h2>
-        <div class="hint">Incidentes fora do SLA de 4h, mês selecionado.</div>
 
         <div class="kpi-row" id="fcaKpiRow" style="margin-bottom:20px;"></div>
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Resumo por Supervisor</h2>
-          <div class="hint">Fora do prazo, quantidade já preenchida (Fato/Causa) e % preenchido · mês selecionado. Não é afetado pelos filtros de Supervisor/Status abaixo.</div>
           <table>
             <thead>
               <tr><th>Supervisor</th><th class="num">Fora do Prazo</th><th class="num">Preenchido</th><th class="num">% Preenchido</th></tr>
@@ -322,19 +323,16 @@
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Área mais Ofensora</h2>
-          <div class="hint">Incidentes fora do prazo por área · mês selecionado. Não é afetado pelos filtros de Supervisor/Status abaixo.</div>
           <div id="areaOfensoraRow" class="kpi-row"></div>
         </div>
 
         <div class="grid">
           <div class="panel">
             <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
-            <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do SUBMIT_DATE · mês selecionado.</div>
             <canvas id="horaForaSubmitChart" height="150"></canvas>
           </div>
           <div class="panel">
             <h2>Fora do Prazo por Horário — CLEAR_DATE</h2>
-            <div class="hint">Total de incidentes e quantos ficaram fora do prazo, por hora do CLEAR_DATE · mês selecionado.</div>
             <canvas id="horaForaClearChart" height="150"></canvas>
           </div>
         </div>
@@ -342,18 +340,15 @@
         <div class="grid">
           <div class="panel">
             <h2>Causa</h2>
-            <div class="hint">Motivos mais frequentes entre os já justificados.</div>
             <canvas id="causaChart" height="180"></canvas>
           </div>
           <div class="panel">
             <h2>Ação tomada</h2>
-            <div class="hint">Tipo de ação registrada entre os já justificados.</div>
             <canvas id="acaoChart" height="180"></canvas>
           </div>
         </div>
 
         <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
-        <div class="hint">Incidentes fora do prazo. Use os filtros para ver por supervisor e/ou por status de preenchimento do Fato/Causa. Clique em "Preencher" para abrir o Forms já com os dados do incidente.</div>
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
           <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
@@ -379,7 +374,6 @@
     <div class="pagina" id="pagina-organograma" style="display:none;">
       <div class="panel" id="headcountSecao">
         <h2>Headcount — Organograma</h2>
-        <div class="hint">Dados da aba Organograma, mesma base do painel de SLA.</div>
 
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <label for="contratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
@@ -396,19 +390,16 @@
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Departamentos</h2>
-          <div class="hint">Colaboradores ativos por área técnica.</div>
           <div class="kpi-row" id="departamentosRow"></div>
         </div>
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Por Unidade de Negócio</h2>
-          <div class="hint">Colaboradores ativos por Unidade de Negócio, com o coordenador responsável.</div>
           <div class="unb-grid" id="unbGrid"></div>
         </div>
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Colaboradores</h2>
-          <div class="hint">Busca por nome, matrícula, placa, supervisor, contrato ou área.</div>
 
           <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
             <div class="search" title="Buscar por nome, matrícula, placa, supervisor, contrato">
@@ -442,19 +433,16 @@
         <div class="grid">
           <div class="panel">
             <h2>Admitidos x Demitidos</h2>
-            <div class="hint">Últimos 8 meses.</div>
             <canvas id="admDemChart" height="160"></canvas>
           </div>
           <div class="panel">
             <h2>Evolução da Equipe</h2>
-            <div class="hint">Headcount ativo ao final de cada mês.</div>
             <canvas id="evolucaoChart" height="160"></canvas>
           </div>
         </div>
 
         <div class="panel" style="margin-top:16px;">
           <h2>Técnicos Ativos Únicos por Supervisor</h2>
-          <div class="hint">Área técnica = Técnico, colaboradores ativos.</div>
           <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto;">
             <canvas id="tecnicosSupervisorChart"></canvas>
           </div>
@@ -465,7 +453,6 @@
     <div class="pagina" id="pagina-vagas" style="display:none;">
       <div class="panel" id="vagasSecao">
         <h2>Gestão de Vagas</h2>
-        <div class="hint">Dados da aba Controle, mesma base do painel de SLA.</div>
 
         <div class="kpi-row" id="vagasMotivoKpiRow" style="margin-bottom:14px;"></div>
         <div class="kpi-row" id="vagasKpiRow" style="margin-bottom:20px;"></div>
@@ -473,28 +460,24 @@
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom:16px;">
           <div class="panel">
             <h2>Motivo da Vaga</h2>
-            <div class="hint">Substituição vs. aumento de quadro.</div>
             <div style="position:relative; height:240px;">
               <canvas id="vagasMotivoChart"></canvas>
             </div>
           </div>
           <div class="panel">
             <h2>Status da Requisição</h2>
-            <div class="hint">Aprovada vs. pendente.</div>
             <div style="position:relative; height:240px;">
               <canvas id="vagasStatusReqChart"></canvas>
             </div>
           </div>
           <div class="panel">
             <h2>Etapa Atual da Vaga</h2>
-            <div class="hint">Distribuição por etapa (coluna STATUS).</div>
             <div style="position:relative; height:240px;">
               <canvas id="vagasEtapaChart"></canvas>
             </div>
           </div>
           <div class="panel">
             <h2>Funil de Recrutamento</h2>
-            <div class="hint">Requisições → Aprovadas → etapas em andamento.</div>
             <div style="position:relative; height:240px;">
               <canvas id="vagasFunilChart"></canvas>
             </div>
@@ -504,7 +487,6 @@
         <div class="grid" style="grid-template-columns: 1fr 1.4fr 1fr; margin-bottom:16px;">
           <div class="panel">
             <h2>Matriz Motivo x Status da Requisição</h2>
-            <div class="hint">Cruzamento de volume.</div>
             <table>
               <thead>
                 <tr><th>Motivo</th><th class="num">Aprovada</th><th class="num">Pendente</th><th class="num">Total</th></tr>
@@ -514,14 +496,12 @@
           </div>
           <div class="panel">
             <h2>Evolução das Requisições</h2>
-            <div class="hint">Aprovadas vs. pendentes, por mês de criação.</div>
             <div style="position:relative; height:220px;">
               <canvas id="vagasEvolucaoChart"></canvas>
             </div>
           </div>
           <div class="panel">
             <h2>Vagas por Área</h2>
-            <div class="hint">Volume de requisições por área.</div>
             <div style="position:relative; height:220px;">
               <canvas id="vagasAreaChart"></canvas>
             </div>
@@ -530,7 +510,6 @@
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Requisições Aguardando Aprovação</h2>
-          <div class="hint">Etapa atual (STATUS) = "Aguardando Aprovação", ordenadas por dias em aberto.</div>
           <table>
             <thead>
               <tr><th>Requisição</th><th>Cargo</th><th>Área</th><th>Motivo</th><th>Status Req.</th><th>Etapa</th><th>Data da Solicitação</th><th class="num">Dias em Aberto</th><th>Solicitante</th></tr>
@@ -541,7 +520,6 @@
 
         <div class="panel" style="margin-top:16px;">
           <h2>Requisições</h2>
-          <div class="hint">Busca por requisição, cargo, recrutadora, área, supervisão, candidato ou CPF.</div>
 
           <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <label for="vagasCargoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Cargo</label>
@@ -618,14 +596,12 @@
     <div class="pagina" id="pagina-frota" style="display:none;">
       <div class="panel" id="frotaSecao">
         <h2>Gestão de Frotas</h2>
-        <div class="hint">Dados da aba Placa, mesma base do painel de SLA.</div>
 
         <div class="kpi-row" id="frotaOperacaoKpiRow" style="margin-bottom:14px;"></div>
         <div class="kpi-row" id="frotaKpiRow" style="margin-bottom:20px;"></div>
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Gasto por Contrato</h2>
-          <div class="hint">Aluguel/compra + combustível somados, por operação.</div>
           <table>
             <thead>
               <tr><th>Operação</th><th class="num">Aluguel/Compra</th><th class="num">Combustível</th><th class="num">Total</th></tr>
@@ -637,35 +613,30 @@
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
           <div class="panel">
             <h2>Veículos por Modelo</h2>
-            <div class="hint">Top 10 modelos com mais veículos.</div>
             <div style="position:relative; height:260px;">
               <canvas id="frotaModeloChart"></canvas>
             </div>
           </div>
           <div class="panel">
             <h2>Status da Frota</h2>
-            <div class="hint">Distribuição por status.</div>
             <div style="position:relative; height:260px;">
               <canvas id="frotaStatusChart"></canvas>
             </div>
           </div>
           <div class="panel">
             <h2>Distribuição por Tipo</h2>
-            <div class="hint">Próprio vs. locado.</div>
             <div style="position:relative; height:260px;">
               <canvas id="frotaTipoChart"></canvas>
             </div>
           </div>
           <div class="panel">
             <h2>Veículos por Combustível</h2>
-            <div class="hint">Distribuição por tipo de combustível.</div>
             <div id="frotaCombustivelLista"></div>
           </div>
         </div>
 
         <div class="panel" style="margin-top:16px; margin-bottom:16px;">
           <h2>Ranking de Gastos por Veículo</h2>
-          <div class="hint">Top 10 — aluguel/compra + combustível somados, do maior para o menor.</div>
           <table>
             <thead>
               <tr><th class="num">#</th><th>Placa</th><th>Condutor</th><th>Operação</th><th class="num">Aluguel/Compra</th><th class="num">Combustível</th><th class="num">Total</th></tr>
@@ -676,7 +647,6 @@
 
         <div class="panel" style="margin-top:16px;">
           <h2>Veículos</h2>
-          <div class="hint">Busca por placa, condutor, marca ou modelo.</div>
 
           <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <label for="frotaOperacaoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Operação</label>
@@ -739,7 +709,6 @@
     <div class="pagina" id="pagina-bancohoras" style="display:none;">
       <div class="panel" id="bancoHorasSecao">
         <h2>Gestão de BH/Extra</h2>
-        <div class="hint">Dados da aba qResumoFuncionario, planilha Banco_de_Horas_V2_Ajustes. Foto do momento — sem histórico mensal.</div>
 
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <label for="bancoHorasContratoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
@@ -769,7 +738,6 @@
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin-bottom:16px;">
           <div class="panel">
             <h2>Status do Banco de Horas</h2>
-            <div class="hint">Positivo / Zerado / Negativo, por colaborador.</div>
             <div style="display:flex; align-items:center; gap:14px;">
               <div style="position:relative; height:150px; width:150px; flex-shrink:0;">
                 <canvas id="bancoHorasStatusBancoChart"></canvas>
@@ -779,7 +747,6 @@
           </div>
           <div class="panel">
             <h2>Status da Aprovação</h2>
-            <div class="hint">Distribuição por status de aprovação.</div>
             <div style="display:flex; align-items:center; gap:14px;">
               <div style="position:relative; height:150px; width:150px; flex-shrink:0;">
                 <canvas id="bancoHorasStatusAprovacaoChart"></canvas>
@@ -789,14 +756,12 @@
           </div>
           <div class="panel">
             <h2>Colaboradores por Prioridade</h2>
-            <div class="hint">Volume por nível de prioridade.</div>
             <div style="position:relative; height:220px;">
               <canvas id="bancoHorasPrioridadeChart"></canvas>
             </div>
           </div>
           <div class="panel">
             <h2>Saldo por Contrato</h2>
-            <div class="hint">Saldo Projetado BH (h) e HE Identificada (h), somados.</div>
             <table>
               <thead>
                 <tr><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
@@ -809,7 +774,6 @@
         <div class="grid" style="grid-template-columns: 1.4fr 1.4fr 1fr; margin-bottom:16px;">
           <div class="panel">
             <h2>Top 10 — Maiores Saldos Positivos (h)</h2>
-            <div class="hint">Saldo Projetado BH (h), do maior para o menor.</div>
             <table>
               <thead>
                 <tr><th class="num">#</th><th>Colaborador</th><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
@@ -819,7 +783,6 @@
           </div>
           <div class="panel">
             <h2>Top 10 — Maiores Saldos Negativos (h)</h2>
-            <div class="hint">Saldo Projetado BH (h), do mais negativo para o menos.</div>
             <table>
               <thead>
                 <tr><th class="num">#</th><th>Colaborador</th><th>Contrato</th><th class="num">Saldo BH (h)</th><th class="num">HE Identificada (h)</th></tr>
@@ -829,7 +792,6 @@
           </div>
           <div class="panel">
             <h2>Resumo Geral</h2>
-            <div class="hint">Totais consolidados.</div>
             <table>
               <tbody id="bancoHorasResumoGeralBody"></tbody>
             </table>
@@ -838,7 +800,6 @@
 
         <div class="panel" style="margin-top:16px;">
           <h2>Colaboradores</h2>
-          <div class="hint">Busca por colaborador, matrícula, supervisor, coordenador ou centro de custo.</div>
 
           <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <label for="bancoHorasStatusColabFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Status Colaborador</label>
