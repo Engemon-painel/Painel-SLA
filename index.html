@@ -781,6 +781,11 @@
           </div>
         </div>
 
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Evolução de Horas por Mês</h2>
+          <canvas id="bancoHorasEvolucaoChart" height="90"></canvas>
+        </div>
+
         <div class="grid" style="grid-template-columns: 1.4fr 1.4fr 1fr; margin-bottom:16px;">
           <div class="panel">
             <h2>Top 10 — Maiores Saldos Positivos (h)</h2>
@@ -826,8 +831,8 @@
             <table id="bancoHorasTable" role="table" aria-label="Tabela de banco de horas">
               <thead>
                 <tr>
-                  <th>Competência</th>
-                  <th>Período</th>
+                  <th>Mês</th>
+                  <th>Folha</th>
                   <th>Matrícula</th>
                   <th>Nome</th>
                   <th>C.C.</th>
@@ -2078,7 +2083,7 @@ let frotaFiltrosPopulados = false;
 let frotaPaginaAtual = 1;
 const FROTA_POR_PAGINA = 10;
 let frotaModeloChartInst, frotaStatusChartInst, frotaTipoChartInst;
-let bancoHorasStatusBancoChartInst, bancoHorasConfereChartInst, bancoHorasCcChartInst;
+let bancoHorasStatusBancoChartInst, bancoHorasConfereChartInst, bancoHorasCcChartInst, bancoHorasEvolucaoChartInst;
 
 function filtrarFrotaPorOperacaoEKpi(valor){
   frotaOperacaoFiltroAtual = valor;
@@ -2569,19 +2574,45 @@ function bancoHorasRotuloCc(v){
   return cc || desc || 'Sem C.C.';
 }
 
-// Todas as competências presentes na base, ordenadas cronologicamente
-// quando possível (aceita "aaaa-mm", "mm/aaaa" ou texto livre — nesse
-// último caso cai para ordenação alfabética).
+// Todas as competências presentes na base, ordenadas cronologicamente:
+// primeiro por ano, depois por mês (ex.: Abr/25, Mai/25, ..., Jan/26,
+// Fev/26...). Aceita "mmm/aa" (ex.: "abr/25"), "aaaa-mm" ou "mm/aaaa";
+// texto em outro formato cai para ordenação alfabética no final.
+const MES_ABREV_ORDEM = {
+  jan:1, fev:2, mar:3, abr:4, mai:5, jun:6,
+  jul:7, ago:8, set:9, out:10, nov:11, dez:12
+};
+
 function bancoHorasCompetenciasOrdenadas(){
   const unicas = Array.from(new Set(BANCO_HORAS.map(v => normFrota(v.competencia)).filter(Boolean)));
+
   function chaveOrdenacao(c){
-    let m = c.match(/^(\d{4})-(\d{1,2})$/);
-    if(m) return m[1] + m[2].padStart(2,'0');
+    // Formato "mmm/aa" ou "mmm/aaaa" (ex.: "abr/25", "jan/2026").
+    let m = c.match(/^([A-Za-zçÇ]{3})\/(\d{2,4})$/);
+    if(m){
+      const mesNum = MES_ABREV_ORDEM[m[1].toLowerCase()];
+      if(mesNum){
+        let ano = Number(m[2]);
+        if(ano < 100) ano += 2000;
+        return ano * 100 + mesNum;
+      }
+    }
+    // Formato "aaaa-mm".
+    m = c.match(/^(\d{4})-(\d{1,2})$/);
+    if(m) return Number(m[1]) * 100 + Number(m[2]);
+    // Formato "mm/aaaa".
     m = c.match(/^(\d{1,2})\/(\d{4})$/);
-    if(m) return m[2] + m[1].padStart(2,'0');
-    return c;
+    if(m) return Number(m[2]) * 100 + Number(m[1]);
+    // Sem reconhecimento — joga pro final, mantendo ordem alfabética entre si.
+    return 999999;
   }
-  return unicas.sort((a,b) => chaveOrdenacao(a).localeCompare(chaveOrdenacao(b)));
+
+  return unicas.sort((a,b) => {
+    const ka = chaveOrdenacao(a);
+    const kb = chaveOrdenacao(b);
+    if(ka !== kb) return ka - kb;
+    return a.localeCompare(b, 'pt-BR');
+  });
 }
 
 function bancoHorasFiltradaGeral(){
@@ -2937,6 +2968,70 @@ function renderBancoHoras(){
       <td class="num mono">${totalCredito.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})}</td>
     </tr>`;
     saldoCcBody.innerHTML = html;
+  }
+
+  // ---- Evolução de Horas por Mês (todas as competências, respeitando
+  // apenas os filtros de C.C./Situação/Confere — não o mês selecionado
+  // nos chips, já que o objetivo aqui é mostrar a tendência ao longo do
+  // tempo) ----
+  const evolucaoCanvas = document.getElementById('bancoHorasEvolucaoChart');
+  if(evolucaoCanvas){
+    const baseEvolucao = BANCO_HORAS.filter(v => {
+      if(bancoHorasCcFiltroAtual && bancoHorasRotuloCc(v) !== bancoHorasCcFiltroAtual) return false;
+      if(bancoHorasSituacaoFiltroAtual && normFrota(v.situacao) !== bancoHorasSituacaoFiltroAtual) return false;
+      if(bancoHorasConfereFiltroAtual && normFrota(v.confere) !== bancoHorasConfereFiltroAtual) return false;
+      return true;
+    });
+
+    const competenciasEvolucao = bancoHorasCompetenciasOrdenadas();
+    const porCompetencia = {};
+    baseEvolucao.forEach(v => {
+      const k = normFrota(v.competencia);
+      if(!k) return;
+      if(!porCompetencia[k]) porCompetencia[k] = { saldo: 0, debito: 0, credito: 0 };
+      porCompetencia[k].saldo += Number(v.saldoAtualNum) || 0;
+      porCompetencia[k].debito += Number(v.debitoNum) || 0;
+      porCompetencia[k].credito += Number(v.creditoNum) || 0;
+    });
+
+    if(bancoHorasEvolucaoChartInst) bancoHorasEvolucaoChartInst.destroy();
+    bancoHorasEvolucaoChartInst = new Chart(evolucaoCanvas, {
+      data: {
+        labels: competenciasEvolucao,
+        datasets: [
+          {
+            type:'line', label:'Saldo Atual (h)',
+            data: competenciasEvolucao.map(k => (porCompetencia[k] || {saldo:0}).saldo),
+            borderColor: cor.accent, backgroundColor: cor.accent,
+            tension:.3, pointRadius:3,
+            datalabels:{ display:false }
+          },
+          {
+            type:'bar', label:'Débito (h)',
+            data: competenciasEvolucao.map(k => (porCompetencia[k] || {debito:0}).debito),
+            backgroundColor: cor.bad, borderRadius:4,
+            datalabels:{ display:false }
+          },
+          {
+            type:'bar', label:'Crédito (h)',
+            data: competenciasEvolucao.map(k => (porCompetencia[k] || {credito:0}).credito),
+            backgroundColor: cor.good, borderRadius:4,
+            datalabels:{ display:false }
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: cor.muted, font: {family:'Inter', size:11} } },
+          datalabels: { display:false }
+        },
+        scales: {
+          x: { ticks: {color: cor.muted, font:{weight:'bold'}}, grid: {display:false} },
+          y: { ticks: {color: cor.muted, font:{weight:'bold'}}, grid: {color: cor.line} }
+        }
+      }
+    });
   }
 
   function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
