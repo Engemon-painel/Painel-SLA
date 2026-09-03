@@ -762,7 +762,7 @@
             </div>
           </div>
           <div class="panel">
-            <h2>Saldo Atual por Competência</h2>
+            <h2>Saldo Atual — Período Atual</h2>
             <div id="bancoHorasPeriodoCompetencia" class="mono" style="font-size:11px; color:var(--muted); margin-bottom:6px;">—</div>
             <div style="position:relative; height:190px;">
               <canvas id="bancoHorasSaldoPorCompetenciaChart"></canvas>
@@ -2933,6 +2933,7 @@ function renderBancoHoras(){
   const saldoPorCompetenciaCanvas = document.getElementById('bancoHorasSaldoPorCompetenciaChart');
   if(saldoPorCompetenciaCanvas){
     const competenciasSaldo = bancoHorasCompetenciasOrdenadas();
+    const competenciaAtualBarra = competenciasSaldo.length ? [competenciasSaldo[competenciasSaldo.length - 1]] : [];
     const porCompetenciaSaldo = {};
     BH_FILTRO.forEach(v => {
       const k = normFrota(v.competencia);
@@ -2944,12 +2945,12 @@ function renderBancoHoras(){
     bancoHorasSaldoPorCompetenciaChartInst = new Chart(saldoPorCompetenciaCanvas, {
       type: 'bar',
       data: {
-        labels: competenciasSaldo,
+        labels: competenciaAtualBarra,
         datasets: [{
           label: 'Saldo Atual (h)',
-          data: competenciasSaldo.map(k => porCompetenciaSaldo[k] || 0),
-          backgroundColor: cor.accent, borderRadius: 4,
-          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) }
+          data: competenciaAtualBarra.map(k => porCompetenciaSaldo[k] || 0),
+          backgroundColor: cor.accent, borderRadius: 4, maxBarThickness: 80,
+          datalabels: { color: cor.text, anchor:'end', align:'top', font:{size:14, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) }
         }]
       },
       plugins: [ChartDataLabels],
@@ -2960,7 +2961,7 @@ function renderBancoHoras(){
           datalabels: { display:true }
         },
         scales: {
-          x: { ticks: {color: cor.muted, font:{weight:'bold', size:9}}, grid: {display:false} },
+          x: { ticks: {color: cor.muted, font:{weight:'bold', size:12}}, grid: {display:false} },
           y: { ticks: {color: cor.muted, font:{weight:'bold'}}, grid: {color: cor.line} }
         }
       }
@@ -3042,15 +3043,21 @@ function renderBancoHoras(){
 
     if(bancoHorasEvolucaoChartInst) bancoHorasEvolucaoChartInst.destroy();
     bancoHorasEvolucaoChartInst = new Chart(evolucaoCanvas, {
-      type: 'bar',
       data: {
         labels: competenciasEvolucao,
         datasets: [
           {
-            label:'Saldo Atual (h)',
+            type:'bar', label:'Saldo Atual (h)',
             data: competenciasEvolucao.map(k => (porCompetencia[k] || {saldo:0}).saldo),
-            backgroundColor: cor.accent, borderRadius: 4,
+            backgroundColor: cor.accent, borderRadius: 4, order: 2,
             datalabels:{ color: cor.text, anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) }
+          },
+          {
+            type:'line', label:'Tendência',
+            data: competenciasEvolucao.map(k => (porCompetencia[k] || {saldo:0}).saldo),
+            borderColor: cor.warn, backgroundColor: cor.warn,
+            tension:.3, pointRadius:3, order: 1,
+            datalabels:{ display:false }
           }
         ]
       },
