@@ -762,12 +762,10 @@
             </div>
           </div>
           <div class="panel">
-            <h2>Confere</h2>
-            <div style="display:flex; align-items:center; gap:14px;">
-              <div style="position:relative; height:150px; width:150px; flex-shrink:0;">
-                <canvas id="bancoHorasConfereChart"></canvas>
-              </div>
-              <div id="bancoHorasConfereLegenda" style="flex:1;"></div>
+            <h2>Período da Folha</h2>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:150px; gap:8px;">
+              <div id="bancoHorasPeriodoValor" class="mono" style="font-size:26px; font-weight:700; color:var(--accent); text-align:center;">—</div>
+              <div id="bancoHorasPeriodoCompetencia" class="mono" style="font-size:12px; color:var(--muted);">—</div>
             </div>
           </div>
           <div class="panel">
@@ -788,7 +786,7 @@
         </div>
 
         <div class="panel" style="margin-bottom:16px;">
-          <h2>Evolução do Saldo Atual por Período</h2>
+          <h2>Evolução do Saldo Atual por Mês</h2>
           <canvas id="bancoHorasEvolucaoChart" height="90"></canvas>
         </div>
 
@@ -2089,7 +2087,7 @@ let frotaFiltrosPopulados = false;
 let frotaPaginaAtual = 1;
 const FROTA_POR_PAGINA = 10;
 let frotaModeloChartInst, frotaStatusChartInst, frotaTipoChartInst;
-let bancoHorasStatusBancoChartInst, bancoHorasConfereChartInst, bancoHorasCcChartInst, bancoHorasEvolucaoChartInst;
+let bancoHorasStatusBancoChartInst, bancoHorasCcChartInst, bancoHorasEvolucaoChartInst;
 
 function filtrarFrotaPorOperacaoEKpi(valor){
   frotaOperacaoFiltroAtual = valor;
@@ -2922,48 +2920,13 @@ function renderBancoHoras(){
     }
   }
 
-  // ---- Confere (Sim/Não) ----
-  const confereCanvas = document.getElementById('bancoHorasConfereChart');
-  if(confereCanvas){
-    const porConfere = {};
-    BH_FILTRO.forEach(v => {
-      const k = normFrota(v.confere) || 'Sem status';
-      porConfere[k] = (porConfere[k] || 0) + 1;
-    });
-    const confereOrd = Object.keys(porConfere).sort((a,b)=> porConfere[b]-porConfere[a]);
-    if(bancoHorasConfereChartInst) bancoHorasConfereChartInst.destroy();
-    bancoHorasConfereChartInst = new Chart(confereCanvas, {
-      type: 'doughnut',
-      data: {
-        labels: confereOrd,
-        datasets: [{
-          data: confereOrd.map(k => porConfere[k]),
-          backgroundColor: confereOrd.map(k => semAcentoHc(k).includes('sim') ? cor.good : (semAcentoHc(k).includes('nao') ? cor.bad : cor.muted)),
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false, cutout: '60%',
-        plugins: {
-          legend: { display:false },
-          datalabels: { display:false }
-        }
-      }
-    });
-    const legendaConfere = document.getElementById('bancoHorasConfereLegenda');
-    if(legendaConfere){
-      const totalConfere = confereOrd.reduce((s,k)=> s + porConfere[k], 0);
-      legendaConfere.innerHTML = confereOrd.map(k => {
-        const corPill = semAcentoHc(k).includes('sim') ? cor.good : (semAcentoHc(k).includes('nao') ? cor.bad : cor.muted);
-        const qtd = porConfere[k];
-        const pct = totalConfere > 0 ? (qtd/totalConfere*100).toFixed(1) : '0.0';
-        return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-          <span style="width:10px; height:10px; border-radius:50%; background:${corPill}; flex-shrink:0;"></span>
-          <span style="font-size:12px; color:${cor.text};">${k}</span>
-          <span class="mono" style="font-size:12px; color:${cor.muted}; margin-left:auto;">${qtd} (${pct}%)</span>
-        </div>`;
-      }).join('');
-    }
+  // ---- Período da Folha (competência selecionada) ----
+  const periodoValorEl = document.getElementById('bancoHorasPeriodoValor');
+  const periodoCompetenciaEl = document.getElementById('bancoHorasPeriodoCompetencia');
+  if(periodoValorEl){
+    const registroCompetencia = BANCO_HORAS.find(v => normFrota(v.competencia) === bancoHorasCompetenciaAtual && normFrota(v.periodo));
+    periodoValorEl.textContent = registroCompetencia ? normFrota(registroCompetencia.periodo) : '—';
+    if(periodoCompetenciaEl) periodoCompetenciaEl.textContent = bancoHorasCompetenciaAtual ? ('Competência: ' + bancoHorasCompetenciaAtual) : '—';
   }
 
   // ---- Colaboradores por Centro de Custo (barra) ----
@@ -3035,9 +2998,7 @@ function renderBancoHoras(){
   // ---- Evolução do Saldo Atual por Mês (todas as competências,
   // respeitando apenas os filtros de C.C./Situação/Confere — não o mês
   // selecionado nos chips, já que o objetivo aqui é mostrar a tendência
-  // ao longo do tempo). Eixo X usa o Período (ex.: "15/01/2025 a
-  // 14/02/2025") em vez do nome do mês, mas a ordenação continua
-  // cronológica pela Competência. ----
+  // ao longo do tempo). Eixo X usa a Competência (mês, ex.: "fev/25"). ----
   const evolucaoCanvas = document.getElementById('bancoHorasEvolucaoChart');
   if(evolucaoCanvas){
     const baseEvolucao = BANCO_HORAS.filter(v => {
@@ -3052,18 +3013,15 @@ function renderBancoHoras(){
     baseEvolucao.forEach(v => {
       const k = normFrota(v.competencia);
       if(!k) return;
-      if(!porCompetencia[k]) porCompetencia[k] = { saldo: 0, periodo: normFrota(v.periodo) };
+      if(!porCompetencia[k]) porCompetencia[k] = { saldo: 0 };
       porCompetencia[k].saldo += Number(v.saldoAtualNum) || 0;
-      if(!porCompetencia[k].periodo) porCompetencia[k].periodo = normFrota(v.periodo);
     });
-
-    const labelsEvolucao = competenciasEvolucao.map(k => (porCompetencia[k] && porCompetencia[k].periodo) || k);
 
     if(bancoHorasEvolucaoChartInst) bancoHorasEvolucaoChartInst.destroy();
     bancoHorasEvolucaoChartInst = new Chart(evolucaoCanvas, {
       type: 'line',
       data: {
-        labels: labelsEvolucao,
+        labels: competenciasEvolucao,
         datasets: [
           {
             label:'Saldo Atual (h)',
