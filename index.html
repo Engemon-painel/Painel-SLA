@@ -276,7 +276,7 @@
       </div>
 
       <div class="panel">
-        <h2>Dentro vs. Fora do prazo — por Área</h2>
+        <h2>Dentro vs. Fora do prazo — por Área (mês selecionado vs. mês anterior)</h2>
         <canvas id="areaChart" height="230"></canvas>
       </div>
     </div>
@@ -3495,11 +3495,24 @@ function render(){
     return totalArea ? (d.dentro/totalArea*100) : 0;
   });
 
+  // Mês anterior (já fechado) — mesma área, pra comparar com o mês atual
+  // (em andamento) selecionado nos chips. Usa o mesmo cálculo de % por
+  // área, mas com o mesObj do índice anterior. Se não houver mês
+  // anterior na base (primeiro mês), a linha de comparação some.
+  const mesAnteriorObj = mesAtualIdx > 0 ? DADOS.meses[mesAtualIdx - 1] : null;
+  const pctPorAreaAnterior = mesAnteriorObj
+    ? areaNames.map(a=>{
+        const d = areasValidas(mesAnteriorObj.areas)[a];
+        if(!d) return null;
+        const totalArea = d.dentro + d.fora;
+        return totalArea ? (d.dentro/totalArea*100) : 0;
+      })
+    : [];
+
   if(areaChart) areaChart.destroy();
-  areaChart = new Chart(document.getElementById('areaChart'), {
-    data:{ labels: areaNames, datasets:[
+  const areaChartDatasets = [
       {
-        type:'bar', label:'Dentro do prazo', data:dentroArr,
+        type:'bar', label:'Dentro do prazo (' + mesObj.mes + ')', data:dentroArr,
         backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2, yAxisID:'y',
         datalabels:{
           color: cor.text, anchor:'end', align:'top',
@@ -3507,7 +3520,7 @@ function render(){
         }
       },
       {
-        type:'bar', label:'Fora do prazo', data:foraArr,
+        type:'bar', label:'Fora do prazo (' + mesObj.mes + ')', data:foraArr,
         backgroundColor: cor.bad, borderRadius:5, order:2, yAxisID:'y',
         datalabels:{
           color: cor.text, anchor:'end', align:'top',
@@ -3515,7 +3528,7 @@ function render(){
         }
       },
       {
-        type:'line', label:'% Dentro do prazo', data:pctPorArea,
+        type:'line', label:'% Dentro — ' + mesObj.mes + ' (em andamento)', data:pctPorArea,
         borderColor: cor.warn, backgroundColor: cor.warn,
         tension:.3, pointRadius:4, pointBackgroundColor: cor.warn,
         yAxisID:'y1', order:1,
@@ -3525,7 +3538,23 @@ function render(){
           formatter: v => v.toFixed(0) + '%'
         }
       },
-    ]},
+  ];
+  if(mesAnteriorObj){
+    areaChartDatasets.push({
+      type:'line', label:'% Dentro — ' + mesAnteriorObj.mes + ' (fechado)', data:pctPorAreaAnterior,
+      borderColor: '#5e34b5', backgroundColor: '#5e34b5', borderDash:[6,4],
+      tension:.3, pointRadius:4, pointBackgroundColor: '#5e34b5',
+      yAxisID:'y1', order:1,
+      datalabels:{
+        color: '#5e34b5', align:'bottom', offset:8,
+        font:{ size:10, family:'JetBrains Mono', weight:'700' },
+        formatter: v => v === null ? '' : v.toFixed(0) + '%'
+      }
+    });
+  }
+
+  areaChart = new Chart(document.getElementById('areaChart'), {
+    data:{ labels: areaNames, datasets: areaChartDatasets },
     plugins:[ChartDataLabels],
     options:{
       responsive:true,
