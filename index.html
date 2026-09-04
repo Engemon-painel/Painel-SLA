@@ -275,9 +275,15 @@
         </table>
       </div>
 
-      <div class="panel">
-        <h2>Dentro vs. Fora do prazo — por Área (mês selecionado vs. mês anterior)</h2>
-        <canvas id="areaChart" height="230"></canvas>
+      <div class="grid">
+        <div class="panel">
+          <h2>Dentro vs. Fora do prazo — por Área (mês selecionado vs. mês anterior)</h2>
+          <canvas id="areaChart" height="180"></canvas>
+        </div>
+        <div class="panel">
+          <h2>Diário por Área — Fora do Prazo</h2>
+          <canvas id="areaDiarioChart" height="180"></canvas>
+        </div>
       </div>
     </div>
 
@@ -1151,7 +1157,7 @@ function renderDiasRow(diarioFiltrado){
 let hcContratoPopulado = false;
 let hcStatusPopulado = false;
 let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
-let areaChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, genericTier2Chart, genericTier3Chart, resolucaoChart, sitesRecorrentesChart;
+let areaChart, areaDiarioChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, genericTier2Chart, genericTier3Chart, resolucaoChart, sitesRecorrentesChart;
 const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
@@ -3570,6 +3576,51 @@ function render(){
       }
     }
   });
+
+  // ---- Diário por Área — Fora do Prazo (mês selecionado) ----
+  // Usa mesObj.diarioAreas — vem da própria base "Historico" (não do
+  // FCA), já quebrado por dia x área x dentro/fora, com a data calculada
+  // a partir do CLEAR_DATE (ou RESOLVED_DATE quando o CLEAR_DATE estiver
+  // vazio) — a mesma data de referência (dataRef) usada no resto do
+  // painel. Requer que o Office Script da aba "Historico" exporte esse
+  // campo por mês (ver "diarioAreas" dentro de buildMeses).
+  const areaDiarioCanvas = document.getElementById('areaDiarioChart');
+  if(areaDiarioCanvas){
+    const diarioAreasDoMes = Array.isArray(mesObj.diarioAreas) ? mesObj.diarioAreas : [];
+
+    const diasComIncidente = diarioAreasDoMes.map(d => d.dia);
+
+    const paletaAreas = { SPC1: '#2563eb', SPC2: '#0e7c86', SPC3: cor.warn, SPC4: cor.bad };
+
+    const datasetsAreaDiario = areaNames.map(a => ({
+      label: a,
+      data: diarioAreasDoMes.map(d => (d.areas && d.areas[a] && d.areas[a].fora) || 0),
+      backgroundColor: paletaAreas[a] || cor.muted,
+      borderRadius: 3,
+      datalabels: { display:false }
+    }));
+
+    if(areaDiarioChart) areaDiarioChart.destroy();
+    areaDiarioChart = new Chart(areaDiarioCanvas, {
+      type: 'bar',
+      data: {
+        labels: diasComIncidente,
+        datasets: datasetsAreaDiario
+      },
+      plugins: [ChartDataLabels],
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: cor.muted, font:{family:'Inter', size:10} } },
+          datalabels: { display:false }
+        },
+        scales: {
+          x: { stacked:true, ticks:{color:cor.muted, font:{size:10, weight:'bold'}}, grid:{display:false} },
+          y: { stacked:true, ticks:{color:cor.muted, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true }
+        }
+      }
+    });
+  }
 
   const monthlyLabels = DADOS.meses.map(m=>m.mes);
   const monthlyDentro = DADOS.meses.map(m=>totais(m).dentro);
