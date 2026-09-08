@@ -1200,13 +1200,15 @@ function renderMetaProjecaoPanel(mesObj){
 
     const pctNecessarioTxt = r.aderenciaNecessaria !== null ? (r.aderenciaNecessaria*100).toFixed(1) + '%' : '—';
     const impossivel = r.aderenciaNecessaria !== null && r.aderenciaNecessaria > 1;
+    const foraToleravelPorDia = r.diasRestantes > 0 ? (r.foraToleravel / r.diasRestantes) : null;
 
     return `<div class="kpi">
       <div class="label">${meta.label}</div>
       <div class="value" style="color:${impossivel ? cor.bad : statusColor(meta.pct)}; font-size:20px;">
         ${impossivel ? '❌ Fora de alcance' : pctNecessarioTxt}
       </div>
-      ${!impossivel ? `<div class="delta" style="color:${cor.muted};">de aderência nos ${r.restantesProjetados.toLocaleString('pt-BR')} incidentes restantes (~${r.foraToleravel.toLocaleString('pt-BR')} "Fora" toleráveis)</div>` : ''}
+      ${!impossivel ? `<div class="delta" style="color:${cor.muted};">de aderência nos ${r.restantesProjetados.toLocaleString('pt-BR')} incidentes restantes (~${r.foraToleravel.toLocaleString('pt-BR')} "Fora" toleráveis)</div>
+      <div class="delta" style="color:${cor.text}; font-weight:600;">≈ ${foraToleravelPorDia !== null ? foraToleravelPorDia.toFixed(1) : '—'} "Fora"/dia nos próximos ${r.diasRestantes} dias</div>` : ''}
     </div>`;
   }
 
