@@ -278,6 +278,8 @@
           <canvas id="weeklyChart" height="90"></canvas>
         </div>
       </div>
+
+      <div class="panel" id="metaProjecaoPanel" style="margin-top:16px;"></div>
     </div>
 
     <div class="pagina" id="pagina-area" style="display:none;">
@@ -1135,6 +1137,98 @@ function calcularProjecaoMes(mesObj){
     foraProjetado, dentroProjetado,
     totalFinal, dentroFinal, foraFinal, pctFinal, taxaFora7
   };
+}
+
+function calcularNecessarioMeta(mesObj, metaPct){
+  const proj = calcularProjecaoMes(mesObj);
+  const t = totais(mesObj);
+
+  // Sem projeção possível (mês ainda sem nenhum dia corrido, ou já
+  // encerrado/sem dias restantes) — mostra só a situação atual.
+  if(!proj){
+    return {
+      temProjecao: false,
+      pctAtual: t.pct, dentroAtual: t.dentro, totalAtual: t.total,
+      bateu: t.total > 0 ? t.pct >= metaPct : null
+    };
+  }
+
+  const totalProjetado = proj.totalFinal;
+  const dentroNecessario = Math.ceil(metaPct * totalProjetado);
+  const restantesProjetados = Math.max(0, totalProjetado - t.total);
+  const faltaDentro = Math.max(0, dentroNecessario - t.dentro);
+  const foraToleravel = Math.max(0, restantesProjetados - faltaDentro);
+  const aderenciaNecessaria = restantesProjetados > 0 ? (faltaDentro / restantesProjetados) : null;
+  const jaGarantido = t.dentro >= dentroNecessario; // já bateu a meta mesmo que o resto dê tudo errado
+
+  return {
+    temProjecao: true,
+    pctAtual: t.pct, dentroAtual: t.dentro, totalAtual: t.total,
+    diasCorridos: proj.diasCorridos, diasRestantes: proj.diasRestantes,
+    totalProjetado, restantesProjetados,
+    dentroNecessario, faltaDentro, foraToleravel, aderenciaNecessaria,
+    jaGarantido
+  };
+}
+
+function renderMetaProjecaoPanel(mesObj){
+  const painel = document.getElementById('metaProjecaoPanel');
+  if(!painel) return;
+
+  const METAS_PAINEL = [
+    { label: 'Meta 85%', pct: 0.85 },
+    { label: 'Piso 82%', pct: 0.82 }
+  ];
+
+  function linhaMeta(meta){
+    const r = calcularNecessarioMeta(mesObj, meta.pct);
+
+    if(!r.temProjecao){
+      const status = r.bateu === null ? '—' : (r.bateu ? '✅ Batendo' : '⚠️ Abaixo');
+      return `<div class="kpi">
+        <div class="label">${meta.label}</div>
+        <div class="value" style="font-size:16px;">${status}</div>
+      </div>`;
+    }
+
+    if(r.jaGarantido){
+      return `<div class="kpi">
+        <div class="label">${meta.label}</div>
+        <div class="value" style="color:${cor.good}; font-size:20px;">✅ Já garantida</div>
+      </div>`;
+    }
+
+    const pctNecessarioTxt = r.aderenciaNecessaria !== null ? (r.aderenciaNecessaria*100).toFixed(1) + '%' : '—';
+    const impossivel = r.aderenciaNecessaria !== null && r.aderenciaNecessaria > 1;
+
+    return `<div class="kpi">
+      <div class="label">${meta.label}</div>
+      <div class="value" style="color:${impossivel ? cor.bad : statusColor(meta.pct)}; font-size:20px;">
+        ${impossivel ? '❌ Fora de alcance' : pctNecessarioTxt}
+      </div>
+      ${!impossivel ? `<div class="delta" style="color:${cor.muted};">de aderência nos ${r.restantesProjetados.toLocaleString('pt-BR')} incidentes restantes (~${r.foraToleravel.toLocaleString('pt-BR')} "Fora" toleráveis)</div>` : ''}
+    </div>`;
+  }
+
+  const t = totais(mesObj);
+  const proj = calcularProjecaoMes(mesObj);
+
+  painel.innerHTML = `
+    <h2>Meta do mês — quanto falta</h2>
+    <div class="kpi-row" style="margin-top:10px;">
+      <div class="kpi">
+        <div class="label">📊 Hoje</div>
+        <div class="value" style="color:${statusColor(t.pct)}; font-size:20px;">${t.total ? (t.pct*100).toFixed(1)+'%' : '—'}</div>
+        <div class="delta" style="color:${cor.muted};">${t.dentro.toLocaleString('pt-BR')} Dentro / ${t.total.toLocaleString('pt-BR')} total</div>
+      </div>
+      ${proj ? `<div class="kpi">
+        <div class="label">📈 Projeção (ritmo atual)</div>
+        <div class="value" style="color:${statusColor(proj.pctFinal)}; font-size:20px;">${(proj.pctFinal*100).toFixed(1)}%</div>
+        <div class="delta" style="color:${cor.muted};">se os próximos ${proj.diasRestantes} dias seguirem o ritmo dos últimos 7</div>
+      </div>` : ''}
+      ${METAS_PAINEL.map(linhaMeta).join('')}
+    </div>
+  `;
 }
 
 function mttrMedioDoMes(mesObj){
@@ -3630,6 +3724,7 @@ function render(){
   const mesObj = DADOS.meses[mesAtualIdx];
   const t = totais(mesObj);
   renderSignal(t.pct);
+  renderMetaProjecaoPanel(mesObj);
 
   const prevIdx = mesAtualIdx - 1;
   const prevPct = prevIdx >= 0 ? totais(DADOS.meses[prevIdx]).pct : null;
@@ -4304,6 +4399,12 @@ render();
 }
 
 carregarDados();
+
+// Recarrega o dados.json periodicamente (o arquivo é atualizado ~1x/dia pelo
+// Power Automate), assim o painel — incluindo o card "Meta do mês — quanto
+// falta" — atualiza sozinho conforme os números da base mudam, sem precisar
+// dar F5.
+setInterval(carregarDados, 5 * 60 * 1000);
 
 </script>
 </body>
