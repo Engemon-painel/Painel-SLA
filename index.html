@@ -386,7 +386,7 @@
 
         <div class="grid">
           <div class="panel">
-            <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
+            <h2>Fora do Prazo por Horário — REPORTED_DATE</h2>
             <canvas id="horaForaSubmitChart" height="150"></canvas>
           </div>
           <div class="panel">
@@ -1601,6 +1601,10 @@ function renderHeadcount(){
     return colabFiltrados.filter(c => {
       if(!c.dataAdmis || c.dataAdmis > fimIso) return false;
       if(c.dataDemissao && c.dataDemissao <= fimIso) return false;
+      // Sem Dt. Demissao preenchida mas já marcado como Inativo no Status
+      // (mês corrente/atual) — não conta como HC ativo, mesmo sem data de
+      // saída lançada na planilha.
+      if(!c.dataDemissao && !c.ativo) return false;
       return true;
     }).length;
   });
