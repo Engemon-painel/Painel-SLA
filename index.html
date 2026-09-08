@@ -4280,7 +4280,7 @@ function renderPendenciasFca(){
     const statusPill = p.pendente
       ? `<span class="pill bad">A preencher</span>`
       : `<span class="pill good">Preenchido</span>`;
-    const ultimaCol = `<a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">${p.pendente ? 'Preencher' : 'Editar'}</a>`;
+    const ultimaCol = `<a class="link-base${p.pendente ? ' link-alt' : ''}" href="${montarLinkForms(p)}" target="_blank" rel="noopener">${p.pendente ? 'Preencher' : 'Editar'}</a>`;
     return `<tr>
     <td>${p.supervisor || '-'}</td>
     <td>${p.area || '-'}</td>
