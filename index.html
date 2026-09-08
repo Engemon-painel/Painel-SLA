@@ -366,6 +366,17 @@
           <div id="areaOfensoraRow" class="kpi-row"></div>
         </div>
 
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Preenchidos no FCA, reclassificados depois (Tipo ≠ Indisponibilidade)</h2>
+          <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Incidentes que têm Causa/Ação preenchida no formulário, mas cujo <span class="mono">Tipo</span> na base já não é mais "Indisponibilidade" — por isso não aparecem no Detalhamento mais abaixo.</p>
+          <table>
+            <thead>
+              <tr><th>Supervisor</th><th>Área</th><th>Incidente</th><th>Tipo atual</th><th>Causa</th><th>Ação</th></tr>
+            </thead>
+            <tbody id="fcaTipoDivergenteBody"></tbody>
+          </table>
+        </div>
+
         <div class="grid">
           <div class="panel">
             <h2>Fora do Prazo por Horário — SUBMIT_DATE</h2>
@@ -894,6 +905,7 @@
 let DADOS, DIARIO, SEMANAL, mesAtualIdx;
 let DADOS_4H, DADOS_6H, SEMANAL_4H, SEMANAL_6H, DIARIO_4H, DIARIO_6H;
 let PENDENTES_FCA = [];
+let FCA_TIPO_DIVERGENTE = [];
 let COLABORADORES = [];
 let FROTA = [];
 let VAGAS = [];
@@ -1039,6 +1051,7 @@ async function carregarDados(){
     DIARIO_4H = data.diario || [];
     DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
     PENDENTES_FCA = data.pendentesFca || [];
+    FCA_TIPO_DIVERGENTE = data.fcaTipoDivergente || [];
     COLABORADORES = data.colaboradores || [];
     FROTA = data.frota || [];
     VAGAS = data.vagas || [];
@@ -4392,6 +4405,33 @@ function renderPendenciasFca(){
     <td>${ultimaCol}</td>
   </tr>`;
   }).join('');
+
+  renderFcaTipoDivergente();
+}
+
+function renderFcaTipoDivergente(){
+  const tbody = document.getElementById('fcaTipoDivergenteBody');
+  if(!tbody) return;
+  const norm = s => (s || '').replace(/\s+/g, ' ').trim();
+
+  const itens = (FCA_TIPO_DIVERGENTE || []).filter(p => {
+    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return false;
+    return true;
+  });
+
+  if(itens.length === 0){
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:${cor.muted};">Nenhum incidente reclassificado encontrado.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = itens.map(p => `<tr>
+    <td>${p.supervisor || '-'}</td>
+    <td>${p.area || '-'}</td>
+    <td>${p.incidente || '-'}</td>
+    <td><span class="pill warn">${p.tipoAtual || '-'}</span></td>
+    <td>${p.causa || '-'}</td>
+    <td>${p.acao || '-'}</td>
+  </tr>`).join('');
 }
 
 renderPendenciasFcaRef = renderPendenciasFca;
