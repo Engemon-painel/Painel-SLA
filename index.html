@@ -398,7 +398,10 @@
             <option value="pendente">A preencher</option>
             <option value="preenchido">Preenchido</option>
           </select>
-          <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
+          <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="link-base" style="cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
+            <button type="button" class="link-base" style="cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPendenteCsv()">⬇ Exportar A Preencher (CSV)</button>
+          </div>
         </div>
         <table>
           <thead>
@@ -3351,6 +3354,171 @@ function exportarFcaPreenchidoCsv(){
   }
 }
 
+function exportarFcaPendenteCsv(){
+  try {
+    if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
+      alert('Os dados do painel ainda não foram carregados.');
+      return;
+    }
+
+    if (!Array.isArray(PENDENTES_FCA)) {
+      alert('A base de FCA não foi carregada corretamente.');
+      return;
+    }
+
+    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+
+    const mesObj = DADOS.meses[mesAtualIdx];
+    if (!mesObj || !mesObj.mes) {
+      alert('Não foi possível identificar o mês selecionado.');
+      return;
+    }
+
+    const partesMes = String(mesObj.mes).split('/');
+    const nomeMes = partesMes[0];
+    const anoCurto = partesMes[1];
+    const mm = NOME_MES[nomeMes];
+
+    if (!mm || !anoCurto) {
+      alert('Formato de mês inválido: ' + mesObj.mes);
+      return;
+    }
+
+    const mesOrdAtual = '20' + anoCurto + '-' + mm;
+
+    const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
+
+    function estaPendente(p) {
+      const valor = p ? p.pendente : false;
+
+      if (valor === true || valor === 1) return true;
+
+      if (typeof valor === 'string') {
+        const v = valor.trim().toLowerCase();
+        return v === 'true' || v === '1' || v === 'sim';
+      }
+
+      return false;
+    }
+
+    const todosDoMes = PENDENTES_FCA.filter(p => {
+      if (!p) return false;
+
+      if (!areasDoMes.includes(norm(p.area))) return false;
+
+      if (norm(p.mesOrd) !== mesOrdAtual) return false;
+
+      if (
+        supervisorFiltroAtual &&
+        norm(p.supervisor) !== norm(supervisorFiltroAtual)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const pendentes = todosDoMes.filter(p => estaPendente(p));
+
+    if (!pendentes.length) {
+      console.log('--- EXPORTAÇÃO FCA (A preencher) ---');
+      console.log('Mês selecionado:', mesObj.mes);
+      console.log('Mês esperado:', mesOrdAtual);
+      console.log('Áreas:', areasDoMes);
+      console.log('Total PENDENTES_FCA:', PENDENTES_FCA.length);
+      console.log('Total do mês:', todosDoMes.length);
+      console.log('Supervisor:', supervisorFiltroAtual || 'Todos');
+
+      alert(
+        'Nenhum incidente a preencher para exportar.\n\n' +
+        'Mês: ' + mesObj.mes +
+        (supervisorFiltroAtual
+          ? '\nSupervisor: ' + supervisorFiltroAtual
+          : '')
+      );
+      return;
+    }
+
+    const colunas = [
+      'Supervisor',
+      'Área',
+      'Site',
+      'Incidente',
+      'Reported',
+      'Submit',
+      'Clear',
+      'Resolved'
+    ];
+
+    function csvEsc(v) {
+      const s = String(v ?? '');
+
+      if (/[",;\n\r]/.test(s)) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+
+      return s;
+    }
+
+    const linhasCsv = [];
+    linhasCsv.push(colunas.map(csvEsc).join(';'));
+
+    pendentes.forEach(p => {
+      linhasCsv.push([
+        p.supervisor || '',
+        p.area || '',
+        p.site || '',
+        p.incidente || '',
+        p.reported || '',
+        p.submit || '',
+        p.clear || '',
+        p.resolved || ''
+      ].map(csvEsc).join(';'));
+    });
+
+    const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
+
+    const blob = new Blob(
+      [csvContent],
+      { type: 'text/csv;charset=utf-8;' }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const nomeArquivo =
+      'FCA_A_Preencher_' +
+      mesObj.mes.replace('/', '-') +
+      '.csv';
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    a.style.display = 'none';
+    a.setAttribute('download', nomeArquivo);
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+    console.log(
+      'CSV FCA (A preencher) exportado com sucesso:',
+      nomeArquivo,
+      'Registros:',
+      pendentes.length
+    );
+
+  } catch (erro) {
+    console.error('Erro ao exportar FCA (A preencher):', erro);
+
+    alert(
+      'Ocorreu um erro ao exportar o CSV.\n\n' +
+      (erro && erro.message ? erro.message : erro)
+    );
+  }
+}
+
 function montarPagina(){
 
 const monthStrip = document.getElementById('monthStrip');
@@ -4112,9 +4280,7 @@ function renderPendenciasFca(){
     const statusPill = p.pendente
       ? `<span class="pill bad">A preencher</span>`
       : `<span class="pill good">Preenchido</span>`;
-    const ultimaCol = p.pendente
-      ? `<a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">Preencher</a>`
-      : '-';
+    const ultimaCol = `<a class="link-base" href="${montarLinkForms(p)}" target="_blank" rel="noopener">${p.pendente ? 'Preencher' : 'Editar'}</a>`;
     return `<tr>
     <td>${p.supervisor || '-'}</td>
     <td>${p.area || '-'}</td>
