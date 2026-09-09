@@ -425,7 +425,7 @@
         </div>
         <table>
           <thead>
-            <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Status</th><th>Causa</th><th>Ação</th><th>Submit</th><th>Clear</th><th>Resolved</th><th>Até Atribuído</th><th>Até Resolvido</th><th>Até Encerrado</th><th>Quem Movimentou</th><th></th></tr>
+            <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Status</th><th>Causa</th><th>Ação</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
           </thead>
           <tbody id="pendenciasBody"></tbody>
         </table>
@@ -4399,20 +4399,8 @@ function renderPendenciasFca(){
     const msg = (supervisorFiltroAtual || statusFiltroAtual)
       ? 'Nenhum incidente para os filtros selecionados neste mês.'
       : 'Nenhum incidente fora do prazo neste mês 🎉';
-    tbody.innerHTML = `<tr><td colspan="15" style="text-align:center; color:${cor.muted};">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:${cor.muted};">${msg}</td></tr>`;
     return;
-  }
-
-  function escFca(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-  function celQuemMovimentou(lista){
-    const nomes = Array.isArray(lista) ? lista.filter(Boolean) : [];
-    if(nomes.length === 0) return '-';
-    const tituloCompleto = escFca(nomes.join(', '));
-    const resumo = nomes.length > 2
-      ? escFca(nomes.slice(0, 2).join(', ')) + ` <span class="mono" style="color:${cor.muted};">+${nomes.length - 2}</span>`
-      : escFca(nomes.join(', '));
-    return `<span title="${tituloCompleto}">${resumo}</span>`;
   }
 
   tbody.innerHTML = itensFiltrados.map(p => {
@@ -4431,10 +4419,6 @@ function renderPendenciasFca(){
     <td class="mono" style="font-size:12px;">${p.submit || '-'}</td>
     <td class="mono" style="font-size:12px;">${p.clear || '-'}</td>
     <td class="mono" style="font-size:12px;">${p.resolved || '-'}</td>
-    <td class="mono" style="font-size:12px;">${p.tempoAteAtribuidoFormatado || '-'}</td>
-    <td class="mono" style="font-size:12px;">${p.tempoAteResolvidoFormatado || '-'}</td>
-    <td class="mono" style="font-size:12px;">${p.tempoAteEncerradoFormatado || '-'}</td>
-    <td style="font-size:12px;">${celQuemMovimentou(p.quemMovimentou)}</td>
     <td>${ultimaCol}</td>
   </tr>`;
   }).join('');
