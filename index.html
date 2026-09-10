@@ -4144,7 +4144,20 @@ function montarLinkForms(p){
   ];
   return FORMS_BASE_URL + params.map(([k,v]) => '&' + k + '=' + v).join('');
 }
+function parseDataHoraFca(str){
+  if(!str) return null;
+  const m = String(str).trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if(!m) return null;
+  const [, dd, mm, yyyy, hh, mi, ss] = m;
+  const d = new Date(Number(yyyy), Number(mm)-1, Number(dd), Number(hh), Number(mi), Number(ss));
+  return isNaN(d.getTime()) ? null : d;
+}
 
+function diasAtrasoFca(p){
+  const dataRef = parseDataHoraFca(p.clear) || parseDataHoraFca(p.resolved);
+  if(!dataRef) return null;
+  return Math.floor((new Date() - dataRef) / 86400000);
+}
 function renderPendenciasFca(){
   const tbody = document.getElementById('pendenciasBody');
   if(!tbody) return;
