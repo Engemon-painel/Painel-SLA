@@ -4305,18 +4305,19 @@ function renderPendenciasFca(){
     }
   }
 
-  const total = itensFiltrados.length;
-  const qtdJustificado = justificadosDoMes.length;
-  const pctJustificado = total > 0 ? (qtdJustificado / total * 100) : 0;
-  const kpiRow = document.getElementById('fcaKpiRow');
-  if(kpiRow){
-    kpiRow.innerHTML = `
-      <div class="kpi"><div class="label">Total Fora do Prazo</div><div class="value">${total.toLocaleString('pt-BR')}</div></div>
-      <div class="kpi"><div class="label">Qtd Justificado</div><div class="value" style="color:${cor.accent}">${qtdJustificado.toLocaleString('pt-BR')}</div></div>
-      <div class="kpi"><div class="label">% Justificado</div><div class="value" style="color:${statusColor(pctJustificado/100)}">${pctJustificado.toFixed(1)}%</div></div>
-    `;
-  }
-
+const total = itensFiltrados.length;
+const qtdJustificado = justificadosDoMes.length;
+const pctJustificado = total > 0 ? (qtdJustificado / total * 100) : 0;
+const qtdAtrasados = itensFiltrados.filter(p => p.pendente && (diasAtrasoFca(p) ?? -1) >= 5).length;
+const kpiRow = document.getElementById('fcaKpiRow');
+if(kpiRow){
+  kpiRow.innerHTML = `
+    <div class="kpi"><div class="label">Total Fora do Prazo</div><div class="value">${total.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">Qtd Justificado</div><div class="value" style="color:${cor.accent}">${qtdJustificado.toLocaleString('pt-BR')}</div></div>
+    <div class="kpi"><div class="label">% Justificado</div><div class="value" style="color:${statusColor(pctJustificado/100)}">${pctJustificado.toFixed(1)}%</div></div>
+    <div class="kpi" style="${qtdAtrasados > 0 ? `border-color:${cor.bad}; box-shadow:0 0 0 2px ${cor.bad} inset;` : ''}"><div class="label">⚠️ Atrasados (&gt;5 dias)</div><div class="value" style="color:${qtdAtrasados > 0 ? cor.bad : cor.good}">${qtdAtrasados.toLocaleString('pt-BR')}</div></div>
+  `;
+}
   const causaCounts = {};
   justificadosDoMes.forEach(p => {
     const c = p.causa || 'Não informado';
@@ -4403,25 +4404,31 @@ function renderPendenciasFca(){
     return;
   }
 
-  tbody.innerHTML = itensFiltrados.map(p => {
-    const statusPill = p.pendente
-      ? `<span class="pill bad">A preencher</span>`
-      : `<span class="pill good">Preenchido</span>`;
-    const ultimaCol = `<a class="link-base${p.pendente ? ' link-alt' : ''}" href="${montarLinkForms(p)}" target="_blank" rel="noopener">${p.pendente ? 'Preencher' : 'Editar'}</a>`;
-    return `<tr>
-    <td>${p.supervisor || '-'}</td>
-    <td>${p.area || '-'}</td>
-    <td>${p.site || '-'}</td>
-    <td>${p.incidente || '-'}</td>
-    <td>${statusPill}</td>
-    <td>${p.causa || '-'}</td>
-    <td>${p.acao || '-'}</td>
-    <td class="mono" style="font-size:12px;">${p.submit || '-'}</td>
-    <td class="mono" style="font-size:12px;">${p.clear || '-'}</td>
-    <td class="mono" style="font-size:12px;">${p.resolved || '-'}</td>
-    <td>${ultimaCol}</td>
-  </tr>`;
-  }).join('');
+tbody.innerHTML = itensFiltrados.map(p => {
+  const diasAtraso = diasAtrasoFca(p);
+  const atrasado = p.pendente && diasAtraso !== null && diasAtraso >= 5;
+
+  const statusPill = p.pendente
+    ? (atrasado
+        ? `<span class="pill bad">⚠ A preencher (${diasAtraso}d)</span>`
+        : `<span class="pill bad">A preencher</span>`)
+    : `<span class="pill good">Preenchido</span>`;
+  const ultimaCol = `<a class="link-base${p.pendente ? ' link-alt' : ''}" href="${montarLinkForms(p)}" target="_blank" rel="noopener">${p.pendente ? 'Preencher' : 'Editar'}</a>`;
+  const rowStyle = atrasado ? ' style="background:rgba(220,38,38,.08);"' : '';
+  return `<tr${rowStyle}>
+  <td>${p.supervisor || '-'}</td>
+  <td>${p.area || '-'}</td>
+  <td>${p.site || '-'}</td>
+  <td>${p.incidente || '-'}</td>
+  <td>${statusPill}</td>
+  <td>${p.causa || '-'}</td>
+  <td>${p.acao || '-'}</td>
+  <td class="mono" style="font-size:12px;">${p.submit || '-'}</td>
+  <td class="mono" style="font-size:12px;">${p.clear || '-'}</td>
+  <td class="mono" style="font-size:12px;">${p.resolved || '-'}</td>
+  <td>${ultimaCol}</td>
+</tr>`;
+}).join('');
 
   renderFcaTipoDivergente();
 }
