@@ -1626,17 +1626,21 @@ function renderHeadcount(){
     return (demPorMes[i] / ativosFechamento) * 100;
   });
 
-  // Média do turnover no período mostrado (label dinâmico — hoje são os
-  // últimos 8 meses, ex.: Fev/26 a Set/26). Simples média aritmética dos
-  // percentuais mensais válidos (ignora meses null).
+  // Turnover acumulado no período mostrado (label dinâmico — hoje são os
+  // últimos 8 meses, ex.: Fev/26 a Set/26): soma de todos os demitidos do
+  // período dividida pela média do headcount ativo no fechamento de cada
+  // mês — diferente da simples média dos percentuais mensais, pondera
+  // pelo tamanho da equipe em cada mês.
   const turnoverMedioLabelEl = document.getElementById('turnoverMedioLabel');
   if(turnoverMedioLabelEl){
-    const valoresValidos = turnoverPct.filter(v => v !== null);
-    if(valoresValidos.length > 0){
-      const media = valoresValidos.reduce((a,b) => a+b, 0) / valoresValidos.length;
+    const somaDemitidos = demPorMes.reduce((a,b) => a+b, 0);
+    const ativosValidos = evolucaoDados.filter(v => v > 0);
+    if(ativosValidos.length > 0){
+      const mediaAtivos = ativosValidos.reduce((a,b) => a+b, 0) / ativosValidos.length;
+      const turnoverAcumulado = (somaDemitidos / mediaAtivos) * 100;
       const primeiroMes = meses8[0].label;
       const ultimoMes = meses8[meses8.length - 1].label;
-      turnoverMedioLabelEl.textContent = 'Turnover médio (' + primeiroMes + ' – ' + ultimoMes + '): ' + media.toFixed(1) + '%';
+      turnoverMedioLabelEl.textContent = 'Turnover acumulado (' + primeiroMes + ' – ' + ultimoMes + '): ' + turnoverAcumulado.toFixed(1) + '% (' + somaDemitidos + ' demitidos / headcount médio ' + mediaAtivos.toFixed(0) + ')';
     } else {
       turnoverMedioLabelEl.textContent = '';
     }
