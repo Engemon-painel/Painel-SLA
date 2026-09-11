@@ -1593,31 +1593,30 @@ function renderHeadcount(){
     return meses8.findIndex(m => m.ano === ano && m.mes === mes);
   }
 
-  // ALTERADO: esses dois gráficos (Admitidos x Demitidos / Evolução da
-  // Equipe) NÃO respeitam os filtros de Contrato/Status acima — sempre
-  // usam a base completa (COLABORADORES), não "colabFiltrados".
-  COLABORADORES.forEach(c => {
+  // CORRIGIDO: esses dois gráficos (Admitidos x Demitidos / Evolução da
+  // Equipe) ficam FIXOS — sempre calculados sobre "só quem está
+  // atualmente Ativo, todos os contratos" (a mesma regra do estado padrão
+  // da tela), travada aqui e independente do que o usuário selecionar nos
+  // filtros de Contrato/Status acima.
+  const baseFixaEvolucao = COLABORADORES.filter(c => c.ativo);
+
+  baseFixaEvolucao.forEach(c => {
     const iAdm = indexDoMesHc(c.dataAdmis);
     if(iAdm !== -1) admPorMes[iAdm]++;
     const iDem = indexDoMesHc(c.dataDemissao);
     if(iDem !== -1) demPorMes[iDem]++;
   });
 
-  // ALTERADO: evolucaoDados (headcount ativo no fechamento de cada mês)
-  // precisa ser calculado ANTES do gráfico Admitidos x Demitidos, porque
-  // o turnover (linha adicionada nesse mesmo gráfico) depende dele.
-  // Também usa COLABORADORES (base completa), ignorando os filtros de
-  // Contrato/Status, igual ao gráfico acima.
+  // evolucaoDados (headcount ativo no fechamento de cada mês) precisa ser
+  // calculado ANTES do gráfico Admitidos x Demitidos, porque o turnover
+  // (linha adicionada nesse mesmo gráfico) depende dele. Usa a mesma base
+  // fixa acima.
   const evolucaoDados = meses8.map(m => {
     const fimDoMes = new Date(m.ano, m.mes + 1, 0);
     const fimIso = fimDoMes.getFullYear() + '-' + pad2hc(fimDoMes.getMonth()+1) + '-' + pad2hc(fimDoMes.getDate());
-    return COLABORADORES.filter(c => {
+    return baseFixaEvolucao.filter(c => {
       if(!c.dataAdmis || c.dataAdmis > fimIso) return false;
       if(c.dataDemissao && c.dataDemissao <= fimIso) return false;
-      // Sem Dt. Demissao preenchida mas já marcado como Inativo no Status
-      // (mês corrente/atual) — não conta como HC ativo, mesmo sem data de
-      // saída lançada na planilha.
-      if(!c.dataDemissao && !c.ativo) return false;
       return true;
     }).length;
   });
