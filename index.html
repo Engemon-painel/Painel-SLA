@@ -428,6 +428,14 @@
             <option value="pendente">A preencher</option>
             <option value="preenchido">Preenchido</option>
           </select>
+          <label for="causaFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Causa</label>
+          <select id="causaFiltro" class="mono" onchange="filtrarPorCausa(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:180px;">
+            <option value="">Todas</option>
+          </select>
+          <label for="acaoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Ação</label>
+          <select id="acaoFiltro" class="mono" onchange="filtrarPorAcao(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:180px;">
+            <option value="">Todas</option>
+          </select>
           <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;">
             <button type="button" class="link-base" style="cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
             <button type="button" class="link-base" style="cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPendenteCsv()">⬇ Exportar A Preencher (CSV)</button>
@@ -930,6 +938,8 @@ let BANCO_HORAS = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
+let causaFiltroAtual = '';
+let acaoFiltroAtual = '';
 let tipoDivergenteFiltroAtual = 'mes';
 let contratoFiltroAtual = '';
 let mesPopuladoFiltro = null;
@@ -942,6 +952,16 @@ function filtrarPorSupervisor(valor){
 
 function filtrarPorStatus(valor){
   statusFiltroAtual = valor;
+  if(renderPendenciasFcaRef) renderPendenciasFcaRef();
+}
+
+function filtrarPorCausa(valor){
+  causaFiltroAtual = valor;
+  if(renderPendenciasFcaRef) renderPendenciasFcaRef();
+}
+
+function filtrarPorAcao(valor){
+  acaoFiltroAtual = valor;
   if(renderPendenciasFcaRef) renderPendenciasFcaRef();
 }
 
@@ -1704,8 +1724,6 @@ function filtrarVagasPorCargo(valor){
 function filtrarVagasPorMotivo(valor){
   vagasMotivoFiltroAtual = valor;
   vagasPaginaAtual = 1;
-  const select = document.getElementById('vagasMotivoFiltro');
-  if(select) select.value = valor;
   renderVagas();
 }
 function filtrarVagasPorStatusReq(valor){
@@ -4209,6 +4227,8 @@ function renderPendenciasFca(){
     if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return false;
     if(statusFiltroAtual === 'pendente' && !p.pendente) return false;
     if(statusFiltroAtual === 'preenchido' && p.pendente) return false;
+    if(causaFiltroAtual && norm(p.causa) !== causaFiltroAtual) return false;
+    if(acaoFiltroAtual && norm(p.acao) !== acaoFiltroAtual) return false;
     return true;
   });
   const justificadosDoMes = itensFiltrados.filter(p => !p.pendente);
@@ -4440,11 +4460,27 @@ if(kpiRow){
     selectSupervisor.value = supervisorFiltroAtual;
     const selectStatus = document.getElementById('statusFiltro');
     if(selectStatus) selectStatus.value = statusFiltroAtual;
+
+    const causasDoMes = Array.from(new Set(todosDoMes.map(p => norm(p.causa)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const acoesDoMes = Array.from(new Set(todosDoMes.map(p => norm(p.acao)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const selectCausa = document.getElementById('causaFiltro');
+    const selectAcao = document.getElementById('acaoFiltro');
+    if(selectCausa){
+      if(causaFiltroAtual && causasDoMes.indexOf(causaFiltroAtual) === -1) causaFiltroAtual = '';
+      selectCausa.innerHTML = '<option value="">Todas</option>' + causasDoMes.map(c => `<option value="${c}">${c}</option>`).join('');
+      selectCausa.value = causaFiltroAtual;
+    }
+    if(selectAcao){
+      if(acaoFiltroAtual && acoesDoMes.indexOf(acaoFiltroAtual) === -1) acaoFiltroAtual = '';
+      selectAcao.innerHTML = '<option value="">Todas</option>' + acoesDoMes.map(a => `<option value="${a}">${a}</option>`).join('');
+      selectAcao.value = acaoFiltroAtual;
+    }
+
     mesPopuladoFiltro = mesAtualIdx;
   }
 
   if(itensFiltrados.length === 0){
-    const msg = (supervisorFiltroAtual || statusFiltroAtual)
+    const msg = (supervisorFiltroAtual || statusFiltroAtual || causaFiltroAtual || acaoFiltroAtual)
       ? 'Nenhum incidente para os filtros selecionados neste mês.'
       : 'Nenhum incidente fora do prazo neste mês 🎉';
     tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:${cor.muted};">${msg}</td></tr>`;
