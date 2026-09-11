@@ -520,18 +520,6 @@
           </div>
         </div>
 
-        <div class="panel" style="margin-top:16px; margin-bottom:16px;">
-          <h2>Turnover Mensal</h2>
-          <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Demitidos no mês ÷ Ativos no fechamento do mês.</p>
-          <canvas id="turnoverChart" height="90"></canvas>
-          <table style="margin-top:16px;">
-            <thead>
-              <tr><th>Mês</th><th class="num">Admitidos</th><th class="num">Demitidos</th><th class="num">Ativos (Fechamento)</th><th class="num">Turnover</th></tr>
-            </thead>
-            <tbody id="turnoverTableBody"></tbody>
-          </table>
-        </div>
-
         <div class="panel" style="margin-top:16px;">
           <h2>Técnicos Ativos Únicos por Supervisor</h2>
           <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto;">
@@ -1339,7 +1327,7 @@ function renderDiasRow(diarioFiltrado){
 
 let hcContratoPopulado = false;
 let hcStatusPopulado = false;
-let admDemChartInst, evolucaoChartInst, turnoverChartInst, tecnicosSupChartInst;
+let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
 let areaChart, areaDiarioChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, genericTier2Chart, genericTier3Chart, resolucaoChart, sitesRecorrentesChart;
 const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -1693,53 +1681,6 @@ function renderHeadcount(){
         }
       }
     });
-  }
-
-  const turnoverCanvas = document.getElementById('turnoverChart');
-  if(turnoverCanvas){
-    if(turnoverChartInst) turnoverChartInst.destroy();
-    turnoverChartInst = new Chart(turnoverCanvas, {
-      type: 'line',
-      data: {
-        labels: meses8.map(m => m.label),
-        datasets: [{
-          label: 'Turnover (%)', data: turnoverPct,
-          borderColor: cor.bad, backgroundColor: cor.bad,
-          tension:.3, pointRadius:4, pointBackgroundColor: cor.bad,
-          datalabels: {
-            color: cor.bad, align:'top', font:{size:10, family:'JetBrains Mono', weight:'700'},
-            formatter: v => v === null ? '' : v.toFixed(1) + '%'
-          }
-        }]
-      },
-      plugins: [ChartDataLabels],
-      options: {
-        responsive: true,
-        plugins: { legend: { display:false }, datalabels: { display:true } },
-        scales: {
-          x: { ticks: {color: cor.muted, font:{weight:'bold'}}, grid: {display:false} },
-          y: { ticks: {color: cor.muted, font:{weight:'bold'}, callback: v => v + '%'}, grid: {color: cor.line}, beginAtZero:true }
-        }
-      }
-    });
-  }
-
-  const turnoverTableBody = document.getElementById('turnoverTableBody');
-  if(turnoverTableBody){
-    turnoverTableBody.innerHTML = meses8.map((m, i) => {
-      const ativosFechamento = evolucaoDados[i];
-      const admitidosMes = admPorMes[i];
-      const demitidosMes = demPorMes[i];
-      const turnoverTxt = turnoverPct[i] === null ? '—' : turnoverPct[i].toFixed(1) + '%';
-      const cls = turnoverPct[i] === null ? '' : (turnoverPct[i] >= 5 ? 'bad' : (turnoverPct[i] >= 2 ? 'warn' : 'good'));
-      return `<tr>
-        <td>${m.label}</td>
-        <td class="num">${admitidosMes}</td>
-        <td class="num">${demitidosMes}</td>
-        <td class="num">${ativosFechamento}</td>
-        <td class="num">${cls ? `<span class="pill ${cls}">${turnoverTxt}</span>` : turnoverTxt}</td>
-      </tr>`;
-    }).join('');
   }
 
   const tecnicosAtivos = ativos.filter(c => semAcentoHc(c.areaTecnica) === 'tecnico');
