@@ -4487,7 +4487,17 @@ if(kpiRow){
     return;
   }
 
-tbody.innerHTML = itensFiltrados.map(p => {
+  // Ordena por Área (SPC1, SPC2, SPC3, SPC4) — áreas fora dessa lista vão
+  // pro final, mantendo a ordem original entre itens da mesma área.
+  const itensOrdenados = [...itensFiltrados].sort((a, b) => {
+    const idxA = AREAS_VALIDAS.indexOf(a.area);
+    const idxB = AREAS_VALIDAS.indexOf(b.area);
+    const ordA = idxA === -1 ? AREAS_VALIDAS.length : idxA;
+    const ordB = idxB === -1 ? AREAS_VALIDAS.length : idxB;
+    return ordA - ordB;
+  });
+
+tbody.innerHTML = itensOrdenados.map(p => {
   const diasAtraso = diasAtrasoFca(p);
   const atrasado = p.pendente && diasAtraso !== null && diasAtraso >= 5;
 
