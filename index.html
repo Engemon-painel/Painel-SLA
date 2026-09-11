@@ -512,6 +512,7 @@
         <div class="grid">
           <div class="panel">
             <h2>Admitidos x Demitidos</h2>
+            <div id="turnoverMedioLabel" class="mono" style="font-size:12px; color:var(--muted); margin:2px 0 12px;"></div>
             <canvas id="admDemChart" height="160"></canvas>
           </div>
           <div class="panel">
@@ -1624,6 +1625,22 @@ function renderHeadcount(){
     if(!ativosFechamento || ativosFechamento <= 0) return null;
     return (demPorMes[i] / ativosFechamento) * 100;
   });
+
+  // Média do turnover no período mostrado (label dinâmico — hoje são os
+  // últimos 8 meses, ex.: Fev/26 a Set/26). Simples média aritmética dos
+  // percentuais mensais válidos (ignora meses null).
+  const turnoverMedioLabelEl = document.getElementById('turnoverMedioLabel');
+  if(turnoverMedioLabelEl){
+    const valoresValidos = turnoverPct.filter(v => v !== null);
+    if(valoresValidos.length > 0){
+      const media = valoresValidos.reduce((a,b) => a+b, 0) / valoresValidos.length;
+      const primeiroMes = meses8[0].label;
+      const ultimoMes = meses8[meses8.length - 1].label;
+      turnoverMedioLabelEl.textContent = 'Turnover médio (' + primeiroMes + ' – ' + ultimoMes + '): ' + media.toFixed(1) + '%';
+    } else {
+      turnoverMedioLabelEl.textContent = '';
+    }
+  }
 
   const admDemCanvas = document.getElementById('admDemChart');
   if(admDemCanvas){
