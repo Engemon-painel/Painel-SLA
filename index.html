@@ -1594,13 +1594,11 @@ function renderHeadcount(){
   }
 
   // CORRIGIDO: esses dois gráficos (Admitidos x Demitidos / Evolução da
-  // Equipe) ficam FIXOS — sempre calculados sobre a base COMPLETA de
-  // colaboradores (ativos e inativos, todos os contratos), travada aqui e
-  // independente do que o usuário selecionar nos filtros de
-  // Contrato/Status acima. Usar só "ativo" aqui zerava os Demitidos,
-  // porque quem já saiu da empresa deixa de estar marcado como ativo —
-  // por isso agora conta todo mundo (COLABORADORES).
-  COLABORADORES.forEach(c => {
+  // Equipe) ficam FIXOS no contrato CLARO — travado aqui e independente
+  // do que o usuário selecionar nos filtros de Contrato/Status acima.
+  const baseFixaClaro = COLABORADORES.filter(c => canonContratoHc(c.contrato) === 'CLARO');
+
+  baseFixaClaro.forEach(c => {
     const iAdm = indexDoMesHc(c.dataAdmis);
     if(iAdm !== -1) admPorMes[iAdm]++;
     const iDem = indexDoMesHc(c.dataDemissao);
@@ -1609,15 +1607,15 @@ function renderHeadcount(){
 
   // evolucaoDados (headcount ativo no fechamento de cada mês) precisa ser
   // calculado ANTES do gráfico Admitidos x Demitidos, porque o turnover
-  // (linha adicionada nesse mesmo gráfico) depende dele. Usa a base
-  // completa (COLABORADORES) e mantém a proteção contra dado incompleto:
-  // se a Dt. Demissao estiver vazia MAS o Status atual já é Inativo, a
-  // pessoa não conta como ativa em nenhum mês (evita inflar o headcount
-  // por causa de desligamento sem data lançada na planilha).
+  // (linha adicionada nesse mesmo gráfico) depende dele. Usa a mesma base
+  // fixa (CLARO) e mantém a proteção contra dado incompleto: se a Dt.
+  // Demissao estiver vazia MAS o Status atual já é Inativo, a pessoa não
+  // conta como ativa em nenhum mês (evita inflar o headcount por causa de
+  // desligamento sem data lançada na planilha).
   const evolucaoDados = meses8.map(m => {
     const fimDoMes = new Date(m.ano, m.mes + 1, 0);
     const fimIso = fimDoMes.getFullYear() + '-' + pad2hc(fimDoMes.getMonth()+1) + '-' + pad2hc(fimDoMes.getDate());
-    return COLABORADORES.filter(c => {
+    return baseFixaClaro.filter(c => {
       if(!c.dataAdmis || c.dataAdmis > fimIso) return false;
       if(c.dataDemissao && c.dataDemissao <= fimIso) return false;
       if(!c.dataDemissao && !c.ativo) return false;
