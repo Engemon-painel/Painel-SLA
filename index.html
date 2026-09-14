@@ -4479,16 +4479,31 @@ if(kpiRow){
   // Fora do Prazo) vs quantos "Saíram de Indisponibilidade" (foram
   // reclassificados depois de já terem Causa/Ação preenchida no FCA).
   // Ex.: Vandalismo com 10 no total, 9 saíram, 1 ficou.
+  // CORRIGIDO: agora dedupe por número de incidente em cada grupo — se o
+  // mesmo incidente aparecer mais de uma vez na base (linha duplicada na
+  // aba "Historico"), só conta uma vez, evitando inflar a soma.
   const causaFicouCounts = {};
+  const incidentesVistosFicou = {};
   justificadosDoMes.forEach(p => {
+    const chave = p.incidente || JSON.stringify(p);
+    if(incidentesVistosFicou[chave]) return;
+    incidentesVistosFicou[chave] = true;
     const c = p.causa || 'Não informado';
     causaFicouCounts[c] = (causaFicouCounts[c] || 0) + 1;
   });
 
   const causaSaiuCounts = {};
+  const incidentesVistosSaiu = {};
   (FCA_TIPO_DIVERGENTE || []).forEach(p => {
     if(p.mesOrd !== mesOrdAtual) return;
     if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return;
+    const chave = p.incidente || JSON.stringify(p);
+    // Proteção extra: se por algum motivo esse incidente também aparecer
+    // como "Ficou" (não deveria, mas evita contar em dobro caso a base
+    // tenha alguma inconsistência), não conta de novo aqui.
+    if(incidentesVistosFicou[chave]) return;
+    if(incidentesVistosSaiu[chave]) return;
+    incidentesVistosSaiu[chave] = true;
     const c = p.causa || 'Não informado';
     causaSaiuCounts[c] = (causaSaiuCounts[c] || 0) + 1;
   });
