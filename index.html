@@ -419,17 +419,6 @@
           </div>
         </div>
 
-        <div class="panel" style="margin-bottom:16px;">
-          <h2>Justificativas por Incidente</h2>
-          <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Agrupado por Causa. Mostra o trecho mais relevante (1ª frase) de cada justificativa — passe o mouse sobre o texto pra ver a justificativa completa.</p>
-          <table>
-            <thead>
-              <tr><th style="width:120px;">Incidente</th><th>Justificativa (resumo)</th></tr>
-            </thead>
-            <tbody id="justificativasTextoBody"></tbody>
-          </table>
-        </div>
-
         <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
@@ -4541,74 +4530,6 @@ if(kpiRow){
     const totalCausaGeral = totalNaoReclassificado + totalReclassificado;
     causaTotalLabelEl.textContent = 'Total analisado e preenchido: ' + totalCausaGeral.toLocaleString('pt-BR') +
       ' (' + totalNaoReclassificado.toLocaleString('pt-BR') + ' não reclassificação / ' + totalReclassificado.toLocaleString('pt-BR') + ' reclassificação)';
-  }
-
-  // NOVO: tabela "Justificativas por Incidente" — texto livre da coluna
-  // "Ação tomada" (campo "fato" exportado pelo Office Script), um por
-  // incidente do mês selecionado (Ficou + Saiu de Indisponibilidade),
-  // dedupe por incidente já garantido pelos Sets acima.
-  const justificativasTextoBody = document.getElementById('justificativasTextoBody');
-  if(justificativasTextoBody){
-    function escJust(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-    // NOVO: como os textos são bem longos, mostra só a 1ª frase (até o
-    // primeiro ". ") como resumo — o texto completo continua acessível
-    // pelo atributo "title" (aparece ao passar o mouse).
-    function trechoRelevante(texto){
-      const t = String(texto || '').trim();
-      const idxPonto = t.indexOf('. ');
-      if(idxPonto > 0 && idxPonto < 220){
-        return t.slice(0, idxPonto + 1);
-      }
-      if(t.length > 200){
-        return t.slice(0, 200) + '…';
-      }
-      return t;
-    }
-
-    const linhasJustificativas = [];
-    justificadosDoMes.forEach(p => {
-      const chave = p.incidente || JSON.stringify(p);
-      if(!incidentesVistosFicou[chave]) return; // evita duplicar (mesmo Set usado acima)
-      if(!p.fato) return;
-      linhasJustificativas.push({ incidente: p.incidente, causa: p.causa, fato: p.fato });
-    });
-    (FCA_TIPO_DIVERGENTE || []).forEach(p => {
-      if(p.mesOrd !== mesOrdAtual) return;
-      if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return;
-      const chave = p.incidente || JSON.stringify(p);
-      if(!incidentesVistosSaiu[chave]) return;
-      if(!p.fato) return;
-      linhasJustificativas.push({ incidente: p.incidente, causa: p.causa, fato: p.fato });
-    });
-
-    if(linhasJustificativas.length === 0){
-      justificativasTextoBody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:${cor.muted};">Nenhuma justificativa em texto livre encontrada para este mês.</td></tr>`;
-    } else {
-      // Agrupa por Causa — uma linha de cabeçalho por causa (com a
-      // quantidade de incidentes), seguida do resumo de cada incidente.
-      const porCausaTabela = {};
-      linhasJustificativas.forEach(j => {
-        const c = j.causa || 'Não informado';
-        if(!porCausaTabela[c]) porCausaTabela[c] = [];
-        porCausaTabela[c].push(j);
-      });
-      const causasOrdenadasTabela = Object.keys(porCausaTabela).sort((a,b) => porCausaTabela[b].length - porCausaTabela[a].length);
-
-      let htmlJustificativas = '';
-      causasOrdenadasTabela.forEach(causaNome => {
-        const itensCausa = porCausaTabela[causaNome];
-        htmlJustificativas += `<tr style="background:rgba(94,52,181,.10);">
-          <td colspan="2" style="font-weight:700; color:${cor.text};">${escJust(causaNome)} <span class="mono" style="font-weight:400; color:${cor.muted}; font-size:11px;">(${itensCausa.length} incidente${itensCausa.length > 1 ? 's' : ''})</span></td>
-        </tr>`;
-        itensCausa.forEach(j => {
-          htmlJustificativas += `<tr>
-            <td class="mono">${escJust(j.incidente) || '—'}</td>
-            <td style="white-space:normal; line-height:1.4; cursor:help;" title="${escJust(j.fato)}">${escJust(trechoRelevante(j.fato))}</td>
-          </tr>`;
-        });
-      });
-      justificativasTextoBody.innerHTML = htmlJustificativas;
-    }
   }
 
   if(causaChart) causaChart.destroy();
