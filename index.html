@@ -4473,64 +4473,86 @@ if(kpiRow){
     <div class="kpi" style="${qtdAtrasados > 0 ? `border-color:${cor.bad}; box-shadow:0 0 0 2px ${cor.bad} inset;` : ''}"><div class="label">⚠️ Atrasados (&gt;5 dias)</div><div class="value" style="color:${qtdAtrasados > 0 ? cor.bad : cor.good}">${qtdAtrasados.toLocaleString('pt-BR')}</div></div>
   `;
 }
-  // ALTERADO: "Causa" agora considera TODOS os justificados (todos os
-  // meses, não só o mês selecionado acima), sem duplicar por incidente —
-  // ainda respeita os filtros de Supervisor/Causa/Ação da tela. Também
-  // acrescenta, como primeira barra, quantos incidentes já foram
-  // justificados no FCA mas depois saíram da fila de Indisponibilidade
-  // (Tipo reclassificado — ver painel "Preenchidos no FCA,
-  // reclassificados depois").
-  const justificadosUnicos = {};
-  PENDENTES_FCA.forEach(p => {
-    if(p.pendente) return;
-    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return;
-    if(causaFiltroAtual && norm(p.causa) !== causaFiltroAtual) return;
-    if(acaoFiltroAtual && norm(p.acao) !== acaoFiltroAtual) return;
-    const chave = p.incidente || JSON.stringify(p);
-    if(justificadosUnicos[chave]) return;
-    justificadosUnicos[chave] = p;
-  });
-
-  const causaCounts = {};
-  Object.values(justificadosUnicos).forEach(p => {
+  // ALTERADO: "Causa" volta a considerar só o MÊS selecionado acima
+  // (mesOrdAtual), mas agora como gráfico empilhado por causa: quantos
+  // incidentes com aquela causa "Ficaram" (continuam no Detalhamento —
+  // Fora do Prazo) vs quantos "Saíram de Indisponibilidade" (foram
+  // reclassificados depois de já terem Causa/Ação preenchida no FCA).
+  // Ex.: Vandalismo com 10 no total, 9 saíram, 1 ficou.
+  const causaFicouCounts = {};
+  justificadosDoMes.forEach(p => {
     const c = p.causa || 'Não informado';
-    causaCounts[c] = (causaCounts[c] || 0) + 1;
+    causaFicouCounts[c] = (causaFicouCounts[c] || 0) + 1;
   });
 
-  const reclassificadosUnicos = {};
+  const causaSaiuCounts = {};
   (FCA_TIPO_DIVERGENTE || []).forEach(p => {
-    if(!p.incidente) return;
+    if(p.mesOrd !== mesOrdAtual) return;
     if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return;
-    reclassificadosUnicos[p.incidente] = true;
+    const c = p.causa || 'Não informado';
+    causaSaiuCounts[c] = (causaSaiuCounts[c] || 0) + 1;
   });
-  const qtdReclassificados = Object.keys(reclassificadosUnicos).length;
 
-  let causaEntries = Object.entries(causaCounts).sort((a,b) => b[1]-a[1]).slice(0, 8);
-  if(qtdReclassificados > 0){
-    causaEntries = [['Saiu de Indisponibilidade (reclassificado)', qtdReclassificados], ...causaEntries];
-  }
+  const causasUnicas = Array.from(new Set([...Object.keys(causaFicouCounts), ...Object.keys(causaSaiuCounts)]));
+  const causaLabelsOrdenados = causasUnicas
+    .map(c => ({ causa: c, total: (causaFicouCounts[c] || 0) + (causaSaiuCounts[c] || 0) }))
+    .sort((a,b) => b.total - a.total)
+    .slice(0, 8)
+    .map(x => x.causa);
 
   if(causaChart) causaChart.destroy();
   const causaCanvas = document.getElementById('causaChart');
   if(causaCanvas){
+    const datasetFicou = {
+      label: 'Ficou',
+      data: causaLabelsOrdenados.map(c => causaFicouCounts[c] || 0),
+      backgroundColor: 'rgba(94,52,181,.75)', borderRadius: 4,
+      datalabels: {
+        display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
+        color: '#ffffff', anchor:'center', align:'center',
+        font: { size:10, family:'JetBrains Mono', weight:'700' }
+      }
+    };
+    const datasetSaiu = {
+      label: 'Saiu de Indisponibilidade',
+      data: causaLabelsOrdenados.map(c => causaSaiuCounts[c] || 0),
+      backgroundColor: cor.warn, borderRadius: 4,
+      datalabels: {
+        display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
+        color: '#ffffff', anchor:'center', align:'center',
+        font: { size:10, family:'JetBrains Mono', weight:'700' }
+      }
+    };
+    const datasetTotalCausa = {
+      label: 'Total',
+      data: causaLabelsOrdenados.map(() => 0),
+      backgroundColor: 'rgba(0,0,0,0)',
+      datalabels: {
+        anchor:'end', align:'right', offset:4,
+        color: cor.text, font:{size:11, family:'JetBrains Mono', weight:'700'},
+        formatter: (value, context) => (causaFicouCounts[causaLabelsOrdenados[context.dataIndex]] || 0) + (causaSaiuCounts[causaLabelsOrdenados[context.dataIndex]] || 0)
+      }
+    };
+
     causaChart = new Chart(causaCanvas, {
       type: 'bar',
       data: {
-        labels: causaEntries.map(e => e[0]),
-        datasets: [{
-          label: 'Ocorrências', data: causaEntries.map(e => e[1]),
-          backgroundColor: causaEntries.map((e,i) => (i === 0 && qtdReclassificados > 0) ? cor.warn : 'rgba(94,52,181,.75)'),
-          borderRadius: 4,
-          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
-        }]
+        labels: causaLabelsOrdenados,
+        datasets: [datasetFicou, datasetSaiu, datasetTotalCausa]
       },
       plugins: [ChartDataLabels],
       options: {
         indexAxis: 'y', responsive: true,
-        plugins: { legend: { display:false }, datalabels: { display:true } },
+        plugins: {
+          legend: {
+            labels:{ color: cor.muted, font:{family:'Inter', size:11} },
+            filter: (item) => item.text !== 'Total'
+          },
+          datalabels: { display:true }
+        },
         scales: {
-          x: { ticks:{color:cor.muted, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
-          y: { ticks:{color:cor.muted, font:{size:11, weight:'bold'}}, grid:{display:false} }
+          x: { stacked:true, ticks:{color:cor.muted, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
+          y: { stacked:true, ticks:{color:cor.muted, font:{size:11, weight:'bold'}}, grid:{display:false} }
         }
       }
     });
