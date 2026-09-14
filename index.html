@@ -4124,11 +4124,20 @@ function render(){
     // ALTERADO: agora soma só os últimos 3 meses (ex.: Jul/Ago/Set), não
     // o histórico inteiro — DADOS.meses vem ordenado cronologicamente,
     // então slice(-3) pega sempre os 3 meses mais recentes disponíveis.
+    // Usa "todosSites" (sem corte em 15) em vez de "topSites", senão um
+    // site que não entrasse no Top 15 de um dos meses ficava de fora
+    // daquele mês na soma, subcontando o total real do site. Cai pra
+    // "topSites" só se "todosSites" ainda não existir no dados.json
+    // (Office Script antigo).
     const ultimosTresMesesSites = DADOS.meses.slice(-3);
+
+    function sitesDoMes(m){
+      return Array.isArray(m.todosSites) ? m.todosSites : (Array.isArray(m.topSites) ? m.topSites : []);
+    }
 
     const somaPorSite = {};
     ultimosTresMesesSites.forEach(m => {
-      (Array.isArray(m.topSites) ? m.topSites : []).forEach(s => {
+      sitesDoMes(m).forEach(s => {
         somaPorSite[s.site] = (somaPorSite[s.site] || 0) + s.total;
       });
     });
@@ -4141,11 +4150,11 @@ function render(){
     const wrapRecorrentes = document.getElementById('sitesRecorrentesChartWrap');
     if(wrapRecorrentes) wrapRecorrentes.style.height = Math.max(alturaMinima, sitesOrdenados.length * alturaPorBarra) + 'px';
 
-    const mesesComSites = ultimosTresMesesSites.filter(m => Array.isArray(m.topSites) && m.topSites.length > 0);
+    const mesesComSites = ultimosTresMesesSites.filter(m => sitesDoMes(m).length > 0);
     const paletaMeses = [cor.accent, '#5e34b5', cor.warn, cor.good, '#2563eb'];
     const datasetsPorMes = mesesComSites.map((m, i) => {
       const mapaMes = {};
-      m.topSites.forEach(s => { mapaMes[s.site] = s.total; });
+      sitesDoMes(m).forEach(s => { mapaMes[s.site] = s.total; });
       return {
         label: m.mes,
         data: sitesOrdenados.map(site => mapaMes[site] || 0),
@@ -4464,12 +4473,42 @@ if(kpiRow){
     <div class="kpi" style="${qtdAtrasados > 0 ? `border-color:${cor.bad}; box-shadow:0 0 0 2px ${cor.bad} inset;` : ''}"><div class="label">⚠️ Atrasados (&gt;5 dias)</div><div class="value" style="color:${qtdAtrasados > 0 ? cor.bad : cor.good}">${qtdAtrasados.toLocaleString('pt-BR')}</div></div>
   `;
 }
+  // ALTERADO: "Causa" agora considera TODOS os justificados (todos os
+  // meses, não só o mês selecionado acima), sem duplicar por incidente —
+  // ainda respeita os filtros de Supervisor/Causa/Ação da tela. Também
+  // acrescenta, como primeira barra, quantos incidentes já foram
+  // justificados no FCA mas depois saíram da fila de Indisponibilidade
+  // (Tipo reclassificado — ver painel "Preenchidos no FCA,
+  // reclassificados depois").
+  const justificadosUnicos = {};
+  PENDENTES_FCA.forEach(p => {
+    if(p.pendente) return;
+    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return;
+    if(causaFiltroAtual && norm(p.causa) !== causaFiltroAtual) return;
+    if(acaoFiltroAtual && norm(p.acao) !== acaoFiltroAtual) return;
+    const chave = p.incidente || JSON.stringify(p);
+    if(justificadosUnicos[chave]) return;
+    justificadosUnicos[chave] = p;
+  });
+
   const causaCounts = {};
-  justificadosDoMes.forEach(p => {
+  Object.values(justificadosUnicos).forEach(p => {
     const c = p.causa || 'Não informado';
     causaCounts[c] = (causaCounts[c] || 0) + 1;
   });
-  const causaEntries = Object.entries(causaCounts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+
+  const reclassificadosUnicos = {};
+  (FCA_TIPO_DIVERGENTE || []).forEach(p => {
+    if(!p.incidente) return;
+    if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return;
+    reclassificadosUnicos[p.incidente] = true;
+  });
+  const qtdReclassificados = Object.keys(reclassificadosUnicos).length;
+
+  let causaEntries = Object.entries(causaCounts).sort((a,b) => b[1]-a[1]).slice(0, 8);
+  if(qtdReclassificados > 0){
+    causaEntries = [['Saiu de Indisponibilidade (reclassificado)', qtdReclassificados], ...causaEntries];
+  }
 
   if(causaChart) causaChart.destroy();
   const causaCanvas = document.getElementById('causaChart');
@@ -4480,7 +4519,8 @@ if(kpiRow){
         labels: causaEntries.map(e => e[0]),
         datasets: [{
           label: 'Ocorrências', data: causaEntries.map(e => e[1]),
-          backgroundColor: 'rgba(94,52,181,.75)', borderRadius: 4,
+          backgroundColor: causaEntries.map((e,i) => (i === 0 && qtdReclassificados > 0) ? cor.warn : 'rgba(94,52,181,.75)'),
+          borderRadius: 4,
           datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
         }]
       },
