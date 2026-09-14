@@ -408,7 +408,9 @@
         <div class="grid">
           <div class="panel">
             <h2>Causa</h2>
-            <canvas id="causaChart" height="180"></canvas>
+            <div id="causaChartWrap" style="position:relative; height:180px;">
+              <canvas id="causaChart"></canvas>
+            </div>
           </div>
           <div class="panel">
             <h2>Ação tomada</h2>
@@ -4512,14 +4514,16 @@ if(kpiRow){
   const causaLabelsOrdenados = causasUnicas
     .map(c => ({ causa: c, total: (causaFicouCounts[c] || 0) + (causaSaiuCounts[c] || 0) }))
     .sort((a,b) => b.total - a.total)
-    .slice(0, 8)
     .map(x => x.causa);
+
+  const causaWrap = document.getElementById('causaChartWrap');
+  if(causaWrap) causaWrap.style.height = Math.max(180, causaLabelsOrdenados.length * 30) + 'px';
 
   if(causaChart) causaChart.destroy();
   const causaCanvas = document.getElementById('causaChart');
   if(causaCanvas){
     const datasetFicou = {
-      label: 'Ficou',
+      label: 'Não reclassificação',
       data: causaLabelsOrdenados.map(c => causaFicouCounts[c] || 0),
       backgroundColor: 'rgba(94,52,181,.75)', borderRadius: 4,
       datalabels: {
@@ -4529,7 +4533,7 @@ if(kpiRow){
       }
     };
     const datasetSaiu = {
-      label: 'Saiu de Indisponibilidade',
+      label: 'Reclassificação',
       data: causaLabelsOrdenados.map(c => causaSaiuCounts[c] || 0),
       backgroundColor: cor.warn, borderRadius: 4,
       datalabels: {
@@ -4557,7 +4561,7 @@ if(kpiRow){
       },
       plugins: [ChartDataLabels],
       options: {
-        indexAxis: 'y', responsive: true,
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: {
             labels:{ color: cor.muted, font:{family:'Inter', size:11} },
