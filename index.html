@@ -4121,8 +4121,13 @@ function render(){
 
   const sitesRecorrentesCanvas = document.getElementById('sitesRecorrentesChart');
   if(sitesRecorrentesCanvas){
+    // ALTERADO: agora soma só os últimos 3 meses (ex.: Jul/Ago/Set), não
+    // o histórico inteiro — DADOS.meses vem ordenado cronologicamente,
+    // então slice(-3) pega sempre os 3 meses mais recentes disponíveis.
+    const ultimosTresMesesSites = DADOS.meses.slice(-3);
+
     const somaPorSite = {};
-    DADOS.meses.forEach(m => {
+    ultimosTresMesesSites.forEach(m => {
       (Array.isArray(m.topSites) ? m.topSites : []).forEach(s => {
         somaPorSite[s.site] = (somaPorSite[s.site] || 0) + s.total;
       });
@@ -4136,7 +4141,7 @@ function render(){
     const wrapRecorrentes = document.getElementById('sitesRecorrentesChartWrap');
     if(wrapRecorrentes) wrapRecorrentes.style.height = Math.max(alturaMinima, sitesOrdenados.length * alturaPorBarra) + 'px';
 
-    const mesesComSites = DADOS.meses.filter(m => Array.isArray(m.topSites) && m.topSites.length > 0);
+    const mesesComSites = ultimosTresMesesSites.filter(m => Array.isArray(m.topSites) && m.topSites.length > 0);
     const paletaMeses = [cor.accent, '#5e34b5', cor.warn, cor.good, '#2563eb'];
     const datasetsPorMes = mesesComSites.map((m, i) => {
       const mapaMes = {};
@@ -4146,23 +4151,50 @@ function render(){
         data: sitesOrdenados.map(site => mapaMes[site] || 0),
         backgroundColor: paletaMeses[i % paletaMeses.length],
         borderRadius: 4,
-        datalabels: { display:false }
+        datalabels: {
+          display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
+          color: '#ffffff', anchor:'center', align:'center',
+          font: { size:10, family:'JetBrains Mono', weight:'700' },
+          formatter: v => v
+        }
       };
     });
+
+    // NOVO: dataset invisível (largura zero) só pra desenhar o TOTAL de
+    // cada site logo depois da última barra empilhada, igual ao segundo
+    // gráfico de referência — soma os valores dos meses reais naquele
+    // índice e mostra o número à direita da barra.
+    const totalDatasetSites = {
+      label: 'Total',
+      data: sitesOrdenados.map(() => 0),
+      backgroundColor: 'rgba(0,0,0,0)',
+      datalabels: {
+        anchor: 'end', align: 'right', offset: 4,
+        color: cor.text, font: { size:11, family:'JetBrains Mono', weight:'700' },
+        formatter: (value, context) => {
+          let total = 0;
+          datasetsPorMes.forEach(ds => { total += ds.data[context.dataIndex] || 0; });
+          return total;
+        }
+      }
+    };
 
     if(sitesRecorrentesChart) sitesRecorrentesChart.destroy();
     sitesRecorrentesChart = new Chart(sitesRecorrentesCanvas, {
       type: 'bar',
       data: {
         labels: sitesOrdenados,
-        datasets: datasetsPorMes
+        datasets: [...datasetsPorMes, totalDatasetSites]
       },
       plugins: [ChartDataLabels],
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: {
-          legend: { labels:{ color: cor.muted, font:{family:'Inter', size:10} } },
-          datalabels: { display:false }
+          legend: {
+            labels:{ color: cor.muted, font:{family:'Inter', size:10} },
+            filter: (item) => item.text !== 'Total'
+          },
+          datalabels: { display:true }
         },
         scales: {
           x: { stacked:true, ticks:{color:cor.muted, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
