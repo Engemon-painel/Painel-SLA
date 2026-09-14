@@ -408,6 +408,7 @@
         <div class="grid">
           <div class="panel">
             <h2>Causa</h2>
+            <div id="causaTotalLabel" class="mono" style="font-size:12px; color:var(--muted); margin:2px 0 12px;"></div>
             <div id="causaChartWrap" style="position:relative; height:180px;">
               <canvas id="causaChart"></canvas>
             </div>
@@ -4518,6 +4519,18 @@ if(kpiRow){
 
   const causaWrap = document.getElementById('causaChartWrap');
   if(causaWrap) causaWrap.style.height = Math.max(180, causaLabelsOrdenados.length * 30) + 'px';
+
+  // Total analisado e preenchido = soma de "Não reclassificação" +
+  // "Reclassificação" (todo mundo que já teve Causa/Ação preenchida no
+  // FCA nesse mês, dedupe por incidente já aplicado acima).
+  const causaTotalLabelEl = document.getElementById('causaTotalLabel');
+  if(causaTotalLabelEl){
+    const totalNaoReclassificado = Object.values(causaFicouCounts).reduce((a,b) => a+b, 0);
+    const totalReclassificado = Object.values(causaSaiuCounts).reduce((a,b) => a+b, 0);
+    const totalCausaGeral = totalNaoReclassificado + totalReclassificado;
+    causaTotalLabelEl.textContent = 'Total analisado e preenchido: ' + totalCausaGeral.toLocaleString('pt-BR') +
+      ' (' + totalNaoReclassificado.toLocaleString('pt-BR') + ' não reclassificação / ' + totalReclassificado.toLocaleString('pt-BR') + ' reclassificação)';
+  }
 
   if(causaChart) causaChart.destroy();
   const causaCanvas = document.getElementById('causaChart');
