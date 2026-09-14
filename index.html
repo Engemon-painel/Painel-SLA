@@ -1593,10 +1593,18 @@ function renderHeadcount(){
     return meses8.findIndex(m => m.ano === ano && m.mes === mes);
   }
 
-  // CORRIGIDO: esses dois gráficos (Admitidos x Demitidos / Evolução da
-  // Equipe) ficam FIXOS no contrato CLARO — travado aqui e independente
-  // do que o usuário selecionar nos filtros de Contrato/Status acima.
+  // CORRIGIDO: esses dois gráficos ficam FIXOS no contrato CLARO —
+  // travado aqui e independente do que o usuário selecionar nos filtros
+  // de Contrato/Status acima. Usam bases DIFERENTES de propósito:
+  //  - Admitidos x Demitidos: todo mundo do CLARO (ativos e inativos),
+  //    pra contar as saídas corretamente.
+  //  - Evolução da Equipe: só quem está Ativo HOJE no CLARO — ignora
+  //    completamente quem já saiu (não tenta reconstruir o histórico via
+  //    data de demissão), só olha desse grupo atual quantos já tinham
+  //    sido admitidos até o fechamento de cada mês. Isso é sempre
+  //    crescente (nunca cai por causa de demissão).
   const baseFixaClaro = COLABORADORES.filter(c => canonContratoHc(c.contrato) === 'CLARO');
+  const baseFixaClaroAtivosHoje = baseFixaClaro.filter(c => c.ativo);
 
   baseFixaClaro.forEach(c => {
     const iAdm = indexDoMesHc(c.dataAdmis);
@@ -1607,19 +1615,12 @@ function renderHeadcount(){
 
   // evolucaoDados (headcount ativo no fechamento de cada mês) precisa ser
   // calculado ANTES do gráfico Admitidos x Demitidos, porque o turnover
-  // (linha adicionada nesse mesmo gráfico) depende dele. Usa a mesma base
-  // fixa (CLARO) e mantém a proteção contra dado incompleto: se a Dt.
-  // Demissao estiver vazia MAS o Status atual já é Inativo, a pessoa não
-  // conta como ativa em nenhum mês (evita inflar o headcount por causa de
-  // desligamento sem data lançada na planilha).
+  // (linha adicionada nesse mesmo gráfico) depende dele.
   const evolucaoDados = meses8.map(m => {
     const fimDoMes = new Date(m.ano, m.mes + 1, 0);
     const fimIso = fimDoMes.getFullYear() + '-' + pad2hc(fimDoMes.getMonth()+1) + '-' + pad2hc(fimDoMes.getDate());
-    return baseFixaClaro.filter(c => {
-      if(!c.dataAdmis || c.dataAdmis > fimIso) return false;
-      if(c.dataDemissao && c.dataDemissao <= fimIso) return false;
-      if(!c.dataDemissao && !c.ativo) return false;
-      return true;
+    return baseFixaClaroAtivosHoje.filter(c => {
+      return c.dataAdmis && c.dataAdmis <= fimIso;
     }).length;
   });
 
