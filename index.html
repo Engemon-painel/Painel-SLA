@@ -356,6 +356,15 @@
 
       <div class="panel">
         <h2>Incidentes por Site</h2>
+        <div style="margin:0 0 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="incidentesPorSiteFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Mostrar</label>
+          <select id="incidentesPorSiteFiltro" class="mono" onchange="filtrarIncidentesPorSite(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:220px;">
+            <option value="com">Com Afaz ou Preventiva</option>
+            <option value="afaz">Somente com Afaz</option>
+            <option value="preventiva">Somente com Preventiva</option>
+            <option value="todos">Todos os incidentes</option>
+          </select>
+        </div>
         <table>
           <thead>
             <tr><th>Site</th><th>Incidente</th><th>Status</th><th>Afaz</th><th>Preventiva</th></tr>
@@ -950,6 +959,7 @@ let FROTA = [];
 let VAGAS = [];
 let BANCO_HORAS = [];
 let INCIDENTES_POR_SITE = [];
+let incidentesPorSiteFiltroAtual = 'com';
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
@@ -994,6 +1004,11 @@ let hcStatusFiltroAtual = '';
 function filtrarPorStatusHc(valor){
   hcStatusFiltroAtual = valor;
   renderHeadcount();
+}
+
+function filtrarIncidentesPorSite(valor){
+  incidentesPorSiteFiltroAtual = valor;
+  if(typeof render === 'function') render();
 }
 
 // ---- Navegação por páginas (menu lateral) ----
@@ -4114,10 +4129,18 @@ function render(){
     const anoCurtoSite = mesObj.mes.split('/')[1];
     const mesOrdSite = anoCurtoSite && mmSite ? ('20' + anoCurtoSite + '-' + mmSite) : null;
 
+    function temValor(v){ return v !== undefined && v !== null && String(v).trim() !== ''; }
+
     const itensSite = (INCIDENTES_POR_SITE || []).filter(it => {
       if(!it) return false;
       if(mesOrdSite !== null && it.mesOrd !== mesOrdSite) return false;
       if(areaNames.indexOf(it.area) === -1) return false;
+      const temAfaz = temValor(it.afaz);
+      const temPreventiva = temValor(it.preventiva);
+      if(incidentesPorSiteFiltroAtual === 'afaz' && !temAfaz) return false;
+      if(incidentesPorSiteFiltroAtual === 'preventiva' && !temPreventiva) return false;
+      if(incidentesPorSiteFiltroAtual === 'com' && !temAfaz && !temPreventiva) return false;
+      // 'todos' não filtra nada
       return true;
     }).sort((a,b) => (a.site || '').localeCompare(b.site || '', 'pt-BR'));
 
