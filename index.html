@@ -349,9 +349,19 @@
           <canvas id="genericTier3Chart" height="200"></canvas>
         </div>
       </div>
-      <div class="panel">
+      <div class="panel" style="margin-bottom:16px;">
         <h2>Resolução (Top 10)</h2>
         <canvas id="resolucaoChart" height="200"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2>Incidentes por Site</h2>
+        <table>
+          <thead>
+            <tr><th>Site</th><th>Incidente</th><th>Status</th><th>Afaz</th><th>Preventiva</th></tr>
+          </thead>
+          <tbody id="incidentesPorSiteBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -939,6 +949,7 @@ let COLABORADORES = [];
 let FROTA = [];
 let VAGAS = [];
 let BANCO_HORAS = [];
+let INCIDENTES_POR_SITE = [];
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
 let statusFiltroAtual = '';
@@ -1103,6 +1114,7 @@ async function carregarDados(){
     FROTA = data.frota || [];
     VAGAS = data.vagas || [];
     BANCO_HORAS = data.bancoHoras || [];
+    INCIDENTES_POR_SITE = data.incidentesPorSite || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
@@ -4086,6 +4098,42 @@ function render(){
           <td class="num">${c.sites}</td>
           <td class="num">${mttrTxt}</td>
           <td class="num"><span class="pill ${cls}">${eserPct}%</span></td>
+        </tr>`;
+      }).join('');
+    }
+  }
+
+  // ---- Incidentes por Site (mês selecionado) ----
+  // Usa INCIDENTES_POR_SITE (do dados.json), filtrado pelo mesmo mesOrd
+  // do mês selecionado nos chips e pelas áreas válidas do mês (mesmo
+  // padrão de renderPendenciasFca), ordenado por Site.
+  const incidentesPorSiteBody = document.getElementById('incidentesPorSiteBody');
+  if(incidentesPorSiteBody){
+    const nomeMesSite = mesObj.mes.split('/')[0];
+    const mmSite = NOME_MES[nomeMesSite];
+    const anoCurtoSite = mesObj.mes.split('/')[1];
+    const mesOrdSite = anoCurtoSite && mmSite ? ('20' + anoCurtoSite + '-' + mmSite) : null;
+
+    const itensSite = (INCIDENTES_POR_SITE || []).filter(it => {
+      if(!it) return false;
+      if(mesOrdSite !== null && it.mesOrd !== mesOrdSite) return false;
+      if(areaNames.indexOf(it.area) === -1) return false;
+      return true;
+    }).sort((a,b) => (a.site || '').localeCompare(b.site || '', 'pt-BR'));
+
+    if(itensSite.length === 0){
+      incidentesPorSiteBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum incidente encontrado para este mês</td></tr>`;
+    } else {
+      incidentesPorSiteBody.innerHTML = itensSite.map(it => {
+        const statusPill = it.eser4h === 'Fora'
+          ? `<span class="pill bad">Fora</span>`
+          : (it.eser4h === 'Dentro' ? `<span class="pill good">Dentro</span>` : '—');
+        return `<tr>
+          <td>${it.site || '—'}</td>
+          <td>${it.incidente || '—'}</td>
+          <td>${statusPill}</td>
+          <td>${it.afaz || '—'}</td>
+          <td>${it.preventiva || '—'}</td>
         </tr>`;
       }).join('');
     }
