@@ -472,7 +472,7 @@
 
         <div class="panel" style="margin-top:16px;">
           <h2>Causa × Ação Interna — Sugestão de Plano de Ação</h2>
-          <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Agrupa os incidentes preenchidos por Causa e Ação Interna. A sugestão é gerada automaticamente a partir da ação mais repetida em "Ação tomada" dentro de cada grupo — não é uma análise de texto por IA, é uma contagem de repetição.</p>
+          <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Agrupa os incidentes preenchidos por Causa e Ação Interna. A sugestão é gerada automaticamente a partir da descrição de "Ação tomada" mais repetida dentro de cada grupo — não é uma análise de texto por IA, é uma contagem de repetição. Requer que o campo "acaoTomada" esteja disponível no fcaJson.</p>
           <table>
             <thead>
               <tr><th>Causa</th><th>Ação Interna</th><th class="num">Qtd</th><th>Sugestão de Plano de Ação</th></tr>
@@ -4421,24 +4421,32 @@ function renderPendenciasFca(){
         gruposCausaAcaoInterna[chaveGrupo] = { causa: causaVal, acaoInterna: acaoInternaVal, qtd: 0, acoesTomadas: {} };
       }
       gruposCausaAcaoInterna[chaveGrupo].qtd++;
-      const acaoTomadaVal = norm(p.acao) || 'Não informado';
-      gruposCausaAcaoInterna[chaveGrupo].acoesTomadas[acaoTomadaVal] = (gruposCausaAcaoInterna[chaveGrupo].acoesTomadas[acaoTomadaVal] || 0) + 1;
+      // ALTERADO (item 24): a sugestão usa o texto longo de "Ação tomada"
+      // (campo acaoTomada), não mais o valor categórico da Ação Interna.
+      // Enquanto o Power Automate não enviar esse campo, fica vazio e é
+      // ignorado na contagem (tratado à parte, ver "semDescricao" abaixo).
+      const acaoTomadaVal = norm(p.acaoTomada);
+      if(acaoTomadaVal !== ''){
+        gruposCausaAcaoInterna[chaveGrupo].acoesTomadas[acaoTomadaVal] = (gruposCausaAcaoInterna[chaveGrupo].acoesTomadas[acaoTomadaVal] || 0) + 1;
+      }
     });
 
     function gerarSugestaoPlano(grupo){
       const entradasAcoes = Object.entries(grupo.acoesTomadas).sort((a,b) => b[1] - a[1]);
-      if(entradasAcoes.length === 0) return 'Sem dados suficientes.';
-      const [acaoMaisComum, qtdMaisComum] = entradasAcoes[0];
-      const totalDoGrupo = grupo.qtd;
-      if(entradasAcoes.length === 1){
-        return 'Padronizar como procedimento: "' + acaoMaisComum + '" — ação única aplicada em todos os ' + totalDoGrupo + ' caso(s) deste grupo.';
+      if(entradasAcoes.length === 0){
+        return 'Sem descrição de "Ação tomada" disponível — atualize o fluxo do Power Automate pra enviar esse campo (acaoTomada) no FCA.';
       }
-      const pctMaisComum = (qtdMaisComum / totalDoGrupo * 100).toFixed(0);
-      if((qtdMaisComum / totalDoGrupo) >= 0.5){
-        return 'Formalizar "' + acaoMaisComum + '" como plano padrão (usada em ' + pctMaisComum + '% dos casos) e revisar os demais casos pontuais.';
+      const totalComDescricao = entradasAcoes.reduce((soma, e) => soma + e[1], 0);
+      const [acaoMaisComum, qtdMaisComum] = entradasAcoes[0];
+      if(entradasAcoes.length === 1){
+        return 'Padronizar como procedimento: "' + acaoMaisComum + '" — ação única aplicada em todos os ' + totalComDescricao + ' caso(s) deste grupo com descrição.';
+      }
+      const pctMaisComum = (qtdMaisComum / totalComDescricao * 100).toFixed(0);
+      if((qtdMaisComum / totalComDescricao) >= 0.5){
+        return 'Formalizar "' + acaoMaisComum + '" como plano padrão (usada em ' + pctMaisComum + '% dos casos com descrição) e revisar os demais casos pontuais.';
       }
       const topDuasAcoes = entradasAcoes.slice(0, 2).map(e => e[0]).join('" e "');
-      return 'Ações dispersas (' + entradasAcoes.length + ' variações diferentes) — recomenda-se padronizar um procedimento único, priorizando as ações mais usadas: "' + topDuasAcoes + '".';
+      return 'Ações dispersas (' + entradasAcoes.length + ' descrições diferentes) — recomenda-se padronizar um procedimento único, priorizando as mais usadas: "' + topDuasAcoes + '".';
     }
 
     function escCausaAcaoInterna(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
