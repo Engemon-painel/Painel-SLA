@@ -432,13 +432,45 @@
               <canvas id="causaChart"></canvas>
             </div>
           </div>
-          <div class="panel">
-            <h2>Ação tomada</h2>
-            <canvas id="acaoChart" height="180"></canvas>
-          </div>
+          <div class="panel" style="margin-bottom:16px;">
+          <h2>Ação tomada</h2>
+          <canvas id="acaoChart" height="180"></canvas>
         </div>
+      </div>
 
-        <div class="panel" style="margin-bottom:16px;">
+      <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
+      <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
+        <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
+          <option value="">Todos</option>
+        </select>
+        <label for="statusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
+        <select id="statusFiltro" class="mono" onchange="filtrarPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+          <option value="">Todos</option>
+          <option value="pendente">A preencher</option>
+          <option value="preenchido">Preenchido</option>
+        </select>
+        <label for="causaFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Causa</label>
+        <select id="causaFiltro" class="mono" onchange="filtrarPorCausa(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:180px;">
+          <option value="">Todas</option>
+        </select>
+        <label for="acaoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Ação</label>
+        <select id="acaoFiltro" class="mono" onchange="filtrarPorAcao(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:180px;">
+          <option value="">Todas</option>
+        </select>
+        <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="link-base" style="cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
+          <button type="button" class="link-base" style="cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPendenteCsv()">⬇ Exportar A Preencher (CSV)</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Status</th><th>Causa</th><th>Ação</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
+        </thead>
+        <tbody id="pendenciasBody"></tbody>
+      </table>
+
+        <div class="panel" style="margin-top:16px;">
           <h2>Causa × Ação Interna — Sugestão de Plano de Ação</h2>
           <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Agrupa os incidentes preenchidos por Causa e Ação Interna. A sugestão é gerada automaticamente a partir da ação mais repetida em "Ação tomada" dentro de cada grupo — não é uma análise de texto por IA, é uma contagem de repetição.</p>
           <table>
@@ -448,38 +480,6 @@
             <tbody id="causaAcaoInternaBody"></tbody>
           </table>
         </div>
-
-        <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
-        <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
-          <select id="supervisorFiltro" class="mono" onchange="filtrarPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
-            <option value="">Todos</option>
-          </select>
-          <label for="statusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
-          <select id="statusFiltro" class="mono" onchange="filtrarPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
-            <option value="">Todos</option>
-            <option value="pendente">A preencher</option>
-            <option value="preenchido">Preenchido</option>
-          </select>
-          <label for="causaFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Causa</label>
-          <select id="causaFiltro" class="mono" onchange="filtrarPorCausa(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:180px;">
-            <option value="">Todas</option>
-          </select>
-          <label for="acaoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Ação</label>
-          <select id="acaoFiltro" class="mono" onchange="filtrarPorAcao(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:180px;">
-            <option value="">Todas</option>
-          </select>
-          <div style="margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="link-base" style="cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPreenchidoCsv()">⬇ Exportar Preenchidos (CSV)</button>
-            <button type="button" class="link-base" style="cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" onclick="exportarFcaPendenteCsv()">⬇ Exportar A Preencher (CSV)</button>
-          </div>
-        </div>
-        <table>
-          <thead>
-            <tr><th>Supervisor</th><th>Área</th><th>Site</th><th>Incidente</th><th>Status</th><th>Causa</th><th>Ação</th><th>Submit</th><th>Clear</th><th>Resolved</th><th></th></tr>
-          </thead>
-          <tbody id="pendenciasBody"></tbody>
-        </table>
       </div>
     </div>
 
