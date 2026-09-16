@@ -287,7 +287,7 @@
         <h2>Detalhe por Área — mês selecionado</h2>
         <table>
           <thead>
-            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th><th class="num">Volume Projetado</th><th class="num">Δ vs Mês Anterior</th><th class="num">Aderência necessária</th><th class="num">Pode perder / dia</th><th class="num">Pode perder / mês</th></tr>
+            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th><th class="num" style="white-space:nowrap;">Volume Projetado</th><th class="num" style="white-space:nowrap;">Δ vs Mês Anterior</th><th class="num" style="white-space:nowrap;">Aderência necessária</th><th class="num" style="white-space:nowrap;">Pode perder / dia</th><th class="num" style="white-space:nowrap;">Pode perder / mês</th></tr>
           </thead>
           <tbody id="tableBody"></tbody>
         </table>
@@ -4459,11 +4459,11 @@ function render(){
       <td class="num">${d.dentro}</td>
       <td class="num">${d.fora}</td>
       <td class="num"><span class="pill ${cls}">${(p*100).toFixed(1)}%</span></td>
-      <td class="num">${volumeProjetadoTxt}</td>
-      <td class="num">${diffMesAnteriorTxt}</td>
-      <td class="num">${aderenciaTxt}</td>
-      <td class="num">${podePerderDiaTxt}</td>
-      <td class="num">${podePerderMesTxt}</td>
+      <td class="num" style="white-space:nowrap;">${volumeProjetadoTxt}</td>
+      <td class="num" style="white-space:nowrap;">${diffMesAnteriorTxt}</td>
+      <td class="num" style="white-space:nowrap;">${aderenciaTxt}</td>
+      <td class="num" style="white-space:nowrap;">${podePerderDiaTxt}</td>
+      <td class="num" style="white-space:nowrap;">${podePerderMesTxt}</td>
     </tr>`;
   }).join('');
 
