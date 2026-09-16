@@ -287,7 +287,7 @@
         <h2>Detalhe por Área — mês selecionado</h2>
         <table>
           <thead>
-            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th><th class="num">Aderência necessária</th><th class="num">Pode perder / dia</th><th class="num">Pode perder / mês</th></tr>
+            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th><th class="num">Volume Projetado</th><th class="num">Δ vs Mês Anterior</th><th class="num">Aderência necessária</th><th class="num">Pode perder / dia</th><th class="num">Pode perder / mês</th></tr>
           </thead>
           <tbody id="tableBody"></tbody>
         </table>
@@ -1335,7 +1335,8 @@ function calcularNecessarioMetaArea(mesObj, area, metaPct){
   const jaGarantido = proj.dentroAtual >= dentroNecessario;
   return {
     temProjecao: true, foraToleravel, foraToleravelPorDia, aderenciaNecessaria,
-    jaGarantido, restantesProjetados, diasRestantes: proj.diasRestantes
+    jaGarantido, restantesProjetados, diasRestantes: proj.diasRestantes,
+    totalProjetado: proj.totalFinal // NOVO: volume total projetado pra área no mês
   };
 }
 
@@ -4414,7 +4415,9 @@ function render(){
     let aderenciaTxt = '—';
     let podePerderDiaTxt = '—';
     let podePerderMesTxt = '—';
+    let volumeProjetadoTxt = '—';
     if(rMetaArea.temProjecao){
+      volumeProjetadoTxt = rMetaArea.totalProjetado.toLocaleString('pt-BR');
       if(rMetaArea.jaGarantido){
         aderenciaTxt = '<span class="pill good">✅ Garantida</span>';
         podePerderDiaTxt = '—';
@@ -4425,12 +4428,32 @@ function render(){
         podePerderMesTxt = '<span class="mono">' + rMetaArea.foraToleravel.toLocaleString('pt-BR') + '</span> de ' + rMetaArea.restantesProjetados.toLocaleString('pt-BR') + ' rest.';
       }
     }
+
+    // NOVO: diferença do volume projetado da área vs o total FECHADO da
+    // mesma área no mês anterior (se existir na base).
+    let diffMesAnteriorTxt = '—';
+    if(mesAnteriorObj){
+      const dAnterior = areasValidas(mesAnteriorObj.areas)[a];
+      if(dAnterior){
+        const totalAnterior = dAnterior.dentro + dAnterior.fora;
+        const totalComparar = rMetaArea.temProjecao ? rMetaArea.totalProjetado : total;
+        const diff = totalComparar - totalAnterior;
+        const diffPct = totalAnterior > 0 ? (diff / totalAnterior * 100) : null;
+        const corDiff = diff > 0 ? cor.bad : (diff < 0 ? cor.good : cor.muted);
+        const seta = diff > 0 ? '▲' : (diff < 0 ? '▼' : '—');
+        const diffPctTxt = diffPct !== null ? ' (' + (diffPct>=0?'+':'') + diffPct.toFixed(0) + '%)' : '';
+        diffMesAnteriorTxt = '<span style="color:' + corDiff + '; font-weight:600;">' + seta + ' ' + (diff>=0?'+':'') + diff + diffPctTxt + '</span>';
+      }
+    }
+
     return `<tr>
       <td>${a}</td>
       <td class="num">${total}</td>
       <td class="num">${d.dentro}</td>
       <td class="num">${d.fora}</td>
       <td class="num"><span class="pill ${cls}">${(p*100).toFixed(1)}%</span></td>
+      <td class="num">${volumeProjetadoTxt}</td>
+      <td class="num">${diffMesAnteriorTxt}</td>
       <td class="num">${aderenciaTxt}</td>
       <td class="num">${podePerderDiaTxt}</td>
       <td class="num">${podePerderMesTxt}</td>
