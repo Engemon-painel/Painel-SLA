@@ -438,6 +438,17 @@
           </div>
         </div>
 
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Causa × Ação Interna — Sugestão de Plano de Ação</h2>
+          <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Agrupa os incidentes preenchidos por Causa e Ação Interna. A sugestão é gerada automaticamente a partir da ação mais repetida em "Ação tomada" dentro de cada grupo — não é uma análise de texto por IA, é uma contagem de repetição.</p>
+          <table>
+            <thead>
+              <tr><th>Causa</th><th>Ação Interna</th><th class="num">Qtd</th><th>Sugestão de Plano de Ação</th></tr>
+            </thead>
+            <tbody id="causaAcaoInternaBody"></tbody>
+          </table>
+        </div>
+
         <h2 style="margin-top:20px;">Detalhamento — Fora do Prazo</h2>
         <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <label for="supervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
@@ -4394,6 +4405,58 @@ function renderPendenciasFca(){
     return true;
   });
   const justificadosDoMes = itensFiltrados.filter(p => !p.pendente);
+
+  // NOVO (item 23): agrupa os incidentes preenchidos do mês por
+  // Causa + Ação Interna, e sugere um plano de ação com base na ação
+  // (coluna "Ação tomada") mais repetida dentro de cada grupo. É uma
+  // contagem de repetição de texto, não uma análise semântica.
+  const causaAcaoInternaBody = document.getElementById('causaAcaoInternaBody');
+  if(causaAcaoInternaBody){
+    const gruposCausaAcaoInterna = {};
+    justificadosDoMes.forEach(p => {
+      const causaVal = norm(p.causa) || 'Não informado';
+      const acaoInternaVal = norm(p.acaoInterna) || 'Não informado';
+      const chaveGrupo = causaVal + '|||' + acaoInternaVal;
+      if(!gruposCausaAcaoInterna[chaveGrupo]){
+        gruposCausaAcaoInterna[chaveGrupo] = { causa: causaVal, acaoInterna: acaoInternaVal, qtd: 0, acoesTomadas: {} };
+      }
+      gruposCausaAcaoInterna[chaveGrupo].qtd++;
+      const acaoTomadaVal = norm(p.acao) || 'Não informado';
+      gruposCausaAcaoInterna[chaveGrupo].acoesTomadas[acaoTomadaVal] = (gruposCausaAcaoInterna[chaveGrupo].acoesTomadas[acaoTomadaVal] || 0) + 1;
+    });
+
+    function gerarSugestaoPlano(grupo){
+      const entradasAcoes = Object.entries(grupo.acoesTomadas).sort((a,b) => b[1] - a[1]);
+      if(entradasAcoes.length === 0) return 'Sem dados suficientes.';
+      const [acaoMaisComum, qtdMaisComum] = entradasAcoes[0];
+      const totalDoGrupo = grupo.qtd;
+      if(entradasAcoes.length === 1){
+        return 'Padronizar como procedimento: "' + acaoMaisComum + '" — ação única aplicada em todos os ' + totalDoGrupo + ' caso(s) deste grupo.';
+      }
+      const pctMaisComum = (qtdMaisComum / totalDoGrupo * 100).toFixed(0);
+      if((qtdMaisComum / totalDoGrupo) >= 0.5){
+        return 'Formalizar "' + acaoMaisComum + '" como plano padrão (usada em ' + pctMaisComum + '% dos casos) e revisar os demais casos pontuais.';
+      }
+      const topDuasAcoes = entradasAcoes.slice(0, 2).map(e => e[0]).join('" e "');
+      return 'Ações dispersas (' + entradasAcoes.length + ' variações diferentes) — recomenda-se padronizar um procedimento único, priorizando as ações mais usadas: "' + topDuasAcoes + '".';
+    }
+
+    function escCausaAcaoInterna(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    const gruposOrdenadosCausaAcaoInterna = Object.values(gruposCausaAcaoInterna).sort((a,b) => b.qtd - a.qtd);
+
+    if(gruposOrdenadosCausaAcaoInterna.length === 0){
+      causaAcaoInternaBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:${cor.muted};">Nenhum incidente preenchido neste mês</td></tr>`;
+    } else {
+      causaAcaoInternaBody.innerHTML = gruposOrdenadosCausaAcaoInterna.map(grupo => `<tr>
+        <td>${escCausaAcaoInterna(grupo.causa)}</td>
+        <td>${escCausaAcaoInterna(grupo.acaoInterna)}</td>
+        <td class="num">${grupo.qtd}</td>
+        <td>${escCausaAcaoInterna(gerarSugestaoPlano(grupo))}</td>
+      </tr>`).join('');
+    }
+  }
+
 
   const badge = document.getElementById('fcaCountNav');
   if(badge) badge.textContent = pendentesDoMes.length > 0 ? '(' + pendentesDoMes.length + ')' : '';
