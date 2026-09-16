@@ -472,10 +472,10 @@
 
         <div class="panel" style="margin-top:16px;">
           <h2>Causa × Ação Interna — Sugestão de Plano de Ação</h2>
-          <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Agrupa os incidentes preenchidos por Causa e Ação Interna. A sugestão é gerada automaticamente a partir da descrição de "Ação tomada" mais repetida dentro de cada grupo — não é uma análise de texto por IA, é uma contagem de repetição. Requer que o campo "acaoTomada" esteja disponível no fcaJson.</p>
+          <p style="font-size:12px; color:var(--muted); margin:0 0 12px;">Agrupa os incidentes preenchidos por Causa e Ação Interna. Mostra os termos mais citados em "Ação tomada" dentro de cada grupo e um trecho curto da ação mais recorrente — é um resumo por repetição de palavras, não uma análise de texto por IA. Requer que o campo "acaoTomada" esteja disponível no fcaJson.</p>
           <table>
             <thead>
-              <tr><th>Causa</th><th>Ação Interna</th><th class="num">Qtd</th><th>Sugestão de Plano de Ação</th></tr>
+              <tr><th>Causa</th><th>Ação Interna</th><th class="num">Qtd</th><th style="max-width:420px;">Sugestão de Plano de Ação</th></tr>
             </thead>
             <tbody id="causaAcaoInternaBody"></tbody>
           </table>
@@ -4436,17 +4436,57 @@ function renderPendenciasFca(){
       if(entradasAcoes.length === 0){
         return 'Sem descrição de "Ação tomada" disponível — atualize o fluxo do Power Automate pra enviar esse campo (acaoTomada) no FCA.';
       }
+
+      // ALTERADO: em vez de citar o texto INTEIRO de "Ação tomada" (o que
+      // deixava a coluna enorme e ilegível quando os textos eram longos e
+      // variados), agora: (1) extrai as palavras mais citadas no grupo
+      // (ignorando palavras de ligação) como um resumo dos temas mais
+      // comuns, e (2) mostra só um TRECHO CURTO (truncado) da ação mais
+      // recorrente como exemplo — não a frase completa.
+      const STOPWORDS_PT = new Set([
+        'a','o','as','os','de','da','do','das','dos','em','no','na','nos','nas','um','uma','uns','umas',
+        'e','ou','que','se','foi','foram','ser','sera','sido','esta','estava','nao','ao','aos',
+        'com','sem','por','para','pra','ate','entre','sobre','apos','antes','durante',
+        'ja','mais','muito','pouco','todo','toda','todos','todas','sua','seu','suas','seus',
+        'este','esse','essa','isso','isto','aquele','aquela','tambem','ainda','apenas',
+        'quando','onde','como','porque','pois','assim','entao','depois','sendo','tendo','ter','teve',
+        'houve','houvesse','pode','podem','poderia','deve','devem','deveria','realizado','realizada',
+        'incidente','site','equipe','tecnico','tecnica','sla','noc','dia','horas','hora','minutos',
+        'foram','sido','apenas','desde','sem','nao','pelo','pela','pelos','pelas','num','numa'
+      ]);
+
+      function truncarTexto(t, max){
+        const s = String(t || '').trim();
+        if(s.length <= max) return s;
+        return s.slice(0, max).trim() + '…';
+      }
+
+      function extrairPalavrasChave(textos, limite){
+        const contagem = {};
+        textos.forEach(t => {
+          const palavras = semAcentoHc(t).split(/[^a-z0-9]+/).filter(Boolean);
+          palavras.forEach(p => {
+            if(p.length < 4 || STOPWORDS_PT.has(p)) return;
+            contagem[p] = (contagem[p] || 0) + 1;
+          });
+        });
+        return Object.entries(contagem).sort((a,b) => b[1] - a[1]).slice(0, limite).map(e => e[0]);
+      }
+
       const totalComDescricao = entradasAcoes.reduce((soma, e) => soma + e[1], 0);
-      const [acaoMaisComum, qtdMaisComum] = entradasAcoes[0];
+      const palavrasChave = extrairPalavrasChave(Object.keys(grupo.acoesTomadas), 4);
+      const kwTexto = palavrasChave.length ? ('Termos mais citados: ' + palavrasChave.join(', ') + '.') : '';
+      const [textoMaisComum, qtdMaisComum] = entradasAcoes[0];
+      const exemplo = truncarTexto(textoMaisComum, 100);
+
       if(entradasAcoes.length === 1){
-        return 'Padronizar como procedimento: "' + acaoMaisComum + '" — ação única aplicada em todos os ' + totalComDescricao + ' caso(s) deste grupo com descrição.';
+        return [kwTexto, 'Ação única registrada em todos os ' + totalComDescricao + ' caso(s) com descrição: "' + exemplo + '"'].filter(Boolean).join(' ');
       }
-      const pctMaisComum = (qtdMaisComum / totalComDescricao * 100).toFixed(0);
-      if((qtdMaisComum / totalComDescricao) >= 0.5){
-        return 'Formalizar "' + acaoMaisComum + '" como plano padrão (usada em ' + pctMaisComum + '% dos casos com descrição) e revisar os demais casos pontuais.';
+      const pctMaisComum = qtdMaisComum / totalComDescricao;
+      if(pctMaisComum >= 0.3){
+        return [kwTexto, 'Ação mais recorrente (' + (pctMaisComum*100).toFixed(0) + '% dos casos com descrição): "' + exemplo + '"'].filter(Boolean).join(' ');
       }
-      const topDuasAcoes = entradasAcoes.slice(0, 2).map(e => e[0]).join('" e "');
-      return 'Ações dispersas (' + entradasAcoes.length + ' descrições diferentes) — recomenda-se padronizar um procedimento único, priorizando as mais usadas: "' + topDuasAcoes + '".';
+      return [kwTexto, entradasAcoes.length + ' descrições diferentes, sem padrão dominante. Exemplo mais comum: "' + exemplo + '"'].filter(Boolean).join(' ');
     }
 
     function escCausaAcaoInterna(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -4460,7 +4500,7 @@ function renderPendenciasFca(){
         <td>${escCausaAcaoInterna(grupo.causa)}</td>
         <td>${escCausaAcaoInterna(grupo.acaoInterna)}</td>
         <td class="num">${grupo.qtd}</td>
-        <td>${escCausaAcaoInterna(gerarSugestaoPlano(grupo))}</td>
+        <td style="max-width:420px;">${escCausaAcaoInterna(gerarSugestaoPlano(grupo))}</td>
       </tr>`).join('');
     }
   }
