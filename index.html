@@ -1303,35 +1303,16 @@ function calcularProjecaoMesArea(mesObj, area){
 
   if(diasCorridos <= 0 || diasRestantes <= 0) return null;
 
-  // ALTERADO: ritmo dos últimos 7 dias do CALENDÁRIO (contando a partir
-  // de diasCorridos já com o corte D-1 acima) — dias sem incidente pra
-  // essa área entram como zero. Antes, só os dias em que a área tinha
-  // ALGUM incidente eram considerados, o que inflava a média diária ao
-  // ignorar os dias "zerados" e distorcia a projeção do mês inteiro.
-  const mapaAreaPorDia = {};
-  diarioAreasDoMes.forEach(d => {
-    const diaNum = Number(d.dia);
-    if(!isNaN(diaNum) && d.areas && d.areas[area]){
-      mapaAreaPorDia[diaNum] = d.areas[area];
-    }
-  });
-  let dentro7 = 0, fora7 = 0, diasConsiderados7 = 0;
-  for(let dia = diasCorridos; dia > Math.max(0, diasCorridos - 7); dia--){
-    diasConsiderados7++;
-    const info = mapaAreaPorDia[dia];
-    if(info){
-      dentro7 += info.dentro || 0;
-      fora7 += info.fora || 0;
-    }
-  }
-  const total7 = dentro7 + fora7;
-
-  const mediaDiaria = diasConsiderados7 > 0 ? (total7 / diasConsiderados7) : (totalAtual / diasCorridos);
+  // ALTERADO: projeção simplificada — média diária = tudo que já entrou
+  // até D-1 dividido pelos dias corridos, multiplicada pelos dias que
+  // ainda faltam, somada ao que já entrou. Sem peso extra pros últimos
+  // 7 dias (isso ficou só na projeção global do "Meta do mês").
+  const mediaDiaria = totalAtual / diasCorridos;
   const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
 
-  const taxaFora7 = total7 > 0 ? (fora7/total7) : (totalAtual > 0 ? foraAtual/totalAtual : 0);
+  const taxaFora = totalAtual > 0 ? (foraAtual / totalAtual) : 0;
 
-  const foraProjetado = Math.round(entrantesProjetados * taxaFora7);
+  const foraProjetado = Math.round(entrantesProjetados * taxaFora);
   const dentroProjetado = entrantesProjetados - foraProjetado;
 
   const totalFinal = totalAtual + entrantesProjetados;
