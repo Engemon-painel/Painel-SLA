@@ -287,7 +287,7 @@
         <h2>Detalhe por Área — mês selecionado</h2>
         <table>
           <thead>
-            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th></tr>
+            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th><th class="num">Pode perder (Meta 85%)</th></tr>
           </thead>
           <tbody id="tableBody"></tbody>
         </table>
@@ -1267,6 +1267,71 @@ function calcularNecessarioMeta(mesObj, metaPct){
     dentroNecessario, faltaDentro, foraToleravel, aderenciaNecessaria,
     jaGarantido
   };
+}
+
+// NOVO: mesma lógica de calcularProjecaoMes/calcularNecessarioMeta, mas
+// escopada pra UMA área (SPC1-4) — usa o ritmo dos últimos 7 dias
+// DAQUELA área (via mesObj.diarioAreas) em vez do ritmo agregado de
+// todas as áreas, pra projetar quantos incidentes "Fora" a área ainda
+// pode acumular neste mês sem deixar de bater a meta.
+function calcularProjecaoMesArea(mesObj, area){
+  const diarioAreasDoMes = Array.isArray(mesObj.diarioAreas) ? mesObj.diarioAreas : [];
+  const diasComDadoArea = diarioAreasDoMes
+    .filter(d => d.areas && d.areas[area])
+    .map(d => Number(d.dia))
+    .filter(n => !isNaN(n));
+  const diasCorridos = diasComDadoArea.length ? Math.max(...diasComDadoArea) : 0;
+  const totalDiasMes = diasNoMes(mesObj);
+  const diasRestantes = Math.max(0, totalDiasMes - diasCorridos);
+
+  const areasDoMes = areasValidas(mesObj.areas);
+  const dadosArea = areasDoMes[area];
+  const dentroAtual = dadosArea ? dadosArea.dentro : 0;
+  const foraAtual = dadosArea ? dadosArea.fora : 0;
+  const totalAtual = dentroAtual + foraAtual;
+
+  if(diasCorridos <= 0 || diasRestantes <= 0) return null;
+
+  // Últimos 7 dias COM DADO da própria área (não necessariamente os
+  // últimos 7 dias do calendário, caso a área fique alguns dias sem
+  // nenhum incidente).
+  const ultimos7DiasArea = diarioAreasDoMes.filter(d => d.areas && d.areas[area]).slice(-7);
+  let dentro7 = 0, fora7 = 0;
+  ultimos7DiasArea.forEach(d => { dentro7 += d.areas[area].dentro || 0; fora7 += d.areas[area].fora || 0; });
+  const total7 = dentro7 + fora7;
+
+  const mediaDiaria = ultimos7DiasArea.length > 0 ? (total7 / ultimos7DiasArea.length) : (totalAtual / diasCorridos);
+  const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
+
+  const taxaFora7 = total7 > 0 ? (fora7/total7) : (totalAtual > 0 ? foraAtual/totalAtual : 0);
+
+  const foraProjetado = Math.round(entrantesProjetados * taxaFora7);
+  const dentroProjetado = entrantesProjetados - foraProjetado;
+
+  const totalFinal = totalAtual + entrantesProjetados;
+  const dentroFinal = dentroAtual + dentroProjetado;
+
+  return {
+    diasCorridos, diasRestantes, entrantesProjetados,
+    totalAtual, dentroAtual, foraAtual,
+    totalFinal, dentroFinal
+  };
+}
+
+// NOVO: quantos "Fora" a área ainda pode acumular neste mês sem deixar
+// de bater a metaPct (ex.: 0.85), na projeção de incidentes restantes
+// só daquela área.
+function calcularNecessarioMetaArea(mesObj, area, metaPct){
+  const proj = calcularProjecaoMesArea(mesObj, area);
+  if(!proj){
+    return { temProjecao: false };
+  }
+  const dentroNecessario = Math.ceil(metaPct * proj.totalFinal);
+  const restantesProjetados = Math.max(0, proj.totalFinal - proj.totalAtual);
+  const faltaDentro = Math.max(0, dentroNecessario - proj.dentroAtual);
+  const foraToleravel = Math.max(0, restantesProjetados - faltaDentro);
+  const jaGarantido = proj.dentroAtual >= dentroNecessario;
+  return { temProjecao: true, foraToleravel, jaGarantido, restantesProjetados };
 }
 
 function renderMetaProjecaoPanel(mesObj){
@@ -4340,12 +4405,20 @@ function render(){
     const total = d.dentro + d.fora;
     const p = d.dentro/total;
     const cls = p>=DADOS.meta ? 'good' : (p>=DADOS.meta-0.05 ? 'warn' : 'bad');
+    const rMetaArea = calcularNecessarioMetaArea(mesObj, a, DADOS.meta);
+    let podePerderTxt = '—';
+    if(rMetaArea.temProjecao){
+      podePerderTxt = rMetaArea.jaGarantido
+        ? '<span class="pill good">✅ Garantida</span>'
+        : ('<span class="mono">' + rMetaArea.foraToleravel.toLocaleString('pt-BR') + '</span> de ' + rMetaArea.restantesProjetados.toLocaleString('pt-BR') + ' rest.');
+    }
     return `<tr>
       <td>${a}</td>
       <td class="num">${total}</td>
       <td class="num">${d.dentro}</td>
       <td class="num">${d.fora}</td>
       <td class="num"><span class="pill ${cls}">${(p*100).toFixed(1)}%</span></td>
+      <td class="num">${podePerderTxt}</td>
     </tr>`;
   }).join('');
 
