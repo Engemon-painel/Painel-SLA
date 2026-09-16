@@ -287,7 +287,7 @@
         <h2>Detalhe por Área — mês selecionado</h2>
         <table>
           <thead>
-            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th><th class="num">Pode perder (Meta 85%)</th></tr>
+            <tr><th>Área</th><th class="num">Incidentes</th><th class="num">Dentro</th><th class="num">Fora</th><th class="num">% Atend.</th><th class="num">Aderência necessária</th><th class="num">Pode perder / dia</th><th class="num">Pode perder / mês</th></tr>
           </thead>
           <tbody id="tableBody"></tbody>
         </table>
@@ -1330,8 +1330,13 @@ function calcularNecessarioMetaArea(mesObj, area, metaPct){
   const restantesProjetados = Math.max(0, proj.totalFinal - proj.totalAtual);
   const faltaDentro = Math.max(0, dentroNecessario - proj.dentroAtual);
   const foraToleravel = Math.max(0, restantesProjetados - faltaDentro);
+  const foraToleravelPorDia = proj.diasRestantes > 0 ? (foraToleravel / proj.diasRestantes) : null;
+  const aderenciaNecessaria = restantesProjetados > 0 ? (faltaDentro / restantesProjetados) : null;
   const jaGarantido = proj.dentroAtual >= dentroNecessario;
-  return { temProjecao: true, foraToleravel, jaGarantido, restantesProjetados };
+  return {
+    temProjecao: true, foraToleravel, foraToleravelPorDia, aderenciaNecessaria,
+    jaGarantido, restantesProjetados, diasRestantes: proj.diasRestantes
+  };
 }
 
 function renderMetaProjecaoPanel(mesObj){
@@ -4406,11 +4411,19 @@ function render(){
     const p = d.dentro/total;
     const cls = p>=DADOS.meta ? 'good' : (p>=DADOS.meta-0.05 ? 'warn' : 'bad');
     const rMetaArea = calcularNecessarioMetaArea(mesObj, a, DADOS.meta);
-    let podePerderTxt = '—';
+    let aderenciaTxt = '—';
+    let podePerderDiaTxt = '—';
+    let podePerderMesTxt = '—';
     if(rMetaArea.temProjecao){
-      podePerderTxt = rMetaArea.jaGarantido
-        ? '<span class="pill good">✅ Garantida</span>'
-        : ('<span class="mono">' + rMetaArea.foraToleravel.toLocaleString('pt-BR') + '</span> de ' + rMetaArea.restantesProjetados.toLocaleString('pt-BR') + ' rest.');
+      if(rMetaArea.jaGarantido){
+        aderenciaTxt = '<span class="pill good">✅ Garantida</span>';
+        podePerderDiaTxt = '—';
+        podePerderMesTxt = '—';
+      } else {
+        aderenciaTxt = rMetaArea.aderenciaNecessaria !== null ? (rMetaArea.aderenciaNecessaria*100).toFixed(1) + '%' : '—';
+        podePerderDiaTxt = rMetaArea.foraToleravelPorDia !== null ? rMetaArea.foraToleravelPorDia.toFixed(1) : '—';
+        podePerderMesTxt = '<span class="mono">' + rMetaArea.foraToleravel.toLocaleString('pt-BR') + '</span> de ' + rMetaArea.restantesProjetados.toLocaleString('pt-BR') + ' rest.';
+      }
     }
     return `<tr>
       <td>${a}</td>
@@ -4418,7 +4431,9 @@ function render(){
       <td class="num">${d.dentro}</td>
       <td class="num">${d.fora}</td>
       <td class="num"><span class="pill ${cls}">${(p*100).toFixed(1)}%</span></td>
-      <td class="num">${podePerderTxt}</td>
+      <td class="num">${aderenciaTxt}</td>
+      <td class="num">${podePerderDiaTxt}</td>
+      <td class="num">${podePerderMesTxt}</td>
     </tr>`;
   }).join('');
 
