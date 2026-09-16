@@ -1276,11 +1276,22 @@ function calcularNecessarioMeta(mesObj, metaPct){
 // pode acumular neste mês sem deixar de bater a meta.
 function calcularProjecaoMesArea(mesObj, area){
   const diarioAreasDoMes = Array.isArray(mesObj.diarioAreas) ? mesObj.diarioAreas : [];
-  const diasComDadoArea = diarioAreasDoMes
-    .filter(d => d.areas && d.areas[area])
-    .map(d => Number(d.dia))
-    .filter(n => !isNaN(n));
-  const diasCorridos = diasComDadoArea.length ? Math.max(...diasComDadoArea) : 0;
+  const todosOsDiasArea = diarioAreasDoMes.map(d => Number(d.dia)).filter(n => !isNaN(n));
+  let diasCorridos = todosOsDiasArea.length ? Math.max(...todosOsDiasArea) : 0;
+
+  // ALTERADO: aplica o mesmo corte D-1 do card "Dias do Mês (D-1)" — se
+  // o mês selecionado é o mês corrente, o dia de hoje nunca conta como
+  // "corrido" (a base normalmente só fecha o dia anterior).
+  const nomeMesArea = mesObj.mes.split('/')[0];
+  const anoCurtoArea = mesObj.mes.split('/')[1];
+  const hojeArea = new Date();
+  const ehMesAtualArea =
+    NOME_MES[nomeMesArea] === String(hojeArea.getMonth() + 1).padStart(2, '0') &&
+    Number(anoCurtoArea) === (hojeArea.getFullYear() % 100);
+  if(ehMesAtualArea){
+    diasCorridos = Math.min(diasCorridos, hojeArea.getDate() - 1);
+  }
+
   const totalDiasMes = diasNoMes(mesObj);
   const diasRestantes = Math.max(0, totalDiasMes - diasCorridos);
 
@@ -1292,15 +1303,30 @@ function calcularProjecaoMesArea(mesObj, area){
 
   if(diasCorridos <= 0 || diasRestantes <= 0) return null;
 
-  // Últimos 7 dias COM DADO da própria área (não necessariamente os
-  // últimos 7 dias do calendário, caso a área fique alguns dias sem
-  // nenhum incidente).
-  const ultimos7DiasArea = diarioAreasDoMes.filter(d => d.areas && d.areas[area]).slice(-7);
-  let dentro7 = 0, fora7 = 0;
-  ultimos7DiasArea.forEach(d => { dentro7 += d.areas[area].dentro || 0; fora7 += d.areas[area].fora || 0; });
+  // ALTERADO: ritmo dos últimos 7 dias do CALENDÁRIO (contando a partir
+  // de diasCorridos já com o corte D-1 acima) — dias sem incidente pra
+  // essa área entram como zero. Antes, só os dias em que a área tinha
+  // ALGUM incidente eram considerados, o que inflava a média diária ao
+  // ignorar os dias "zerados" e distorcia a projeção do mês inteiro.
+  const mapaAreaPorDia = {};
+  diarioAreasDoMes.forEach(d => {
+    const diaNum = Number(d.dia);
+    if(!isNaN(diaNum) && d.areas && d.areas[area]){
+      mapaAreaPorDia[diaNum] = d.areas[area];
+    }
+  });
+  let dentro7 = 0, fora7 = 0, diasConsiderados7 = 0;
+  for(let dia = diasCorridos; dia > Math.max(0, diasCorridos - 7); dia--){
+    diasConsiderados7++;
+    const info = mapaAreaPorDia[dia];
+    if(info){
+      dentro7 += info.dentro || 0;
+      fora7 += info.fora || 0;
+    }
+  }
   const total7 = dentro7 + fora7;
 
-  const mediaDiaria = ultimos7DiasArea.length > 0 ? (total7 / ultimos7DiasArea.length) : (totalAtual / diasCorridos);
+  const mediaDiaria = diasConsiderados7 > 0 ? (total7 / diasConsiderados7) : (totalAtual / diasCorridos);
   const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
 
   const taxaFora7 = total7 > 0 ? (fora7/total7) : (totalAtual > 0 ? foraAtual/totalAtual : 0);
