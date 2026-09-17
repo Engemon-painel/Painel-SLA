@@ -246,6 +246,7 @@
         <div class="nav-item" id="nav-area" onclick="mostrarPagina('area')"><span class="nav-icon">🗺️</span> Por Área</div>
         <div class="nav-item" id="nav-site" onclick="mostrarPagina('site')"><span class="nav-icon">📡</span> Por Site</div>
         <div class="nav-item" id="nav-fca" onclick="mostrarPagina('fca')"><span class="nav-icon">⚠️</span> FCA<span id="fcaCountNav" style="margin-left:4px;"></span></div>
+        <div class="nav-item" id="nav-infra" onclick="mostrarPagina('infra')"><span class="nav-icon">🏗️</span> Infra</div>
       </div>
     </div>
     <div class="nav-item" id="nav-organograma" onclick="mostrarPagina('organograma')"><span class="nav-icon">👥</span> Organograma</div>
@@ -480,6 +481,35 @@
             <tbody id="causaAcaoInternaBody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <div class="pagina" id="pagina-infra" style="display:none;">
+      <div style="margin:0 0 16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="search" title="Buscar por site, tipo de infra, unidade responsável ou incidente">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <input id="infra-search" type="search" placeholder="Buscar por site, tipo de infra, unidade responsável ou incidente..." aria-label="Buscar infra" />
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Fora do Prazo (Eser 4h) — por Site / Infra</h2>
+        <table>
+          <thead>
+            <tr><th>Site</th><th>Tipo de Infra</th><th>Unidade Responsável 2</th><th>Incidente</th></tr>
+          </thead>
+          <tbody id="infraForaBody"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>Dentro do Prazo (Eser 4h) — por Site / Infra</h2>
+        <table>
+          <thead>
+            <tr><th>Site</th><th>Tipo de Infra</th><th>Unidade Responsável 2</th><th>Incidente</th></tr>
+          </thead>
+          <tbody id="infraDentroBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -970,6 +1000,7 @@ let FROTA = [];
 let VAGAS = [];
 let BANCO_HORAS = [];
 let INCIDENTES_POR_SITE = [];
+let INFRA_ITENS_ATUAL = [];
 let incidentesPorSiteFiltroAtual = 'com';
 let slaAtivo = '4h';
 let supervisorFiltroAtual = '';
@@ -1022,8 +1053,54 @@ function filtrarIncidentesPorSite(valor){
   if(typeof render === 'function') render();
 }
 
+function escInfra(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderInfraTables(){
+  const infraForaBody = document.getElementById('infraForaBody');
+  const infraDentroBody = document.getElementById('infraDentroBody');
+  if(!infraForaBody && !infraDentroBody) return;
+
+  const q = (document.getElementById('infra-search')?.value || '').toLowerCase().trim();
+
+  function bate(it){
+    if(!q) return true;
+    const hay = [it.site, it.tipoInfra, it.unidadeResponsavel2, it.incidente].map(x => String(x || '').toLowerCase()).join(' ');
+    return hay.includes(q);
+  }
+
+  function linhaInfra(it){
+    return `<tr>
+      <td>${escInfra(it.site) || '—'}</td>
+      <td>${escInfra(it.tipoInfra) || '—'}</td>
+      <td>${escInfra(it.unidadeResponsavel2) || '—'}</td>
+      <td>${escInfra(it.incidente) || '—'}</td>
+    </tr>`;
+  }
+
+  if(infraForaBody){
+    const itensFora = INFRA_ITENS_ATUAL.filter(it => it.eser4h === 'Fora' && bate(it));
+    infraForaBody.innerHTML = itensFora.length
+      ? itensFora.map(linhaInfra).join('')
+      : `<tr><td colspan="4" style="text-align:center; color:${cor.muted};">Nenhum incidente Fora do prazo encontrado</td></tr>`;
+  }
+
+  if(infraDentroBody){
+    const itensDentro = INFRA_ITENS_ATUAL.filter(it => it.eser4h === 'Dentro' && bate(it));
+    infraDentroBody.innerHTML = itensDentro.length
+      ? itensDentro.map(linhaInfra).join('')
+      : `<tr><td colspan="4" style="text-align:center; color:${cor.muted};">Nenhum incidente Dentro do prazo encontrado</td></tr>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const inputInfra = document.getElementById('infra-search');
+  if(inputInfra){
+    inputInfra.addEventListener('input', debounce(() => renderInfraTables(), 200));
+  }
+});
+
 // ---- Navegação por páginas (menu lateral) ----
-const PAGINAS = ['consolidado', 'area', 'site', 'fca', 'organograma', 'vagas', 'frota', 'bancohoras'];
+const PAGINAS = ['consolidado', 'area', 'site', 'fca', 'infra', 'organograma', 'vagas', 'frota', 'bancohoras'];
 
 function toggleNavGroup(id){
   const group = document.getElementById(id);
@@ -4249,6 +4326,28 @@ function render(){
         </tr>`;
       }).join('');
     }
+  }
+
+  // ---- Página "Infra" (Tipo de Infra / Unidade Responsável 2), separada
+  // em Dentro e Fora do prazo (Eser 4h) — mesma fonte de dados e mesmo
+  // filtro de mês/área de "Incidentes por Site" acima, mas sem o filtro
+  // de Afaz/Preventiva.
+  const infraForaBody = document.getElementById('infraForaBody');
+  const infraDentroBody = document.getElementById('infraDentroBody');
+  if(infraForaBody || infraDentroBody){
+    const nomeMesInfra = mesObj.mes.split('/')[0];
+    const mmInfra = NOME_MES[nomeMesInfra];
+    const anoCurtoInfra = mesObj.mes.split('/')[1];
+    const mesOrdInfra = anoCurtoInfra && mmInfra ? ('20' + anoCurtoInfra + '-' + mmInfra) : null;
+
+    INFRA_ITENS_ATUAL = (INCIDENTES_POR_SITE || []).filter(it => {
+      if(!it) return false;
+      if(mesOrdInfra !== null && it.mesOrd !== mesOrdInfra) return false;
+      if(areaNames.indexOf(it.area) === -1) return false;
+      return true;
+    }).sort((a,b) => (a.site || '').localeCompare(b.site || '', 'pt-BR'));
+
+    renderInfraTables();
   }
 
   const topSitesCanvas = document.getElementById('topSitesChart');
