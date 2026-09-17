@@ -496,7 +496,7 @@
         <h2>Fora do Prazo (Eser 4h) — por Site / Infra</h2>
         <table>
           <thead>
-            <tr><th>Site</th><th>Tipo de Infra</th><th>Unidade Responsável 2</th><th>Incidente</th></tr>
+            <tr><th>Site</th><th>Tipo de Infra</th><th>Unidade Responsável 2</th><th class="num">Qtd</th></tr>
           </thead>
           <tbody id="infraForaBody"></tbody>
         </table>
@@ -506,7 +506,7 @@
         <h2>Dentro do Prazo (Eser 4h) — por Site / Infra</h2>
         <table>
           <thead>
-            <tr><th>Site</th><th>Tipo de Infra</th><th>Unidade Responsável 2</th><th>Incidente</th></tr>
+            <tr><th>Site</th><th>Tipo de Infra</th><th>Unidade Responsável 2</th><th class="num">Qtd</th></tr>
           </thead>
           <tbody id="infraDentroBody"></tbody>
         </table>
@@ -1064,30 +1064,51 @@ function renderInfraTables(){
 
   function bate(it){
     if(!q) return true;
-    const hay = [it.site, it.tipoInfra, it.unidadeResponsavel2, it.incidente].map(x => String(x || '').toLowerCase()).join(' ');
+    const hay = [it.site, it.tipoInfra, it.unidadeResponsavel2].map(x => String(x || '').toLowerCase()).join(' ');
     return hay.includes(q);
   }
 
-  function linhaInfra(it){
+  // NOVO: agrupa por Site (não mais uma linha por incidente) — pega o
+  // primeiro Tipo de Infra / Unidade Responsável 2 não vazios encontrados
+  // pra aquele site, e soma a quantidade de incidentes.
+  function agruparPorSite(itens){
+    const grupos = {};
+    itens.forEach(it => {
+      const siteKey = it.site || 'Sem site';
+      if(!grupos[siteKey]){
+        grupos[siteKey] = { site: siteKey, tipoInfra: '', unidadeResponsavel2: '', qtd: 0 };
+      }
+      if(!grupos[siteKey].tipoInfra && it.tipoInfra){
+        grupos[siteKey].tipoInfra = it.tipoInfra;
+      }
+      if(!grupos[siteKey].unidadeResponsavel2 && it.unidadeResponsavel2){
+        grupos[siteKey].unidadeResponsavel2 = it.unidadeResponsavel2;
+      }
+      grupos[siteKey].qtd++;
+    });
+    return Object.values(grupos).sort((a,b) => b.qtd - a.qtd);
+  }
+
+  function linhaInfra(g){
     return `<tr>
-      <td>${escInfra(it.site) || '—'}</td>
-      <td>${escInfra(it.tipoInfra) || '—'}</td>
-      <td>${escInfra(it.unidadeResponsavel2) || '—'}</td>
-      <td>${escInfra(it.incidente) || '—'}</td>
+      <td>${escInfra(g.site) || '—'}</td>
+      <td>${escInfra(g.tipoInfra) || '—'}</td>
+      <td>${escInfra(g.unidadeResponsavel2) || '—'}</td>
+      <td class="num">${g.qtd}</td>
     </tr>`;
   }
 
   if(infraForaBody){
-    const itensFora = INFRA_ITENS_ATUAL.filter(it => it.eser4h === 'Fora' && bate(it));
-    infraForaBody.innerHTML = itensFora.length
-      ? itensFora.map(linhaInfra).join('')
+    const gruposFora = agruparPorSite(INFRA_ITENS_ATUAL.filter(it => it.eser4h === 'Fora' && bate(it)));
+    infraForaBody.innerHTML = gruposFora.length
+      ? gruposFora.map(linhaInfra).join('')
       : `<tr><td colspan="4" style="text-align:center; color:${cor.muted};">Nenhum incidente Fora do prazo encontrado</td></tr>`;
   }
 
   if(infraDentroBody){
-    const itensDentro = INFRA_ITENS_ATUAL.filter(it => it.eser4h === 'Dentro' && bate(it));
-    infraDentroBody.innerHTML = itensDentro.length
-      ? itensDentro.map(linhaInfra).join('')
+    const gruposDentro = agruparPorSite(INFRA_ITENS_ATUAL.filter(it => it.eser4h === 'Dentro' && bate(it)));
+    infraDentroBody.innerHTML = gruposDentro.length
+      ? gruposDentro.map(linhaInfra).join('')
       : `<tr><td colspan="4" style="text-align:center; color:${cor.muted};">Nenhum incidente Dentro do prazo encontrado</td></tr>`;
   }
 }
