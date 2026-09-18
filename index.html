@@ -1970,13 +1970,65 @@ function renderHeadcount(){
     vagasAbertasPorSupervisor[s.label] = s.vagas;
   });
 
+  // NOVO: quadro de referência com o quadro ideal (headcount que o
+  // supervisor deveria ter), informado manualmente — não vem de nenhuma
+  // aba da planilha, por isso fica fixo aqui. Comparado (por nome,
+  // ignorando acento/maiúscula) com ativos + vagas abertas pra apontar a
+  // diferença ao lado de cada barra.
+  const TOTAL_ESPERADO_RAW = {
+    'Marcelo Rodrigues Rosa': 17,
+    'Ycaro Dias de Souza': 14,
+    'Nayane Barros Hilario': 12,
+    'Esaie Geneste': 11,
+    'Cleiton de Souza Cardoso': 31,
+    'Thiago Patricio Da Silva': 26,
+    'Rogerio Santana Bandeira': 5,
+    'Rodolfo De La Hermosa Alonso': 28
+  };
+  const totalEsperadoPorSupervisor = {};
+  Object.keys(TOTAL_ESPERADO_RAW).forEach(nome => {
+    totalEsperadoPorSupervisor[semAcentoHc(nome)] = TOTAL_ESPERADO_RAW[nome];
+  });
+
   const tecnicosCanvas = document.getElementById('tecnicosSupervisorChart');
   if(tecnicosCanvas){
     if(tecnicosSupChartInst) tecnicosSupChartInst.destroy();
-    const alturaPorBarra = 34;
+    const alturaPorBarra = 32;
     const alturaMinima = 260;
     const alturaCalculada = Math.max(alturaMinima, supervisoresOrdenados.length * alturaPorBarra);
     tecnicosCanvas.parentElement.style.height = alturaCalculada + 'px';
+
+    // Dataset invisível só pra desenhar, no fim de cada barra empilhada,
+    // o total atual (ativos + vagas), o total esperado e a diferença.
+    const totalEsperadoDataset = {
+      label: 'Esperado',
+      data: supervisoresOrdenados.map(() => 0),
+      backgroundColor: 'rgba(0,0,0,0)',
+      datalabels: {
+        anchor: 'end', align: 'right', offset: 4,
+        font: { size:10, family:'JetBrains Mono', weight:'700' },
+        color: (ctx) => {
+          const label = supervisoresOrdenados[ctx.dataIndex];
+          const esperado = totalEsperadoPorSupervisor[semAcentoHc(label)];
+          if(esperado === undefined) return cor.muted;
+          const atual = (porSupervisor[label]||0) + (vagasAbertasPorSupervisor[label]||0);
+          const diff = esperado - atual;
+          if(diff === 0) return cor.good;
+          return diff > 0 ? cor.bad : cor.warn;
+        },
+        formatter: (value, ctx) => {
+          const label = supervisoresOrdenados[ctx.dataIndex];
+          const atual = (porSupervisor[label]||0) + (vagasAbertasPorSupervisor[label]||0);
+          const esperado = totalEsperadoPorSupervisor[semAcentoHc(label)];
+          if(esperado === undefined) return 'Total: ' + atual;
+          const diff = esperado - atual;
+          if(diff === 0) return 'Total: ' + atual + ' (completo)';
+          if(diff > 0) return 'Total: ' + atual + ' de ' + esperado + ' (faltam ' + diff + ')';
+          return 'Total: ' + atual + ' de ' + esperado + ' (excedente ' + Math.abs(diff) + ')';
+        }
+      }
+    };
+
     tecnicosSupChartInst = new Chart(tecnicosCanvas, {
       type: 'bar',
       data: {
@@ -1984,10 +2036,10 @@ function renderHeadcount(){
         datasets: [
           {
             label: 'Técnicos ativos', data: supervisoresOrdenados.map(k => porSupervisor[k] || 0),
-            backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+            backgroundColor: 'rgba(37,99,235,.85)', borderRadius: 4,
             datalabels: {
               display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
-              color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'}
+              color: '#ffffff', anchor:'center', align:'center', font:{size:10, family:'JetBrains Mono', weight:'700'}
             }
           },
           {
@@ -1995,9 +2047,10 @@ function renderHeadcount(){
             backgroundColor: cor.warn, borderRadius: 4,
             datalabels: {
               display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
-              color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'}
+              color: '#ffffff', anchor:'center', align:'center', font:{size:10, family:'JetBrains Mono', weight:'700'}
             }
-          }
+          },
+          totalEsperadoDataset
         ]
       },
       plugins: [ChartDataLabels],
@@ -2005,16 +2058,22 @@ function renderHeadcount(){
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        maxBarThickness: 13,
+        maxBarThickness: 20,
         barPercentage: 0.7,
         categoryPercentage: 0.7,
         plugins: {
-          legend: { display:true, labels: { color: cor.muted, font:{family:'Inter', size:11} } },
+          legend: {
+            display:true,
+            labels: {
+              color: cor.text, font:{family:'Inter', size:11},
+              filter: (item) => item.text !== 'Esperado'
+            }
+          },
           datalabels: { display:true }
         },
         scales: {
-          x: { stacked:false, ticks: {color: cor.text}, grid: {color: cor.line}, beginAtZero:true },
-          y: { stacked:false, ticks: {color: cor.text, font:{size:11}}, grid: {display:false} }
+          x: { stacked:true, ticks: {color: cor.text}, grid: {color: cor.line}, beginAtZero:true },
+          y: { stacked:true, ticks: {color: cor.text, font:{size:11}}, grid: {display:false} }
         }
       }
     });
