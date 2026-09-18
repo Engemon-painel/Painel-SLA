@@ -1929,10 +1929,18 @@ function renderHeadcount(){
   }
 
   const tecnicosAtivos = ativos.filter(c => semAcentoHc(c.areaTecnica) === 'tecnico');
-  const porSupervisor = {};
+
+  // NOVO: junta "Técnicos ativos" e "Vagas abertas" pelo nome do supervisor
+  // ignorando maiúsculas/minúsculas e acentos (a aba Controle costuma trazer
+  // o nome em CAIXA ALTA, diferente do Organograma) — senão o mesmo
+  // supervisor aparecia duas vezes no gráfico, uma vez em cada grafia.
+  const supervisorDados = {}; // chave normalizada -> { label, tecnicos, vagas }
+
   tecnicosAtivos.forEach(c => {
-    const k = normHc(c.supervisor) || 'Sem supervisor';
-    porSupervisor[k] = (porSupervisor[k] || 0) + 1;
+    const label = normHc(c.supervisor) || 'Sem supervisor';
+    const key = semAcentoHc(label);
+    if(!supervisorDados[key]) supervisorDados[key] = { label, tecnicos: 0, vagas: 0 };
+    supervisorDados[key].tecnicos++;
   });
 
   // NOVO: vagas em aberto por supervisor — a partir da aba "Controle"
@@ -1945,17 +1953,22 @@ function renderHeadcount(){
     'entrevista gestor',
     'triagem'
   ]);
-  const vagasAbertasPorSupervisor = {};
   (VAGAS || []).forEach(v => {
     if(!STATUS_VAGA_ABERTA.has(semAcentoHc(v.status))) return;
-    const k = normHc(v.supervisao) || 'Sem supervisor';
-    vagasAbertasPorSupervisor[k] = (vagasAbertasPorSupervisor[k] || 0) + 1;
+    const label = normHc(v.supervisao) || 'Sem supervisor';
+    const key = semAcentoHc(label);
+    if(!supervisorDados[key]) supervisorDados[key] = { label, tecnicos: 0, vagas: 0 };
+    supervisorDados[key].vagas++;
   });
 
-  const supervisoresOrdenados = Array.from(new Set([
-    ...Object.keys(porSupervisor),
-    ...Object.keys(vagasAbertasPorSupervisor)
-  ])).sort((a,b)=> (porSupervisor[b]||0) - (porSupervisor[a]||0));
+  const listaSupervisores = Object.values(supervisorDados).sort((a,b)=> b.tecnicos - a.tecnicos);
+  const supervisoresOrdenados = listaSupervisores.map(s => s.label);
+  const porSupervisor = {};
+  const vagasAbertasPorSupervisor = {};
+  listaSupervisores.forEach(s => {
+    porSupervisor[s.label] = s.tecnicos;
+    vagasAbertasPorSupervisor[s.label] = s.vagas;
+  });
 
   const tecnicosCanvas = document.getElementById('tecnicosSupervisorChart');
   if(tecnicosCanvas){
@@ -1972,12 +1985,18 @@ function renderHeadcount(){
           {
             label: 'Técnicos ativos', data: supervisoresOrdenados.map(k => porSupervisor[k] || 0),
             backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
-            datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+            datalabels: {
+              display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
+              color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'}
+            }
           },
           {
             label: 'Vagas abertas', data: supervisoresOrdenados.map(k => vagasAbertasPorSupervisor[k] || 0),
             backgroundColor: cor.warn, borderRadius: 4,
-            datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+            datalabels: {
+              display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
+              color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'}
+            }
           }
         ]
       },
