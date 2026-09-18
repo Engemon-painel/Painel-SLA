@@ -1934,12 +1934,33 @@ function renderHeadcount(){
     const k = normHc(c.supervisor) || 'Sem supervisor';
     porSupervisor[k] = (porSupervisor[k] || 0) + 1;
   });
-  const supervisoresOrdenados = Object.keys(porSupervisor).sort((a,b)=> porSupervisor[b]-porSupervisor[a]);
+
+  // NOVO: vagas em aberto por supervisor — a partir da aba "Controle"
+  // (VAGAS), contando as requisições cuja coluna STATUS (Etapa Atual da
+  // Vaga) esteja em uma das etapas ainda "em andamento". Comparado ao
+  // Status Req. (Aprovada/Pendente), aqui é o STATUS/etapa granular.
+  const STATUS_VAGA_ABERTA = new Set([
+    'aguardando aprovacao',
+    'aguardando validacao da claro',
+    'entrevista gestor',
+    'triagem'
+  ]);
+  const vagasAbertasPorSupervisor = {};
+  (VAGAS || []).forEach(v => {
+    if(!STATUS_VAGA_ABERTA.has(semAcentoHc(v.status))) return;
+    const k = normHc(v.supervisao) || 'Sem supervisor';
+    vagasAbertasPorSupervisor[k] = (vagasAbertasPorSupervisor[k] || 0) + 1;
+  });
+
+  const supervisoresOrdenados = Array.from(new Set([
+    ...Object.keys(porSupervisor),
+    ...Object.keys(vagasAbertasPorSupervisor)
+  ])).sort((a,b)=> (porSupervisor[b]||0) - (porSupervisor[a]||0));
 
   const tecnicosCanvas = document.getElementById('tecnicosSupervisorChart');
   if(tecnicosCanvas){
     if(tecnicosSupChartInst) tecnicosSupChartInst.destroy();
-    const alturaPorBarra = 28;
+    const alturaPorBarra = 34;
     const alturaMinima = 260;
     const alturaCalculada = Math.max(alturaMinima, supervisoresOrdenados.length * alturaPorBarra);
     tecnicosCanvas.parentElement.style.height = alturaCalculada + 'px';
@@ -1947,19 +1968,31 @@ function renderHeadcount(){
       type: 'bar',
       data: {
         labels: supervisoresOrdenados,
-        datasets: [{
-          label: 'Técnicos ativos', data: supervisoresOrdenados.map(k => porSupervisor[k]),
-          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
-          datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
-        }]
+        datasets: [
+          {
+            label: 'Técnicos ativos', data: supervisoresOrdenados.map(k => porSupervisor[k] || 0),
+            backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          },
+          {
+            label: 'Vagas abertas', data: supervisoresOrdenados.map(k => vagasAbertasPorSupervisor[k] || 0),
+            backgroundColor: cor.warn, borderRadius: 4,
+            datalabels: { color: cor.text, anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          }
+        ]
       },
       plugins: [ChartDataLabels],
       options: {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        maxBarThickness: 20,
-        plugins: { legend: { display:false }, datalabels: { display:true } },
+        maxBarThickness: 13,
+        barPercentage: 0.7,
+        categoryPercentage: 0.7,
+        plugins: {
+          legend: { display:true, labels: { color: cor.muted, font:{family:'Inter', size:11} } },
+          datalabels: { display:true }
+        },
         scales: {
           x: { ticks: {color: cor.muted}, grid: {color: cor.line}, beginAtZero:true },
           y: { ticks: {color: cor.muted, font:{size:11}}, grid: {display:false} }
