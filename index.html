@@ -586,8 +586,11 @@
 
         <div class="panel" style="margin-top:16px;">
           <h2>Técnicos Ativos Únicos por Supervisor</h2>
-          <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto;">
-            <canvas id="tecnicosSupervisorChart"></canvas>
+          <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+            <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto; flex:1 1 320px; min-width:280px;">
+              <canvas id="tecnicosSupervisorChart"></canvas>
+            </div>
+            <div id="tecnicosSupervisorResumoBox" style="flex:0 0 240px; max-height:340px; overflow-y:auto; border:1px solid var(--line); border-radius:10px; background:var(--panel);"></div>
           </div>
         </div>
       </div>
@@ -1998,37 +2001,6 @@ function renderHeadcount(){
     const alturaCalculada = Math.max(alturaMinima, supervisoresOrdenados.length * alturaPorBarra);
     tecnicosCanvas.parentElement.style.height = alturaCalculada + 'px';
 
-    // Dataset invisível só pra desenhar, no fim de cada barra empilhada,
-    // o total atual (ativos + vagas), o total esperado e a diferença.
-    const totalEsperadoDataset = {
-      label: 'Esperado',
-      data: supervisoresOrdenados.map(() => 0),
-      backgroundColor: 'rgba(0,0,0,0)',
-      datalabels: {
-        anchor: 'end', align: 'right', offset: 4,
-        font: { size:10, family:'JetBrains Mono', weight:'700' },
-        color: (ctx) => {
-          const label = supervisoresOrdenados[ctx.dataIndex];
-          const esperado = totalEsperadoPorSupervisor[semAcentoHc(label)];
-          if(esperado === undefined) return cor.muted;
-          const atual = (porSupervisor[label]||0) + (vagasAbertasPorSupervisor[label]||0);
-          const diff = esperado - atual;
-          if(diff === 0) return cor.good;
-          return diff > 0 ? cor.bad : cor.warn;
-        },
-        formatter: (value, ctx) => {
-          const label = supervisoresOrdenados[ctx.dataIndex];
-          const atual = (porSupervisor[label]||0) + (vagasAbertasPorSupervisor[label]||0);
-          const esperado = totalEsperadoPorSupervisor[semAcentoHc(label)];
-          if(esperado === undefined) return 'Total: ' + atual;
-          const diff = esperado - atual;
-          if(diff === 0) return 'Total: ' + atual + ' (completo)';
-          if(diff > 0) return 'Total: ' + atual + ' de ' + esperado + ' (faltam ' + diff + ')';
-          return 'Total: ' + atual + ' de ' + esperado + ' (excedente ' + Math.abs(diff) + ')';
-        }
-      }
-    };
-
     tecnicosSupChartInst = new Chart(tecnicosCanvas, {
       type: 'bar',
       data: {
@@ -2049,8 +2021,7 @@ function renderHeadcount(){
               display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
               color: '#ffffff', anchor:'center', align:'center', font:{size:10, family:'JetBrains Mono', weight:'700'}
             }
-          },
-          totalEsperadoDataset
+          }
         ]
       },
       plugins: [ChartDataLabels],
@@ -2062,13 +2033,7 @@ function renderHeadcount(){
         barPercentage: 0.7,
         categoryPercentage: 0.7,
         plugins: {
-          legend: {
-            display:true,
-            labels: {
-              color: cor.text, font:{family:'Inter', size:11},
-              filter: (item) => item.text !== 'Esperado'
-            }
-          },
+          legend: { display:true, labels: { color: cor.text, font:{family:'Inter', size:11} } },
           datalabels: { display:true }
         },
         scales: {
@@ -2077,6 +2042,30 @@ function renderHeadcount(){
         }
       }
     });
+  }
+
+  // NOVO: quadrinho ao lado do gráfico com Total atual / Meta / Diferença
+  // por supervisor — tirado do gráfico (que ficava esticado demais com o
+  // texto) e colocado numa lista compacta, na mesma ordem das barras.
+  const resumoBox = document.getElementById('tecnicosSupervisorResumoBox');
+  if(resumoBox){
+    resumoBox.innerHTML = supervisoresOrdenados.map(label => {
+      const atual = (porSupervisor[label]||0) + (vagasAbertasPorSupervisor[label]||0);
+      const esperado = totalEsperadoPorSupervisor[semAcentoHc(label)];
+      let linhaMeta = '';
+      if(esperado === undefined){
+        linhaMeta = `<div class="mono" style="font-size:11px; color:${cor.muted};">Total: ${atual}</div>`;
+      } else {
+        const diff = esperado - atual;
+        const corDiff = diff === 0 ? cor.good : (diff > 0 ? cor.bad : cor.warn);
+        const textoDiff = diff === 0 ? 'completo' : (diff > 0 ? `faltam ${diff}` : `excedente ${Math.abs(diff)}`);
+        linhaMeta = `<div class="mono" style="font-size:11px; color:${corDiff}; font-weight:700;">${atual} de ${esperado} · ${textoDiff}</div>`;
+      }
+      return `<div style="padding:8px 10px; border-bottom:1px solid ${cor.line};">
+        <div style="font-size:11.5px; font-weight:600; color:${cor.text}; margin-bottom:2px;">${label}</div>
+        ${linhaMeta}
+      </div>`;
+    }).join('');
   }
 
   const searchInput = document.getElementById('hc-search');
