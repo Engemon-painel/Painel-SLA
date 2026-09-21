@@ -4518,9 +4518,17 @@ function render(){
       return Array.isArray(m.todosSites) ? m.todosSites : (Array.isArray(m.topSites) ? m.topSites : []);
     }
 
+    // NOVO: sites já conhecidos como os maiores ofensores — excluídos daqui
+    // pra este ranking mostrar quem mais teve incidentes em Jul/Ago/Set
+    // além desses.
+    const SITES_EXCLUIDOS_RECORRENTES = new Set([
+      'SMPIR62','SMSMT03','SMIKGR1','SMSOBR3','SMFCRR1','SMBMB02','SMPIRT3','SMBGI1','SMSAME1'
+    ]);
+
     const somaPorSite = {};
     ultimosTresMesesSites.forEach(m => {
       sitesDoMes(m).forEach(s => {
+        if(SITES_EXCLUIDOS_RECORRENTES.has(s.site)) return;
         somaPorSite[s.site] = (somaPorSite[s.site] || 0) + s.total;
       });
     });
