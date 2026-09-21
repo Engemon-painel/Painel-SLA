@@ -4655,9 +4655,8 @@ function render(){
         (d.sugestoes && d.sugestoes.length ? ' Talvez seja: ' + d.sugestoes.map(x => x.site + ' (' + x.total + ')').join(', ') + '.' : ''));
     });
     const tituloTop = ['Período: ' + periodoTop];
-    if(mesesJanela.length && janelaBase.usados === mesesJanela.length){
-      tituloTop.push('Fonte: aba Historico (Tipo = Indisponibilidade, por SITE_CI)');
-    } else {
+    // Só avisa quando a contagem direta da base (sitesBase) NÃO está sendo usada.
+    if(!(mesesJanela.length && janelaBase.usados === mesesJanela.length)){
       tituloTop.push('Fonte: totais do painel (com filtros) — rode o Office Script novo para usar a base completa');
     }
     if(zerosClaro.length){
