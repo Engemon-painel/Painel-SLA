@@ -326,13 +326,22 @@
         </table>
       </div>
 
-      <div class="grid" style="grid-template-columns: 1.6fr 1fr; margin-bottom:16px;">
+      <div class="grid" style="grid-template-columns: 1fr 1fr; margin-bottom:16px;">
         <div class="panel">
-          <h2>Top Sites — Claro e Engemon</h2>
-          <div id="topSitesChartWrap" style="position:relative; height:460px;">
-            <canvas id="topSitesChart"></canvas>
+          <h2>Top Sites — Claro</h2>
+          <div id="topSitesClaroChartWrap" style="position:relative; height:340px;">
+            <canvas id="topSitesClaroChart"></canvas>
           </div>
         </div>
+        <div class="panel">
+          <h2>Top 10 Sites — Engemon</h2>
+          <div id="topSitesEngemonChartWrap" style="position:relative; height:340px;">
+            <canvas id="topSitesEngemonChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns: 1fr; margin-bottom:16px;">
         <div class="panel">
           <h2>Sites que Mais Repetiram (Top 15)</h2>
           <div id="sitesRecorrentesChartWrap" style="position:relative; height:460px;">
@@ -1697,7 +1706,7 @@ function renderDiasRow(diarioFiltrado){
 let hcContratoPopulado = false;
 let hcStatusPopulado = false;
 let admDemChartInst, evolucaoChartInst, tecnicosSupChartInst;
-let areaChart, areaDiarioChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, genericTier2Chart, genericTier3Chart, resolucaoChart, sitesRecorrentesChart;
+let areaChart, areaDiarioChart, monthlyChart, dailyChart, weeklyChart, causaChart, acaoChart, horaForaSubmitChart, horaForaClearChart, topSitesChart, topSitesEngemonChart, genericTier2Chart, genericTier3Chart, resolucaoChart, sitesRecorrentesChart;
 const MES_PT_ARR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function pad2hc(n){ return n < 10 ? '0'+n : String(n); }
@@ -4619,12 +4628,13 @@ function render(){
     renderInfraTables();
   }
 
-  // ---- Top Sites — Claro (vermelho, lista fixa) e Engemon (azul, Top 10 dos demais) ----
+  // ---- Top Sites — quadro da Claro (vermelho, lista fixa) e quadro da Engemon (azul, Top 10 dos demais) ----
   // Período: os últimos MESES_RANKING_SITES meses, terminando no mês selecionado.
   // Todos os sites da Claro (SITES_CLARO) aparecem sempre; se algum estiver com 0, o motivo provável
   // é explicado no Console (F12).
-  const topSitesCanvas = document.getElementById('topSitesChart');
-  if(topSitesCanvas){
+  const topSitesClaroCanvas = document.getElementById('topSitesClaroChart');
+  const topSitesEngemonCanvas = document.getElementById('topSitesEngemonChart');
+  if(topSitesClaroCanvas && topSitesEngemonCanvas){
     const LIMITE_ENGEMON = 10;
     const inicioJanela = Math.max(0, mesAtualIdx - MESES_RANKING_SITES + 1);
     const mesesJanela = DADOS.meses.slice(inicioJanela, mesAtualIdx + 1);
@@ -4637,12 +4647,7 @@ function render(){
     const todosBase = mesesComSitesDaBase(DADOS.meses, SITES_BASE);
     const rk = rankingSitesClaroEngemon(janelaBase.meses, todosBase.meses, LIMITE_ENGEMON);
 
-    const separador = rk.engemon.length ? [''] : [];
-    const labelsTop = [...rk.claro.map(x => x.site), ...separador, ...rk.engemon.map(x => x.site)];
-    const dadosClaro = [...rk.claro.map(x => x.total), ...separador.map(() => null), ...rk.engemon.map(() => null)];
-    const dadosEngemon = [...rk.claro.map(() => null), ...separador.map(() => null), ...rk.engemon.map(x => x.total)];
-
-    // sites da Claro sem incidentes no período: avisa no gráfico e explica no Console
+    // sites da Claro sem incidentes no período: avisa no quadro e explica no Console
     const zerosClaro = rk.claro.filter(x => x.total === 0).map(x => x.site);
     zerosClaro.forEach(site => {
       const d = rk.diagnostico[site];
@@ -4655,21 +4660,32 @@ function render(){
         (parecidos ? ' Nomes parecidos: ' + parecidos + '.' : '') +
         (d.sugestoes && d.sugestoes.length ? ' Talvez seja: ' + d.sugestoes.map(x => x.site + ' (' + x.total + ')').join(', ') + '.' : ''));
     });
-    const tituloTop = ['Período: ' + periodoTop];
+
+    const tituloClaro = ['Período: ' + periodoTop];
     // Só avisa quando a contagem direta da base (sitesBase) NÃO está sendo usada.
     if(!(mesesJanela.length && janelaBase.usados === mesesJanela.length)){
-      tituloTop.push('Fonte: totais do painel (com filtros) — rode o Office Script novo para usar a base completa');
+      tituloClaro.push('Fonte: totais do painel (com filtros) — rode o Office Script novo para usar a base completa');
     }
     if(zerosClaro.length){
-      tituloTop.push('Sem incidentes no período: ' + zerosClaro.map(site => {
+      tituloClaro.push('Sem incidentes no período: ' + zerosClaro.map(site => {
         const sug = (rk.diagnostico[site].sugestoes || [])[0];
         return sug ? site + ' (parecido: ' + sug.site + ' = ' + sug.total + ')' : site;
       }).join(', '));
     }
     if(rk.usouTopSites){
-      tituloTop.push('Atenção: o dados.json não traz "todosSites"; usando só o Top 15 de cada mês.');
+      tituloClaro.push('Atenção: o dados.json não traz "todosSites"; usando só o Top 15 de cada mês.');
       console.warn('[Top Sites] "todosSites" ausente no dados.json — contagem parcial (Top 15 por mês). Atualize o Office Script.');
     }
+    const tituloEngemon = rk.engemon.length
+      ? ['Período: ' + periodoTop]
+      : ['Sem incidentes no período ' + periodoTop];
+
+    // os dois quadros têm a mesma altura
+    const alturaQuadros = Math.max(300, Math.max(rk.claro.length, rk.engemon.length) * 24 + 110);
+    ['topSitesClaroChartWrap', 'topSitesEngemonChartWrap'].forEach(id => {
+      const w = document.getElementById(id);
+      if(w) w.style.height = alturaQuadros + 'px';
+    });
 
     const rotuloClaro = {
       color: '#000000', anchor:'end', align:'right',
@@ -4682,33 +4698,33 @@ function render(){
       display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0
     };
 
-    const wrap = document.getElementById('topSitesChartWrap');
-    if(wrap) wrap.style.height = Math.max(260, labelsTop.length * 24 + 70) + 'px';
-
-    if(topSitesChart) topSitesChart.destroy();
-    topSitesChart = new Chart(topSitesCanvas, {
-      type: 'bar',
-      data: {
-        labels: labelsTop,
-        datasets: [
-          { label: 'Claro', data: dadosClaro, backgroundColor: '#e4202b', borderRadius: 4, datalabels: rotuloClaro },
-          { label: 'Engemon', data: dadosEngemon, backgroundColor: '#1f77b4', borderRadius: 4, datalabels: rotuloEngemon }
-        ]
-      },
-      plugins: [ChartDataLabels],
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { labels:{ color: cor.muted, font:{family:'Inter', size:11} } },
-          title: { display: true, text: tituloTop, color: cor.muted, font:{family:'Inter', size:11, weight:'normal'} },
-          datalabels: { display:true }
+    function criarQuadroRanking(canvas, chartAtual, nomeSerie, itens, corBarra, rotulo, tituloLinhas){
+      if(chartAtual) chartAtual.destroy();
+      return new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: itens.map(x => x.site),
+          datasets: [{ label: nomeSerie, data: itens.map(x => x.total), backgroundColor: corBarra, borderRadius: 4, datalabels: rotulo }]
         },
-        scales: {
-          x: { stacked:true, ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
-          y: { stacked:true, ticks:{color:cor.text, font:{size:11, weight:'bold'}}, grid:{display:false} }
+        plugins: [ChartDataLabels],
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          layout: { padding: { right: 28 } },
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: tituloLinhas, color: cor.muted, font:{family:'Inter', size:11, weight:'normal'} },
+            datalabels: { display: true }
+          },
+          scales: {
+            x: { ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
+            y: { ticks:{color:cor.text, font:{size:11, weight:'bold'}}, grid:{display:false} }
+          }
         }
-      }
-    });
+      });
+    }
+
+    topSitesChart = criarQuadroRanking(topSitesClaroCanvas, topSitesChart, 'Claro', rk.claro, '#e4202b', rotuloClaro, tituloClaro);
+    topSitesEngemonChart = criarQuadroRanking(topSitesEngemonCanvas, topSitesEngemonChart, 'Engemon', rk.engemon, '#1f77b4', rotuloEngemon, tituloEngemon);
   }
 
   // =====================================================================
