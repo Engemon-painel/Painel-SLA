@@ -4526,15 +4526,21 @@ function render(){
     ]);
 
     const somaPorSite = {};
+    const mesesComIncidentePorSite = {};
     ultimosTresMesesSites.forEach(m => {
       sitesDoMes(m).forEach(s => {
         if(SITES_EXCLUIDOS_RECORRENTES.has(s.site)) return;
+        if(!s.total) return;
         somaPorSite[s.site] = (somaPorSite[s.site] || 0) + s.total;
+        if(!mesesComIncidentePorSite[s.site]) mesesComIncidentePorSite[s.site] = new Set();
+        mesesComIncidentePorSite[s.site].add(m.mes);
       });
     });
+    // NOVO: só entra quem teve incidente nos 3 meses (Jul/Ago/Set), não
+    // só os de maior volume total — por isso sem corte no Top 15/10 aqui.
     const sitesOrdenados = Object.keys(somaPorSite)
-      .sort((a,b) => somaPorSite[b] - somaPorSite[a])
-      .slice(0, 15);
+      .filter(site => mesesComIncidentePorSite[site] && mesesComIncidentePorSite[site].size === ultimosTresMesesSites.length)
+      .sort((a,b) => somaPorSite[b] - somaPorSite[a]);
 
     const alturaPorBarra = 24;
     const alturaMinima = 260;
