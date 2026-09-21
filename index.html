@@ -1131,7 +1131,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // Engemon (Top 10 dos demais).
 const SITES_CLARO = ['SMPIR62','SMSMT03','SMIKGR1','SMSOBR3','SMFCRR1','SMEMB02','SMPIRT3','SMEBG1N','SMSAME1'];
 // Quantos meses entram no ranking (terminando no mês selecionado nos chips).
-const MESES_RANKING_SITES = 3;
+// 1 = só o mês selecionado (ex.: escolheu Set/26 -> mostra o volume de setembro).
+const MESES_RANKING_SITES = 1;
 
 // "SMPIR-62 " e "smpir62" viram a mesma chave: SMPIR62.
 function chaveSite(s){ return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
