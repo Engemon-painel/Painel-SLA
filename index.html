@@ -1247,7 +1247,21 @@ async function carregarDados(){
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
     mesAtualIdx = DADOS.meses.length - 1;
-    if(status) status.textContent = data.atualizado_em ? ('Dados atualizados em ' + data.atualizado_em) : '';
+    if(status){
+      let txt = data.atualizado_em ? ('Dados atualizados em ' + data.atualizado_em) : '';
+      let defasada = false;
+      if(data.dadosAte){
+        txt += ' · base até ' + data.dadosAte;
+        const p = String(data.dadosAte).split('/');
+        if(p.length === 3){
+          const dtBase = new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+          const diasAtraso = Math.floor((new Date() - dtBase) / 86400000);
+          if(diasAtraso > 2){ defasada = true; txt += ' ⚠ base com ' + diasAtraso + ' dias de atraso'; }
+        }
+      }
+      status.textContent = txt;
+      status.style.color = defasada ? cor.bad : '';
+    }
     montarPagina();
     renderHeadcount();
   }catch(err){
