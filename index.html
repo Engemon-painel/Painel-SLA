@@ -554,10 +554,15 @@
           <h2>Colaboradores</h2>
 
           <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
-            <div class="search" title="Buscar por nome, matrícula, placa, supervisor, contrato">
+            <div class="search" title="Buscar por nome, matrícula, placa, supervisor, endereço">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              <input id="hc-search" type="search" placeholder="Buscar por nome, matrícula, placa, supervisor, contrato..." aria-label="Buscar colaboradores" />
+              <input id="hc-search" type="search" placeholder="Buscar por nome, matrícula, placa, supervisor, endereço..." aria-label="Buscar colaboradores" />
             </div>
+            <label for="hcSupervisorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Supervisor</label>
+            <select id="hcSupervisorFiltro" class="mono" onchange="filtrarPorSupervisorHc(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:220px;">
+              <option value="">Todos</option>
+            </select>
+            <span id="hcContagemTabela" class="mono" style="font-size:11px; color:var(--muted); margin-left:auto;"></span>
           </div>
 
           <div style="overflow:auto; border-radius:8px;">
@@ -567,6 +572,7 @@
                   <th>Status</th>
                   <th>Matrícula</th>
                   <th>Nome</th>
+                  <th>Endereço</th>
                   <th>Nome Supervisor</th>
                   <th>Data Admis.</th>
                   <th>Coordenador</th>
@@ -1054,6 +1060,14 @@ function filtrarTipoDivergentePorMes(valor){
 function filtrarPorContrato(valor){
   contratoFiltroAtual = valor;
   renderHeadcount();
+}
+
+let hcSupervisorFiltroAtual = '';
+// Filtro de supervisor da tabela Colaboradores (só a tabela; não muda os cards/gráficos acima).
+function filtrarPorSupervisorHc(valor){
+  hcSupervisorFiltroAtual = valor;
+  const busca = document.getElementById('hc-search');
+  renderEmployeeTable(busca ? busca.value : '');
 }
 
 let hcStatusFiltroAtual = '';
@@ -1776,6 +1790,7 @@ function renderEmployeeTable(filterText = '') {
     if(contratoFiltroAtual && canonContratoHc(c.contrato) !== contratoFiltroAtual) return false;
     if(hcStatusFiltroAtual === 'Ativo' && !c.ativo) return false;
     if(hcStatusFiltroAtual === 'Inativo' && c.ativo) return false;
+    if(hcSupervisorFiltroAtual && normHc(c.supervisor) !== hcSupervisorFiltroAtual) return false;
     return true;
   }).filter(c => {
     if(!q) return true;
@@ -1786,10 +1801,14 @@ function renderEmployeeTable(filterText = '') {
     const contrato2 = getValAuto(c, ['contrato_2','contrato2','contrato']);
     const area = getValAuto(c, ['area','areatecnica','areaTecnica']);
     const funcao = getValAuto(c, ['descFuncao','descricaoFuncao','funcao','cargo','descricao']);
+    const enderecoBusca = c.endereco || '';
 
-    const hay = [nome, matricula, placa, supervisor, contrato2, area, funcao].map(x => norm(x)).join(' ');
+    const hay = [nome, matricula, placa, supervisor, contrato2, area, funcao, enderecoBusca].map(x => norm(x)).join(' ');
     return hay.includes(q);
   });
+
+  const contagemEl = document.getElementById('hcContagemTabela');
+  if(contagemEl) contagemEl.textContent = filtered.length.toLocaleString('pt-BR') + ' colaborador' + (filtered.length === 1 ? '' : 'es');
 
   if (filtered.length === 0) {
     tbody.innerHTML = '';
@@ -1814,11 +1833,13 @@ function renderEmployeeTable(filterText = '') {
     const placa = getValAuto(c, ['placa','placaVeiculo','placa_veiculo']) || '—';
     const contrato2 = getValAuto(c, ['contrato_2','contrato2']) || getValAuto(c, ['contrato']) || '—';
     const descFuncao = getValAuto(c, ['descFuncao','descricaoFuncao','funcao','cargo','descricao']) || '—';
+    const endereco = c.endereco || '—';
 
     return `<tr data-nome="${esc(nome)}" data-matricula="${esc(matricula)}" data-supervisor="${esc(supervisor)}">
       <td>${statusHtml}</td>
       <td>${esc(matricula)}</td>
       <td>${esc(nome)}</td>
+      <td>${esc(endereco)}</td>
       <td>${esc(supervisor)}</td>
       <td>${esc(dataAdmis)}</td>
       <td>${esc(coordenador)}</td>
@@ -1876,6 +1897,17 @@ function renderHeadcount(){
 
   const ativos = colabFiltrados.filter(c => hcStatusFiltroAtual ? true : c.ativo);
   const hcTotal = ativos.length;
+
+  // opções do filtro de supervisor da tabela Colaboradores
+  const selectSupHc = document.getElementById('hcSupervisorFiltro');
+  if(selectSupHc){
+    const supervisoresHc = Array.from(new Set(colabFiltrados.map(c => normHc(c.supervisor)).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    if(hcSupervisorFiltroAtual && supervisoresHc.indexOf(hcSupervisorFiltroAtual) === -1) hcSupervisorFiltroAtual = '';
+    selectSupHc.innerHTML = '<option value="">Todos</option>' +
+      supervisoresHc.map(s => `<option value="${s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}">${s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</option>`).join('');
+    selectSupHc.value = hcSupervisorFiltroAtual;
+  }
 
   const porContrato = {};
   ativos.forEach(c => {
