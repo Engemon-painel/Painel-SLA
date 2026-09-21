@@ -1129,7 +1129,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Sites que são da Claro. Todos eles SEMPRE aparecem no gráfico (mesmo com 0
 // incidentes no período). Qualquer site fora desta lista entra no ranking da
 // Engemon (Top 10 dos demais).
-const SITES_CLARO = ['SMPIR62','SMSMT03','SMIKGR1','SMSOBR3','SMFCRR1','SMBMB02','SMPIRT3','SMBGI1','SMSAME1'];
+const SITES_CLARO = ['SMPIR62','SMSMT03','SMIKGR1','SMSOBR3','SMFCRR1','SMEMB02','SMPIRT3','SMBGI1','SMSAME1'];
 // Quantos meses entram no ranking (terminando no mês selecionado nos chips).
 const MESES_RANKING_SITES = 3;
 
@@ -1162,6 +1162,20 @@ function sitesDoMesRanking(m){
   if(m && Array.isArray(m.todosSites)) return m.todosSites;
   if(m && Array.isArray(m.topSites)) return m.topSites;
   return [];
+}
+
+// Distância de edição (quantas letras trocar/inserir/apagar) entre duas chaves curtas.
+function distanciaEdicao(a, b){
+  const m = a.length, n = b.length;
+  let anterior = Array.from({ length: n + 1 }, (_, j) => j);
+  for(let i = 1; i <= m; i++){
+    const atual = [i];
+    for(let j = 1; j <= n; j++){
+      atual[j] = Math.min(anterior[j] + 1, atual[j - 1] + 1, anterior[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    anterior = atual;
+  }
+  return anterior[n];
 }
 
 function rankingSitesClaroEngemon(mesesJanela, todosMeses, limiteEngemon){
@@ -1207,6 +1221,26 @@ function rankingSitesClaroEngemon(mesesJanela, todosMeses, limiteEngemon){
         });
       }
     });
+  });
+
+  // sugestões: sites da base com nome quase igual ao de um site da Claro (até 3 letras de diferença)
+  const totaisPorChave = {};
+  (todosMeses || []).forEach(m => {
+    sitesDoMesRanking(m).forEach(s => {
+      const nome = String((s && s.site) || '').trim();
+      const chave = chaveSite(nome);
+      const n = Number(s && s.total) || 0;
+      if(chave.length < 5 || n <= 0 || nomePorChave[chave]) return;
+      if(!totaisPorChave[chave]) totaisPorChave[chave] = { site: nome.toUpperCase(), total: 0 };
+      totaisPorChave[chave].total += n;
+    });
+  });
+  Object.keys(nomePorChave).forEach(k => {
+    diagnostico[nomePorChave[k]].sugestoes = Object.keys(totaisPorChave)
+      .map(c => ({ site: totaisPorChave[c].site, total: totaisPorChave[c].total, dist: distanciaEdicao(k, c) }))
+      .filter(x => x.dist <= 3)
+      .sort((x, y) => x.dist - y.dist || y.total - x.total)
+      .slice(0, 3);
   });
 
   const claro = SITES_CLARO
@@ -4586,7 +4620,7 @@ function render(){
 
   // ---- Top Sites — Claro (vermelho, lista fixa) e Engemon (azul, Top 10 dos demais) ----
   // Período: os últimos MESES_RANKING_SITES meses, terminando no mês selecionado.
-  // Os 9 sites da Claro aparecem sempre; se algum estiver com 0, o motivo provável
+  // Todos os sites da Claro (SITES_CLARO) aparecem sempre; se algum estiver com 0, o motivo provável
   // é explicado no Console (F12).
   const topSitesCanvas = document.getElementById('topSitesChart');
   if(topSitesCanvas){
@@ -4617,7 +4651,8 @@ function render(){
         (meses
           ? 'Aparece em outros meses — ' + meses + '.'
           : 'Nome não encontrado em nenhum mês do dados.json.') +
-        (parecidos ? ' Nomes parecidos: ' + parecidos + '.' : ''));
+        (parecidos ? ' Nomes parecidos: ' + parecidos + '.' : '') +
+        (d.sugestoes && d.sugestoes.length ? ' Talvez seja: ' + d.sugestoes.map(x => x.site + ' (' + x.total + ')').join(', ') + '.' : ''));
     });
     const tituloTop = ['Período: ' + periodoTop];
     if(mesesJanela.length && janelaBase.usados === mesesJanela.length){
@@ -4625,7 +4660,12 @@ function render(){
     } else {
       tituloTop.push('Fonte: totais do painel (com filtros) — rode o Office Script novo para usar a base completa');
     }
-    if(zerosClaro.length) tituloTop.push('Sem incidentes no período: ' + zerosClaro.join(', '));
+    if(zerosClaro.length){
+      tituloTop.push('Sem incidentes no período: ' + zerosClaro.map(site => {
+        const sug = (rk.diagnostico[site].sugestoes || [])[0];
+        return sug ? site + ' (parecido: ' + sug.site + ' = ' + sug.total + ')' : site;
+      }).join(', '));
+    }
     if(rk.usouTopSites){
       tituloTop.push('Atenção: o dados.json não traz "todosSites"; usando só o Top 15 de cada mês.');
       console.warn('[Top Sites] "todosSites" ausente no dados.json — contagem parcial (Top 15 por mês). Atualize o Office Script.');
