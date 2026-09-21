@@ -1125,37 +1125,80 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ---- Ranking de sites: Claro (lista fixa) x Engemon (todos os demais) ----
-// Sites que são da Claro. Qualquer site que NÃO esteja nesta lista entra no
-// ranking da Engemon (Top 10 dos demais).
+// Sites que são da Claro. Todos eles SEMPRE aparecem no gráfico (mesmo com 0
+// incidentes no período). Qualquer site fora desta lista entra no ranking da
+// Engemon (Top 10 dos demais).
 const SITES_CLARO = ['SMPIR62','SMSMT03','SMIKGR1','SMSOBR3','SMFCRR1','SMBMB02','SMPIRT3','SMBGI1','SMSAME1'];
 // Quantos meses entram no ranking (terminando no mês selecionado nos chips).
 const MESES_RANKING_SITES = 3;
 
-function rankingSitesClaroEngemon(itens, mesesOrd, limiteEngemon){
-  const claroSet = new Set(SITES_CLARO.map(s => s.toUpperCase()));
-  const ords = new Set(mesesOrd);
+// "SMPIR-62 " e "smpir62" viram a mesma chave: SMPIR62.
+function chaveSite(s){ return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+// Totais de incidentes por site em cada mês (mesma fonte do gráfico
+// "Sites que Mais Repetiram"): usa "todosSites"; se o dados.json ainda não
+// trouxer esse campo, cai no "topSites" (só o Top 15 de cada mês).
+function sitesDoMesRanking(m){
+  if(m && Array.isArray(m.todosSites)) return m.todosSites;
+  if(m && Array.isArray(m.topSites)) return m.topSites;
+  return [];
+}
+
+function rankingSitesClaroEngemon(mesesJanela, todosMeses, limiteEngemon){
+  const nomePorChave = {};
+  SITES_CLARO.forEach(s => { nomePorChave[chaveSite(s)] = s.toUpperCase(); });
+
+  const usouTopSites = (mesesJanela || []).some(m => m && !Array.isArray(m.todosSites) && Array.isArray(m.topSites) && m.topSites.length > 0);
   const contClaro = {}, contEngemon = {};
   let totalIncidentes = 0;
 
-  (itens || []).forEach(it => {
-    if(!it || !ords.has(it.mesOrd)) return;
-    if(AREAS_VALIDAS.indexOf(it.area) === -1) return;
-    const site = String(it.site || '').trim().toUpperCase();
-    if(site === '') return;
-    totalIncidentes++;
-    const alvo = claroSet.has(site) ? contClaro : contEngemon;
-    alvo[site] = (alvo[site] || 0) + 1;
+  (mesesJanela || []).forEach(m => {
+    sitesDoMesRanking(m).forEach(s => {
+      const siteBruto = String((s && s.site) || '').trim();
+      const chave = chaveSite(siteBruto);
+      const n = Number(s && s.total) || 0;
+      if(chave === '' || chave === 'SEMSITE' || n <= 0) return;
+      totalIncidentes += n;
+      const nomeClaro = nomePorChave[chave];
+      if(nomeClaro){
+        contClaro[nomeClaro] = (contClaro[nomeClaro] || 0) + n;
+      } else {
+        const nome = siteBruto.toUpperCase();
+        contEngemon[nome] = (contEngemon[nome] || 0) + n;
+      }
+    });
   });
 
-  const ordenar = c => Object.keys(c)
-    .map(site => ({ site: site, total: c[site] }))
-    .sort((x, y) => y.total - x.total || x.site.localeCompare(y.site, 'pt-BR'));
+  // diagnóstico: onde cada site da Claro aparece em QUALQUER mês, e nomes parecidos
+  const diagnostico = {};
+  SITES_CLARO.forEach(s => { diagnostico[s.toUpperCase()] = { meses: {}, parecidos: {} }; });
+  (todosMeses || []).forEach(m => {
+    sitesDoMesRanking(m).forEach(s => {
+      const siteBruto = String((s && s.site) || '').trim();
+      const chave = chaveSite(siteBruto);
+      const n = Number(s && s.total) || 0;
+      if(chave === '' || n <= 0) return;
+      const nomeClaro = nomePorChave[chave];
+      if(nomeClaro){
+        diagnostico[nomeClaro].meses[m.mes] = (diagnostico[nomeClaro].meses[m.mes] || 0) + n;
+      } else if(chave.length >= 5){
+        Object.keys(nomePorChave).forEach(k => {
+          if(chave.indexOf(k) !== -1 || k.indexOf(chave) !== -1) diagnostico[nomePorChave[k]].parecidos[siteBruto] = true;
+        });
+      }
+    });
+  });
 
-  return {
-    claro: ordenar(contClaro),
-    engemon: ordenar(contEngemon).slice(0, limiteEngemon),
-    totalIncidentes: totalIncidentes
-  };
+  const claro = SITES_CLARO
+    .map((s, i) => ({ site: s.toUpperCase(), total: contClaro[s.toUpperCase()] || 0, ordem: i }))
+    .sort((x, y) => y.total - x.total || x.ordem - y.ordem);
+
+  const engemon = Object.keys(contEngemon)
+    .map(site => ({ site: site, total: contEngemon[site] }))
+    .sort((x, y) => y.total - x.total || x.site.localeCompare(y.site, 'pt-BR'))
+    .slice(0, limiteEngemon);
+
+  return { claro: claro, engemon: engemon, totalIncidentes: totalIncidentes, diagnostico: diagnostico, usouTopSites: usouTopSites };
 }
 
 // ---- Navegação por páginas (menu lateral) ----
@@ -4522,35 +4565,56 @@ function render(){
 
   // ---- Top Sites — Claro (vermelho, lista fixa) e Engemon (azul, Top 10 dos demais) ----
   // Período: os últimos MESES_RANKING_SITES meses, terminando no mês selecionado.
+  // Os 9 sites da Claro aparecem sempre; se algum estiver com 0, o motivo provável
+  // é explicado no Console (F12).
   const topSitesCanvas = document.getElementById('topSitesChart');
   if(topSitesCanvas){
     const LIMITE_ENGEMON = 10;
     const inicioJanela = Math.max(0, mesAtualIdx - MESES_RANKING_SITES + 1);
     const mesesJanela = DADOS.meses.slice(inicioJanela, mesAtualIdx + 1);
-    const mesesOrdJanela = mesesJanela.map(m => '20' + m.mes.split('/')[1] + '-' + NOME_MES[m.mes.split('/')[0]]);
     const periodoTop = mesesJanela.length > 1
       ? mesesJanela[0].mes + ' – ' + mesesJanela[mesesJanela.length - 1].mes
       : (mesesJanela[0] ? mesesJanela[0].mes : '');
 
-    const rk = rankingSitesClaroEngemon(INCIDENTES_POR_SITE, mesesOrdJanela, LIMITE_ENGEMON);
+    const rk = rankingSitesClaroEngemon(mesesJanela, DADOS.meses, LIMITE_ENGEMON);
 
-    const separador = (rk.claro.length && rk.engemon.length) ? [''] : [];
+    const separador = rk.engemon.length ? [''] : [];
     const labelsTop = [...rk.claro.map(x => x.site), ...separador, ...rk.engemon.map(x => x.site)];
     const dadosClaro = [...rk.claro.map(x => x.total), ...separador.map(() => null), ...rk.engemon.map(() => null)];
     const dadosEngemon = [...rk.claro.map(() => null), ...separador.map(() => null), ...rk.engemon.map(x => x.total)];
 
-    const tituloTop = rk.totalIncidentes === 0
-      ? 'Sem incidentes no período ' + periodoTop
-      : 'Período: ' + periodoTop;
+    // sites da Claro sem incidentes no período: avisa no gráfico e explica no Console
+    const zerosClaro = rk.claro.filter(x => x.total === 0).map(x => x.site);
+    zerosClaro.forEach(site => {
+      const d = rk.diagnostico[site];
+      const meses = Object.keys(d.meses).sort().map(m => m + ': ' + d.meses[m]).join(', ');
+      const parecidos = Object.keys(d.parecidos).slice(0, 5).join(', ');
+      console.warn('[Top Sites] ' + site + ' com 0 no período ' + periodoTop + '. ' +
+        (meses
+          ? 'Aparece em outros meses — ' + meses + '.'
+          : 'Nome não encontrado em nenhum mês do dados.json.') +
+        (parecidos ? ' Nomes parecidos: ' + parecidos + '.' : ''));
+    });
+    const tituloTop = ['Período: ' + periodoTop];
+    if(zerosClaro.length) tituloTop.push('Sem incidentes no período: ' + zerosClaro.join(', '));
+    if(rk.usouTopSites){
+      tituloTop.push('Atenção: o dados.json não traz "todosSites"; usando só o Top 15 de cada mês.');
+      console.warn('[Top Sites] "todosSites" ausente no dados.json — contagem parcial (Top 15 por mês). Atualize o Office Script.');
+    }
 
-    const rotuloValor = {
+    const rotuloClaro = {
+      color: '#000000', anchor:'end', align:'right',
+      font:{size:10, family:'JetBrains Mono', weight:'700'},
+      display: (ctx) => ctx.dataset.data[ctx.dataIndex] !== null   // mostra também o 0
+    };
+    const rotuloEngemon = {
       color: '#000000', anchor:'end', align:'right',
       font:{size:10, family:'JetBrains Mono', weight:'700'},
       display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0
     };
 
     const wrap = document.getElementById('topSitesChartWrap');
-    if(wrap) wrap.style.height = Math.max(260, labelsTop.length * 24 + 60) + 'px';
+    if(wrap) wrap.style.height = Math.max(260, labelsTop.length * 24 + 70) + 'px';
 
     if(topSitesChart) topSitesChart.destroy();
     topSitesChart = new Chart(topSitesCanvas, {
@@ -4558,8 +4622,8 @@ function render(){
       data: {
         labels: labelsTop,
         datasets: [
-          { label: 'Claro', data: dadosClaro, backgroundColor: '#e4202b', borderRadius: 4, datalabels: rotuloValor },
-          { label: 'Engemon', data: dadosEngemon, backgroundColor: '#1f77b4', borderRadius: 4, datalabels: rotuloValor }
+          { label: 'Claro', data: dadosClaro, backgroundColor: '#e4202b', borderRadius: 4, datalabels: rotuloClaro },
+          { label: 'Engemon', data: dadosEngemon, backgroundColor: '#1f77b4', borderRadius: 4, datalabels: rotuloEngemon }
         ]
       },
       plugins: [ChartDataLabels],
