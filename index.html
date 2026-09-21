@@ -1004,6 +1004,7 @@ let FROTA = [];
 let VAGAS = [];
 let BANCO_HORAS = [];
 let INCIDENTES_POR_SITE = [];
+let SITES_BASE = []; // contagem por site direto da aba Historico (sitesBase do dados.json)
 let INFRA_ITENS_ATUAL = [];
 let incidentesPorSiteFiltroAtual = 'com';
 let slaAtivo = '4h';
@@ -1134,6 +1135,25 @@ const MESES_RANKING_SITES = 3;
 
 // "SMPIR-62 " e "smpir62" viram a mesma chave: SMPIR62.
 function chaveSite(s){ return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+// Converte "Set/26" em "2026-09".
+function ordDoMesLabel(mes){
+  const p = String(mes || '').split('/');
+  return '20' + p[1] + '-' + NOME_MES[p[0]];
+}
+
+// Para cada mês, usa a contagem por SITE_CI direto da aba Historico ("sitesBase"
+// do dados.json) quando ela existir; senão mantém os totais do painel.
+// "usados" diz em quantos meses a base foi usada.
+function mesesComSitesDaBase(meses, sitesBase){
+  let usados = 0;
+  const mapeados = (meses || []).map(m => {
+    const b = (sitesBase || []).find(x => x.mesOrd === ordDoMesLabel(m.mes));
+    if(b){ usados++; return { mes: m.mes, todosSites: b.sites }; }
+    return m;
+  });
+  return { meses: mapeados, usados: usados };
+}
 
 // Totais de incidentes por site em cada mês (mesma fonte do gráfico
 // "Sites que Mais Repetiram"): usa "todosSites"; se o dados.json ainda não
@@ -1320,6 +1340,7 @@ async function carregarDados(){
     VAGAS = data.vagas || [];
     BANCO_HORAS = data.bancoHoras || [];
     INCIDENTES_POR_SITE = data.incidentesPorSite || [];
+    SITES_BASE = data.sitesBase || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
     DIARIO = DIARIO_4H;
@@ -4576,7 +4597,10 @@ function render(){
       ? mesesJanela[0].mes + ' – ' + mesesJanela[mesesJanela.length - 1].mes
       : (mesesJanela[0] ? mesesJanela[0].mes : '');
 
-    const rk = rankingSitesClaroEngemon(mesesJanela, DADOS.meses, LIMITE_ENGEMON);
+    // Contagem direto da base (aba Historico), quando o dados.json trouxer "sitesBase".
+    const janelaBase = mesesComSitesDaBase(mesesJanela, SITES_BASE);
+    const todosBase = mesesComSitesDaBase(DADOS.meses, SITES_BASE);
+    const rk = rankingSitesClaroEngemon(janelaBase.meses, todosBase.meses, LIMITE_ENGEMON);
 
     const separador = rk.engemon.length ? [''] : [];
     const labelsTop = [...rk.claro.map(x => x.site), ...separador, ...rk.engemon.map(x => x.site)];
@@ -4596,6 +4620,11 @@ function render(){
         (parecidos ? ' Nomes parecidos: ' + parecidos + '.' : ''));
     });
     const tituloTop = ['Período: ' + periodoTop];
+    if(mesesJanela.length && janelaBase.usados === mesesJanela.length){
+      tituloTop.push('Fonte: aba Historico (Tipo = Indisponibilidade, por SITE_CI)');
+    } else {
+      tituloTop.push('Fonte: totais do painel (com filtros) — rode o Office Script novo para usar a base completa');
+    }
     if(zerosClaro.length) tituloTop.push('Sem incidentes no período: ' + zerosClaro.join(', '));
     if(rk.usouTopSites){
       tituloTop.push('Atenção: o dados.json não traz "todosSites"; usando só o Top 15 de cada mês.');
