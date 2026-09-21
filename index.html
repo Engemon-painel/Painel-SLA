@@ -334,7 +334,7 @@
           </div>
         </div>
         <div class="panel">
-          <h2>Sites que Mais Repetiram</h2>
+          <h2>Sites que Mais Repetiram (Top 15)</h2>
           <div id="sitesRecorrentesChartWrap" style="position:relative; height:460px;">
             <canvas id="sitesRecorrentesChart"></canvas>
           </div>
@@ -4560,12 +4560,16 @@ function render(){
     // Sites com incidente em 2 ou 3 dos 3 meses, sem limite de 10.
     // Ordem: primeiro os de 3 meses, depois os de 2; dentro de cada grupo,
     // quem tem mais incidentes.
+    // Quantos sites aparecem no gráfico (os que mais repetiram, já ordenados).
+    const LIMITE_SITES_RECORRENTES = 15;
+
     const sitesOrdenados = Object.keys(somaPorSite)
       .filter(site => mesesComIncidentePorSite[site].size >= 2)
       .sort((a, b) =>
         mesesComIncidentePorSite[b].size - mesesComIncidentePorSite[a].size ||
         somaPorSite[b] - somaPorSite[a]
-      );
+      )
+      .slice(0, LIMITE_SITES_RECORRENTES);
 
     // Altura do card acompanha a quantidade de sites.
     const alturaPorBarra = 24;
