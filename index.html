@@ -4536,10 +4536,12 @@ function render(){
         mesesComIncidentePorSite[s.site].add(m.mes);
       });
     });
-    // NOVO: só entra quem teve incidente nos 3 meses (Jul/Ago/Set), não
-    // só os de maior volume total — por isso sem corte no Top 15/10 aqui.
+    // ALTERADO: exigir os 3 meses ao mesmo tempo dava lista vazia — os
+    // únicos sites que se repetiam nos 3 meses eram justamente os 9 já
+    // excluídos acima. Com pelo menos 2 dos 3 meses aparece uma segunda
+    // camada de sites recorrentes, além dos já conhecidos.
     const sitesOrdenados = Object.keys(somaPorSite)
-      .filter(site => mesesComIncidentePorSite[site] && mesesComIncidentePorSite[site].size === ultimosTresMesesSites.length)
+      .filter(site => mesesComIncidentePorSite[site] && mesesComIncidentePorSite[site].size >= 2)
       .sort((a,b) => somaPorSite[b] - somaPorSite[a]);
 
     const alturaPorBarra = 24;
