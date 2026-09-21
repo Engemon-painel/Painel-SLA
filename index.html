@@ -761,6 +761,14 @@
       <div class="panel" id="frotaSecao">
         <h2>Gestão de Frotas</h2>
 
+        <div style="margin:6px 0 12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="frotaContratoTopo" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Contrato</label>
+          <select id="frotaContratoTopo" class="mono" onchange="filtrarFrotaPorOperacaoEKpi(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:280px;">
+            <option value="">Todos os contratos</option>
+          </select>
+          <span id="frotaFiltroInfo" class="mono" style="font-size:11px; color:var(--muted);"></span>
+        </div>
+
         <div class="kpi-row" id="frotaOperacaoKpiRow" style="margin-bottom:14px;"></div>
         <div class="kpi-row" id="frotaKpiRow" style="margin-bottom:20px;"></div>
 
@@ -2884,7 +2892,7 @@ function extrairNumeroValorFrota(v){
 function frotaFiltrada(){
   const q = (document.getElementById('frota-search')?.value || '').toLowerCase().trim();
   return FROTA.filter(v => {
-    if(frotaOperacaoFiltroAtual && canonOperacaoFrota(v.operacao) !== frotaOperacaoFiltroAtual) return false;
+    if(frotaOperacaoFiltroAtual && (canonOperacaoFrota(v.operacao) || 'Sem operação') !== frotaOperacaoFiltroAtual) return false;
     if(frotaStatusFiltroAtual && normFrota(v.status) !== frotaStatusFiltroAtual) return false;
     if(frotaModeloFiltroAtual && normFrota(v.modelo) !== frotaModeloFiltroAtual) return false;
     if(frotaTipoFiltroAtual && normFrota(v.tipo) !== frotaTipoFiltroAtual) return false;
@@ -3037,6 +3045,12 @@ function renderFrota(){
   }
 
   const total = FROTA.length;
+  // Filtro de contrato: tudo o que fica abaixo dos cards de contrato (status, gasto, gráficos,
+  // ranking, combustível e a tabela) usa só a frota do contrato selecionado.
+  const FROTA_F = frotaOperacaoFiltroAtual
+    ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === frotaOperacaoFiltroAtual)
+    : FROTA;
+  const totalF = FROTA_F.length;
 
   const porOperacao = {};
   FROTA.forEach(v => {
@@ -3044,6 +3058,21 @@ function renderFrota(){
     porOperacao[k] = (porOperacao[k] || 0) + 1;
   });
   const operacoesOrdenadas = Object.keys(porOperacao).sort((a,b)=> porOperacao[b]-porOperacao[a]);
+
+  // seletor de contrato no topo (sincronizado com os cards e com o filtro da tabela)
+  const escAttrFrota = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const selectContratoTopo = document.getElementById('frotaContratoTopo');
+  if(selectContratoTopo){
+    selectContratoTopo.innerHTML = '<option value="">Todos os contratos (' + total + ')</option>' +
+      operacoesOrdenadas.map(k => `<option value="${escAttrFrota(k)}">${escAttrFrota(k)} (${porOperacao[k]})</option>`).join('');
+    selectContratoTopo.value = frotaOperacaoFiltroAtual;
+  }
+  const infoFiltroFrota = document.getElementById('frotaFiltroInfo');
+  if(infoFiltroFrota){
+    infoFiltroFrota.textContent = frotaOperacaoFiltroAtual
+      ? ('Mostrando ' + totalF + ' de ' + total + ' veículos — ' + frotaOperacaoFiltroAtual)
+      : '';
+  }
 
   const operacaoKpiRow = document.getElementById('frotaOperacaoKpiRow');
   if(operacaoKpiRow){
@@ -3069,7 +3098,7 @@ function renderFrota(){
   const gastoContratoBody = document.getElementById('frotaGastoContratoBody');
   if(gastoContratoBody){
     const gastoPorOperacao = {};
-    FROTA.forEach(v => {
+    FROTA_F.forEach(v => {
       const k = canonOperacaoFrota(v.operacao) || 'Sem operação';
       if(!gastoPorOperacao[k]) gastoPorOperacao[k] = { aluguel: 0, combustivel: 0 };
       gastoPorOperacao[k].aluguel += extrairNumeroValorFrota(v.valor);
@@ -3101,7 +3130,7 @@ function renderFrota(){
 
   const rankingBody = document.getElementById('frotaRankingBody');
   if(rankingBody){
-    const ranking = FROTA.map(v => {
+    const ranking = FROTA_F.map(v => {
       const aluguel = extrairNumeroValorFrota(v.valor);
       const combustivel = extrairNumeroValorFrota(v.valorCombustivel);
       return { v, aluguel, combustivel, total: aluguel + combustivel };
@@ -3121,7 +3150,7 @@ function renderFrota(){
   }
 
   const porStatus = {};
-  FROTA.forEach(v => {
+  FROTA_F.forEach(v => {
     const k = normFrota(v.status) || 'Sem status';
     porStatus[k] = (porStatus[k] || 0) + 1;
   });
@@ -3138,7 +3167,7 @@ function renderFrota(){
   kpiRow.innerHTML =
     statusOrdenados.map((k, i) => {
       const qtd = porStatus[k];
-      const pct = total > 0 ? (qtd/total*100).toFixed(1) : 0;
+      const pct = totalF > 0 ? (qtd/totalF*100).toFixed(1) : 0;
       const p = PALETA_FROTA[i % PALETA_FROTA.length];
       return `<div class="kpi" style="background:${p.bg}; border-color:${p.border};">
         <div class="label" style="color:${p.text};">${iconeStatusFrota(k)} ${k}</div>
@@ -3148,7 +3177,7 @@ function renderFrota(){
     }).join('');
 
   const porModelo = {};
-  FROTA.forEach(v => {
+  FROTA_F.forEach(v => {
     const k = normFrota(v.modelo) || 'Sem modelo';
     porModelo[k] = (porModelo[k] || 0) + 1;
   });
@@ -3208,7 +3237,7 @@ function renderFrota(){
   }
 
   const porTipo = {};
-  FROTA.forEach(v => {
+  FROTA_F.forEach(v => {
     const k = normFrota(v.tipo) || 'Sem tipo';
     porTipo[k] = (porTipo[k] || 0) + 1;
   });
@@ -3242,14 +3271,14 @@ function renderFrota(){
   const listaCombustivel = document.getElementById('frotaCombustivelLista');
   if(listaCombustivel){
     const porCombustivel = {};
-    FROTA.forEach(v => {
+    FROTA_F.forEach(v => {
       const k = normFrota(v.combustivel) || 'Sem combustível';
       porCombustivel[k] = (porCombustivel[k] || 0) + 1;
     });
     const combustiveisOrdenados = Object.keys(porCombustivel).sort((a,b)=> porCombustivel[b]-porCombustivel[a]);
     listaCombustivel.innerHTML = combustiveisOrdenados.map((k, i) => {
       const qtd = porCombustivel[k];
-      const pct = total > 0 ? (qtd/total*100) : 0;
+      const pct = totalF > 0 ? (qtd/totalF*100) : 0;
       const p = PALETA_FROTA[i % PALETA_FROTA.length];
       return `<div style="margin-bottom:12px;">
         <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
