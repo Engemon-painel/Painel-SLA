@@ -328,7 +328,7 @@
 
       <div class="grid" style="grid-template-columns: 1.6fr 1fr; margin-bottom:16px;">
         <div class="panel">
-          <h2>Top 15 Sites</h2>
+          <h2>Top 10 Sites — Claro e Engemon</h2>
           <div id="topSitesChartWrap" style="position:relative; height:460px;">
             <canvas id="topSitesChart"></canvas>
           </div>
@@ -1123,6 +1123,60 @@ document.addEventListener('DOMContentLoaded', () => {
     inputInfra.addEventListener('input', debounce(() => renderInfraTables(), 200));
   }
 });
+
+// ---- Ranking de sites por responsável (Claro x Engemon) ----
+// Classifica cada incidente como "Claro" ou "Engemon" olhando o texto de
+// "Unidade Responsável 2" e, se não achar, o de "Tipo de Infra". Incidentes
+// que não citam nenhum dos dois ficam de fora do ranking (e os valores
+// encontrados são devolvidos em "valoresVistos" pra facilitar o ajuste).
+function classificarResponsavelIncidente(it){
+  const candidatos = [it && it.unidadeResponsavel2, it && it.tipoInfra];
+  for(const c of candidatos){
+    const n = semAcentoHc(c);
+    if(n.includes('claro')) return 'Claro';
+    if(n.includes('engemon')) return 'Engemon';
+  }
+  return null;
+}
+
+function rankingClaroEngemon(itens, mesOrd, limite){
+  const contagem = { Claro: {}, Engemon: {} };
+  const vistosUnidade = {}, vistosInfra = {};
+  let totalIncidentes = 0, classificados = 0;
+
+  (itens || []).forEach(it => {
+    if(!it || it.mesOrd !== mesOrd) return;
+    if(AREAS_VALIDAS.indexOf(it.area) === -1) return;
+    const site = String(it.site || '').trim();
+    if(site === '') return;
+    totalIncidentes++;
+    const resp = classificarResponsavelIncidente(it);
+    if(!resp){
+      const u = String(it.unidadeResponsavel2 || '').trim(), t = String(it.tipoInfra || '').trim();
+      if(u) vistosUnidade[u] = true;
+      if(t) vistosInfra[t] = true;
+      return;
+    }
+    classificados++;
+    contagem[resp][site] = (contagem[resp][site] || 0) + 1;
+  });
+
+  const topDe = resp => Object.keys(contagem[resp])
+    .map(site => ({ site: site, total: contagem[resp][site] }))
+    .sort((a, b) => b.total - a.total || a.site.localeCompare(b.site, 'pt-BR'))
+    .slice(0, limite);
+
+  return {
+    claro: topDe('Claro'),
+    engemon: topDe('Engemon'),
+    totalIncidentes: totalIncidentes,
+    classificados: classificados,
+    valoresVistos: {
+      unidadeResponsavel2: Object.keys(vistosUnidade).slice(0, 6),
+      tipoInfra: Object.keys(vistosInfra).slice(0, 6)
+    }
+  };
+}
 
 // ---- Navegação por páginas (menu lateral) ----
 const PAGINAS = ['consolidado', 'area', 'site', 'fca', 'infra', 'organograma', 'vagas', 'frota', 'bancohoras'];
@@ -4486,32 +4540,61 @@ function render(){
     renderInfraTables();
   }
 
+  // ---- Top 10 Sites — Claro (vermelho) e Engemon (azul), mês selecionado ----
   const topSitesCanvas = document.getElementById('topSitesChart');
   if(topSitesCanvas){
-    const topSites = Array.isArray(mesObj.topSites) ? mesObj.topSites : [];
-    const alturaPorBarra = 24;
-    const alturaMinima = 260;
+    const TOP_POR_RESPONSAVEL = 10;
+    const mesOrdTop = '20' + mesObj.mes.split('/')[1] + '-' + NOME_MES[mesObj.mes.split('/')[0]];
+    const rk = rankingClaroEngemon(INCIDENTES_POR_SITE, mesOrdTop, TOP_POR_RESPONSAVEL);
+
+    const separador = (rk.claro.length && rk.engemon.length) ? [''] : [];
+    const labelsTop = [...rk.claro.map(x => x.site), ...separador, ...rk.engemon.map(x => x.site)];
+    const dadosClaro = [...rk.claro.map(x => x.total), ...separador.map(() => null), ...rk.engemon.map(() => null)];
+    const dadosEngemon = [...rk.claro.map(() => null), ...separador.map(() => null), ...rk.engemon.map(x => x.total)];
+
+    // Mensagem quando nenhum incidente foi identificado como Claro/Engemon.
+    let mensagemTop = '';
+    if(!rk.claro.length && !rk.engemon.length){
+      if(rk.totalIncidentes === 0){
+        mensagemTop = 'Sem incidentes neste mês.';
+      } else {
+        const vistos = rk.valoresVistos.unidadeResponsavel2.concat(rk.valoresVistos.tipoInfra);
+        mensagemTop = 'Nenhum incidente identificado como Claro/Engemon em "Unidade Responsável 2" ou "Tipo de Infra".' +
+          (vistos.length ? ' Valores encontrados: ' + vistos.join(', ') : '');
+        console.warn('[Top Sites Claro/Engemon] ' + mensagemTop);
+      }
+    }
+
     const wrap = document.getElementById('topSitesChartWrap');
-    if(wrap) wrap.style.height = Math.max(alturaMinima, topSites.length * alturaPorBarra) + 'px';
+    if(wrap) wrap.style.height = Math.max(260, labelsTop.length * 24 + 50) + 'px';
+
+    const rotuloValor = {
+      color: '#000000', anchor:'end', align:'right',
+      font:{size:10, family:'JetBrains Mono', weight:'700'},
+      display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0
+    };
 
     if(topSitesChart) topSitesChart.destroy();
     topSitesChart = new Chart(topSitesCanvas, {
       type: 'bar',
       data: {
-        labels: topSites.map(s => s.site),
-        datasets: [{
-          label: 'Incidentes', data: topSites.map(s => s.total),
-          backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 4,
-          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
-        }]
+        labels: labelsTop,
+        datasets: [
+          { label: 'Claro', data: dadosClaro, backgroundColor: '#e4202b', borderRadius: 4, datalabels: rotuloValor },
+          { label: 'Engemon', data: dadosEngemon, backgroundColor: '#1f77b4', borderRadius: 4, datalabels: rotuloValor }
+        ]
       },
       plugins: [ChartDataLabels],
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display:false }, datalabels: { display:true } },
+        plugins: {
+          legend: { labels:{ color: cor.muted, font:{family:'Inter', size:11} } },
+          title: { display: mensagemTop !== '', text: mensagemTop, color: cor.muted, font:{family:'Inter', size:11, weight:'normal'} },
+          datalabels: { display:true }
+        },
         scales: {
-          x: { ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
-          y: { ticks:{color:cor.text, font:{size:11, weight:'bold'}}, grid:{display:false} }
+          x: { stacked:true, ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
+          y: { stacked:true, ticks:{color:cor.text, font:{size:11, weight:'bold'}}, grid:{display:false} }
         }
       }
     });
