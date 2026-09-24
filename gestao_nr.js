@@ -34,10 +34,12 @@
     { k:'OK',     label:'Em dia',        cor:'#059669' },
     { k:'DOC',    label:'Documentação',  cor:'#d97706' },
     { k:'PEND',   label:'Pendente',      cor:'#dc2626' },
-    { k:'SEMREG', label:'Sem registro',  cor:'#9ca3af' }
+    { k:'SEMREG', label:'Sem registro',  cor:'#9ca3af' },
+    { k:'SAIU',   label:'Saiu da empresa', cor:'#374151' }
   ];
   const CAT = {}; CATS.forEach(c => CAT[c.k] = c);
   function categoria(c){
+    if(c.saiu) return 'SAIU';   // está na Base_Supervisores mas não está mais na aba BASE
     const st = (NR.cursos || []).map(k => (c.cursos[k] || {}).status || 'SEM REGISTRO');
     if(st.every(s => s === 'SEM REGISTRO')) return 'SEMREG';
     if(st.some(s => s === 'PENDENTE' || s === 'EM ANDAMENTO')) return 'PEND';
@@ -225,14 +227,17 @@
   }
 
   // filtros do topo (valem para KPIs, gráficos e matriz)
-  function baseFiltrada(){
+  function baseFiltrada(ignorarSituacao){
     const funcoes = funcaoPorMatricula();
     return (NR.colaboradores || []).map(c => Object.assign({}, c, { funcao: funcoes[normMat(c.matricula)] || '', cat: categoria(c) }))
       .filter(c => {
         if(filtro.coord && c.coordenador !== filtro.coord) return false;
         if(filtro.sup && c.supervisor !== filtro.sup) return false;
         if(filtro.area && c.area !== filtro.area) return false;
-        if(filtro.situacao && c.cat !== filtro.situacao) return false;
+        if(!ignorarSituacao){
+          if(filtro.situacao){ if(c.cat !== filtro.situacao) return false; }
+          else if(c.cat === 'SAIU') return false;   // quem saiu não entra nos totais
+        }
         return true;
       });
   }
@@ -269,7 +274,7 @@
     if(!NR){ info.textContent = 'Carregando dados_nr.json...'; return; }
     info.style.color = '';
     info.textContent = 'Base NR atualizada em ' + dataBr(NR.atualizado_em).replace(/\/(\d{2})$/, '/20$1') +
-      ' · ' + fmt((NR.colaboradores || []).length) + ' técnicos na base';
+      ' · ' + fmt((NR.colaboradores || []).filter(c => !c.saiu).length) + ' técnicos ativos na base';
 
     const base = baseFiltrada();
     renderKpis(base);
@@ -279,15 +284,17 @@
   }
 
   function renderKpis(base){
-    const n = base.length;
-    const cont = { OK:0, DOC:0, PEND:0, SEMREG:0 };
-    base.forEach(c => cont[c.cat]++);
+    const todos = baseFiltrada(true);
+    const cont = { OK:0, DOC:0, PEND:0, SEMREG:0, SAIU:0 };
+    todos.forEach(c => cont[c.cat]++);
+    const n = todos.length - cont.SAIU;   // técnicos ativos
     const pct = v => n > 0 ? (v / n * 100).toFixed(0) + '% dos técnicos' : '—';
+    const deltaSaiu = 'fora dos totais · clique p/ ver';
     const card = (k, icone, titulo, valor, cor) => `
       <div class="kpi" style="cursor:pointer; ${filtro.situacao === k ? 'box-shadow:0 0 0 2px ' + cor + ' inset;' : ''}" data-cat="${k}">
         <div class="label">${icone} ${titulo}</div>
         <div class="value" style="color:${cor}">${fmt(valor)}</div>
-        <div class="delta" style="color:var(--muted)">${k ? pct(valor) : 'clique num card para filtrar'}</div>
+        <div class="delta" style="color:var(--muted)">${k === 'SAIU' ? deltaSaiu : (k ? pct(valor) : 'clique num card para filtrar')}</div>
       </div>`;
     const row = document.getElementById('nrKpiRow');
     row.innerHTML =
@@ -295,7 +302,8 @@
       card('OK', '✅', 'Em dia', cont.OK, '#059669') +
       card('DOC', '✍️', 'Só documentação', cont.DOC, '#d97706') +
       card('PEND', '⏳', 'Com curso pendente', cont.PEND, '#dc2626') +
-      card('SEMREG', '📭', 'Sem nenhum registro', cont.SEMREG, '#6b7590');
+      card('SEMREG', '📭', 'Sem nenhum registro', cont.SEMREG, '#6b7590') +
+      card('SAIU', '🚪', 'Saiu da empresa', cont.SAIU, '#374151');
     row.querySelectorAll('.kpi').forEach(el => el.onclick = () => {
       const k = el.dataset.cat;
       filtro.situacao = (filtro.situacao === k) ? '' : k;
@@ -359,7 +367,7 @@
     const porSup = {};
     base.forEach(c => {
       const sup = c.supervisor || 'Sem supervisor';
-      if(!porSup[sup]) porSup[sup] = { total:0, OK:0, DOC:0, PEND:0, SEMREG:0 };
+      if(!porSup[sup]) porSup[sup] = { total:0, OK:0, DOC:0, PEND:0, SEMREG:0, SAIU:0 };
       porSup[sup][c.cat]++; porSup[sup].total++;
     });
     const sups = Object.keys(porSup).sort((a,b) => porSup[b].total - porSup[a].total);
@@ -380,7 +388,7 @@
       datalabels: {
         anchor:'end', align:'right', offset:4, color:'#000000',
         font:{ size:11, family:'JetBrains Mono', weight:'700' },
-        formatter: (v, ctx) => porSup[sups[ctx.dataIndex]].total + ' téc.'
+        formatter: (v, ctx) => { const tt = porSup[sups[ctx.dataIndex]].total; return tt + (filtro.situacao === 'SAIU' ? (tt === 1 ? ' saiu' : ' saíram') : ' téc.'); }
       }
     });
 
@@ -406,7 +414,7 @@
         },
         onHover: (evt, els) => { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
         plugins:{
-          legend:{ position:'bottom', labels:{ color:'#6b7590', font:{ family:'Inter', size:10 }, boxWidth:10, filter: it => it.text !== 'Total' } },
+          legend:{ position:'bottom', labels:{ color:'#6b7590', font:{ family:'Inter', size:10 }, boxWidth:10, filter: (it, data) => it.text !== 'Total' && data.datasets[it.datasetIndex].data.some(v => v > 0) } },
           datalabels:{ display:true },
           tooltip:{ callbacks:{ footer: items => 'Total do supervisor: ' + porSup[sups[items[0].dataIndex]].total + ' técnicos' } }
         },
@@ -449,7 +457,7 @@
     vazio.style.display = 'none';
 
     tbody.innerHTML = linhas.map(c => {
-      const pillSit = pillCat(c.cat);
+      const pillSit = pillCat(c.cat) + (c.saiu && c.demissao ? ` <span class="mono" style="font-size:11px; color:var(--muted);">${dataBr(c.demissao)}</span>` : '');
       const celulas = cursos.map(k => {
         const r = c.cursos[k] || { status:'SEM REGISTRO' };
         const s = ST[r.status] || ST['SEM REGISTRO'];
