@@ -97,10 +97,6 @@
         <select id="nrArea" style="min-width:150px;"></select>
         <label class="nr-lbl" for="nrSituacao" style="margin-left:8px;">Situação</label>
         <select id="nrSituacao" style="min-width:130px;"></select>
-        <div class="search" style="margin-left:auto;" title="Buscar por nome, matrícula ou função">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <input id="nrBusca" type="search" placeholder="Buscar por nome, matrícula ou função..." aria-label="Buscar colaborador" style="min-width:220px;" />
-        </div>
       </div>
 
       <div class="kpi-row" id="nrKpiRow"></div>
@@ -125,6 +121,10 @@
           <select id="nrCurso" style="min-width:140px;"></select>
           <label class="nr-lbl" for="nrStatus" style="margin-left:8px;">Status</label>
           <select id="nrStatus" style="min-width:200px;"></select>
+          <div class="search" style="margin-left:8px;" title="Digite a matrícula (número) ou parte do nome">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <input id="nrBusca" type="search" placeholder="Matrícula ou nome do técnico..." aria-label="Buscar técnico" style="min-width:230px;" />
+          </div>
           <span id="nrContagem" class="mono" style="font-size:11px; color:var(--muted);"></span>
           <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" id="nrExportar">⬇ Exportar (CSV)</button>
         </div>
@@ -177,7 +177,7 @@
     document.getElementById('nrStatus').addEventListener('change', e => { filtro.status = e.target.value; renderTabela(); });
     let t;
     document.getElementById('nrBusca').addEventListener('input', e => {
-      clearTimeout(t); t = setTimeout(() => { filtro.q = e.target.value.trim().toLowerCase(); renderNr(); }, 200);
+      clearTimeout(t); t = setTimeout(() => { filtro.q = e.target.value.trim().toLowerCase(); renderTabela(); }, 200);
     });
     document.getElementById('nrExportar').addEventListener('click', exportarCsv);
 
@@ -233,10 +233,6 @@
         if(filtro.sup && c.supervisor !== filtro.sup) return false;
         if(filtro.area && c.area !== filtro.area) return false;
         if(filtro.situacao && c.cat !== filtro.situacao) return false;
-        if(filtro.q){
-          const hay = [c.nome, c.matricula, c.funcao, c.supervisor].join(' ').toLowerCase();
-          if(!hay.includes(filtro.q)) return false;
-        }
         return true;
       });
   }
@@ -247,6 +243,15 @@
   function linhasTabela(base){
     const cursos = filtro.curso ? [filtro.curso] : (NR.cursos || []);
     return base.filter(c => {
+      if(filtro.q){
+        // só números -> procura pela matrícula (começando com o que foi digitado)
+        if(/^\d+$/.test(filtro.q)){
+          if(!normMat(c.matricula).startsWith(filtro.q.replace(/^0+/, ''))) return false;
+        } else {
+          const hay = [c.nome, c.funcao, c.supervisor].join(' ').toLowerCase();
+          if(!hay.includes(filtro.q)) return false;
+        }
+      }
       if(!filtro.status) return true;
       return cursos.some(k => (c.cursos[k] || {}).status === filtro.status);
     });
