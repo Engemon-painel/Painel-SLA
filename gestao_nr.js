@@ -25,6 +25,26 @@
   // O que é "pendência" de verdade (precisa de ação).
   const PROBLEMA = ['PENDENTE','SEM ASSINATURA','DIVERGÊNCIA','EM ANDAMENTO'];
 
+  // Situação de cada TÉCNICO (uma só por pessoa, pra os números fecharem com o total):
+  //  Sem registro  -> nenhum curso lançado
+  //  Pendente      -> tem curso pendente ou em andamento (ainda precisa fazer)
+  //  Documentação  -> fez tudo, mas falta assinatura ou tem data divergente
+  //  Em dia        -> tudo que se aplica está OK
+  const CATS = [
+    { k:'OK',     label:'Em dia',        cor:'#059669' },
+    { k:'DOC',    label:'Documentação',  cor:'#d97706' },
+    { k:'PEND',   label:'Pendente',      cor:'#dc2626' },
+    { k:'SEMREG', label:'Sem registro',  cor:'#9ca3af' }
+  ];
+  const CAT = {}; CATS.forEach(c => CAT[c.k] = c);
+  function categoria(c){
+    const st = (NR.cursos || []).map(k => (c.cursos[k] || {}).status || 'SEM REGISTRO');
+    if(st.every(s => s === 'SEM REGISTRO')) return 'SEMREG';
+    if(st.some(s => s === 'PENDENTE' || s === 'EM ANDAMENTO')) return 'PEND';
+    if(st.some(s => s === 'SEM ASSINATURA' || s === 'DIVERGÊNCIA')) return 'DOC';
+    return 'OK';
+  }
+
   let NR = null, nrErro = null;
   const filtro = { coord:'', sup:'', area:'', situacao:'', q:'', curso:'', status:'' };
   let chartCurso = null, chartSup = null;
@@ -33,6 +53,7 @@
   const normMat = m => String(m ?? '').replace(/\D/g,'').replace(/^0+/,'');
   const dataBr = iso => { if(!iso) return ''; const p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0].slice(2); };
   const fmt = n => Number(n).toLocaleString('pt-BR');
+  const pillCat = k => { const c = CAT[k]; return `<span class="pill" style="background:${c.cor}22; color:${c.cor};">${c.label}</span>`; };
 
   // Função (cargo) vem da lista de colaboradores do dados.json, cruzando pela matrícula.
   function funcaoPorMatricula(){
@@ -64,7 +85,7 @@
 
   const TEMPLATE = `
     <div class="panel">
-      <h2>Gestão de NR — Treinamentos e Documentos</h2>
+      <h2>Gestão de NR — Técnicos</h2>
       <div class="hint mono" id="nrInfo">Carregando dados_nr.json...</div>
 
       <div class="nr-filtros">
@@ -86,13 +107,13 @@
 
       <div class="grid" style="grid-template-columns: 1.3fr 1fr;">
         <div class="panel">
-          <h2>Status por curso</h2>
-          <div class="hint">Clique numa barra para ver quem está naquele status, na matriz abaixo.</div>
+          <h2>Técnicos por status em cada curso</h2>
+          <div class="hint">Cada barra soma o total de técnicos. Clique para ver quem está naquele status, na matriz abaixo.</div>
           <div id="nrCursoWrap" style="position:relative; height:470px;"><canvas id="nrCursoChart"></canvas></div>
         </div>
         <div class="panel">
-          <h2>Pendências por supervisor</h2>
-          <div class="hint">Soma de cursos pendentes, sem assinatura, com divergência ou em andamento. Clique para filtrar.</div>
+          <h2>Técnicos por supervisor</h2>
+          <div class="hint">Cada técnico conta uma vez, pela situação dele. A barra inteira é o total de técnicos do supervisor. Clique para filtrar.</div>
           <div id="nrSupWrap" style="position:relative; height:470px;"><canvas id="nrSupChart"></canvas></div>
         </div>
       </div>
@@ -192,13 +213,13 @@
     preencher('nrCoord', unicos('coordenador'), 'Todos', 'coord');
     preencher('nrSup', unicos('supervisor'), 'Todos', 'sup');
     preencher('nrArea', unicos('area'), 'Todas', 'area');
-    preencher('nrSituacao', unicos('situacao_nr'), 'Todas', 'situacao');
+    const selSit = document.getElementById('nrSituacao');
+    selSit.innerHTML = '<option value="">Todas</option>' + CATS.map(c => `<option value="${c.k}">${c.label}</option>`).join('');
+    selSit.value = filtro.situacao;
     preencher('nrCurso', NR.cursos || [], 'Todos os cursos', 'curso');
 
     const selStatus = document.getElementById('nrStatus');
     selStatus.innerHTML = '<option value="">Todos</option>' +
-      '<option value="__PROB">Com alguma pendência</option>' +
-      '<option value="__VAZIO">Sem nenhum registro</option>' +
       NR_STATUS.map(s => `<option value="${esc(s.k)}">${esc(s.label)}</option>`).join('');
     selStatus.value = filtro.status;
   }
@@ -206,12 +227,12 @@
   // filtros do topo (valem para KPIs, gráficos e matriz)
   function baseFiltrada(){
     const funcoes = funcaoPorMatricula();
-    return (NR.colaboradores || []).map(c => Object.assign({}, c, { funcao: funcoes[normMat(c.matricula)] || '' }))
+    return (NR.colaboradores || []).map(c => Object.assign({}, c, { funcao: funcoes[normMat(c.matricula)] || '', cat: categoria(c) }))
       .filter(c => {
         if(filtro.coord && c.coordenador !== filtro.coord) return false;
         if(filtro.sup && c.supervisor !== filtro.sup) return false;
         if(filtro.area && c.area !== filtro.area) return false;
-        if(filtro.situacao && c.situacao_nr !== filtro.situacao) return false;
+        if(filtro.situacao && c.cat !== filtro.situacao) return false;
         if(filtro.q){
           const hay = [c.nome, c.matricula, c.funcao, c.supervisor].join(' ').toLowerCase();
           if(!hay.includes(filtro.q)) return false;
@@ -227,8 +248,6 @@
     const cursos = filtro.curso ? [filtro.curso] : (NR.cursos || []);
     return base.filter(c => {
       if(!filtro.status) return true;
-      if(filtro.status === '__VAZIO') return semNenhumRegistro(c);
-      if(filtro.status === '__PROB') return cursos.some(k => PROBLEMA.indexOf((c.cursos[k] || {}).status) !== -1);
       return cursos.some(k => (c.cursos[k] || {}).status === filtro.status);
     });
   }
@@ -245,7 +264,7 @@
     if(!NR){ info.textContent = 'Carregando dados_nr.json...'; return; }
     info.style.color = '';
     info.textContent = 'Base NR atualizada em ' + dataBr(NR.atualizado_em).replace(/\/(\d{2})$/, '/20$1') +
-      ' · ' + fmt((NR.colaboradores || []).length) + ' colaboradores na base';
+      ' · ' + fmt((NR.colaboradores || []).length) + ' técnicos na base';
 
     const base = baseFiltrada();
     renderKpis(base);
@@ -255,32 +274,29 @@
   }
 
   function renderKpis(base){
-    const cursos = NR.cursos || [];
-    const cont = {}; NR_STATUS.forEach(s => cont[s.k] = 0);
-    let aplic = 0;
-    base.forEach(c => cursos.forEach(k => {
-      const s = (c.cursos[k] || {}).status || 'SEM REGISTRO';
-      cont[s] = (cont[s] || 0) + 1;
-      if(APLICAVEIS.has(s)) aplic++;
-    }));
     const n = base.length;
-    const concluidos = base.filter(c => String(c.situacao_nr).toUpperCase().startsWith('CONCLU')).length;
-    const pctConf = aplic > 0 ? cont['OK'] / aplic : 0;
-    const colabPend = base.filter(c => cursos.some(k => PROBLEMA.indexOf((c.cursos[k] || {}).status) !== -1)).length;
-    const vazios = base.filter(semNenhumRegistro);
-    const vaziosTec = vazios.filter(c => String(c.area).trim().toUpperCase() === 'TÉCNICO').length;
-    const corConf = pctConf >= 0.85 ? '#059669' : (pctConf >= 0.7 ? '#d97706' : '#dc2626');
-    const pct = (a, b) => b > 0 ? (a / b * 100).toFixed(0) + '%' : '0%';
-
-    document.getElementById('nrKpiRow').innerHTML = `
-      <div class="kpi"><div class="label">👥 Colaboradores</div><div class="value" style="color:var(--accent)">${fmt(n)}</div><div class="delta" style="color:var(--muted)">${fmt(colabPend)} com alguma pendência</div></div>
-      <div class="kpi"><div class="label">✅ Situação concluída</div><div class="value" style="color:#059669">${fmt(concluidos)}</div><div class="delta" style="color:var(--muted)">${pct(concluidos, n)} dos colaboradores</div></div>
-      <div class="kpi"><div class="label">📈 % Conformidade</div><div class="value" style="color:${corConf}">${(pctConf*100).toFixed(1)}%</div><div class="delta" style="color:var(--muted)">${fmt(cont['OK'])} em dia de ${fmt(aplic)} aplicáveis</div></div>
-      <div class="kpi"><div class="label">⏳ Pendentes</div><div class="value" style="color:#dc2626">${fmt(cont['PENDENTE'])}</div><div class="delta" style="color:var(--muted)">cursos/documentos</div></div>
-      <div class="kpi"><div class="label">✍️ Sem assinatura</div><div class="value" style="color:#d97706">${fmt(cont['SEM ASSINATURA'])}</div><div class="delta" style="color:var(--muted)">cursos/documentos</div></div>
-      <div class="kpi"><div class="label">⚠️ Divergências</div><div class="value" style="color:#5e34b5">${fmt(cont['DIVERGÊNCIA'])}</div><div class="delta" style="color:var(--muted)">data errada / divergente</div></div>
-      <div class="kpi"><div class="label">📭 Sem nenhum registro</div><div class="value">${fmt(vazios.length)}</div><div class="delta" style="color:${vaziosTec > 0 ? '#dc2626' : 'var(--muted)'}">${fmt(vaziosTec)} técnico${vaziosTec === 1 ? '' : 's'}</div></div>
-    `;
+    const cont = { OK:0, DOC:0, PEND:0, SEMREG:0 };
+    base.forEach(c => cont[c.cat]++);
+    const pct = v => n > 0 ? (v / n * 100).toFixed(0) + '% dos técnicos' : '—';
+    const card = (k, icone, titulo, valor, cor) => `
+      <div class="kpi" style="cursor:pointer; ${filtro.situacao === k ? 'box-shadow:0 0 0 2px ' + cor + ' inset;' : ''}" data-cat="${k}">
+        <div class="label">${icone} ${titulo}</div>
+        <div class="value" style="color:${cor}">${fmt(valor)}</div>
+        <div class="delta" style="color:var(--muted)">${k ? pct(valor) : 'clique num card para filtrar'}</div>
+      </div>`;
+    const row = document.getElementById('nrKpiRow');
+    row.innerHTML =
+      card('', '👷', 'Técnicos', n, 'var(--accent)') +
+      card('OK', '✅', 'Em dia', cont.OK, '#059669') +
+      card('DOC', '✍️', 'Só documentação', cont.DOC, '#d97706') +
+      card('PEND', '⏳', 'Com curso pendente', cont.PEND, '#dc2626') +
+      card('SEMREG', '📭', 'Sem nenhum registro', cont.SEMREG, '#6b7590');
+    row.querySelectorAll('.kpi').forEach(el => el.onclick = () => {
+      const k = el.dataset.cat;
+      filtro.situacao = (filtro.situacao === k) ? '' : k;
+      document.getElementById('nrSituacao').value = filtro.situacao;
+      renderNr();
+    });
   }
 
   function irParaMatriz(curso, status){
@@ -335,26 +351,22 @@
   function renderChartSup(base){
     const canvas = document.getElementById('nrSupChart');
     if(!canvas || typeof Chart === 'undefined') return;
-    const cursos = NR.cursos || [];
     const porSup = {};
     base.forEach(c => {
       const sup = c.supervisor || 'Sem supervisor';
-      if(!porSup[sup]){ porSup[sup] = { total:0 }; PROBLEMA.forEach(p => porSup[sup][p] = 0); }
-      cursos.forEach(k => {
-        const s = (c.cursos[k] || {}).status;
-        if(PROBLEMA.indexOf(s) !== -1){ porSup[sup][s]++; porSup[sup].total++; }
-      });
+      if(!porSup[sup]) porSup[sup] = { total:0, OK:0, DOC:0, PEND:0, SEMREG:0 };
+      porSup[sup][c.cat]++; porSup[sup].total++;
     });
-    const sups = Object.keys(porSup).filter(s => porSup[s].total > 0).sort((a,b) => porSup[b].total - porSup[a].total);
+    const sups = Object.keys(porSup).sort((a,b) => porSup[b].total - porSup[a].total);
     const wrap = document.getElementById('nrSupWrap');
-    if(wrap) wrap.style.height = Math.max(260, sups.length * 30 + 90) + 'px';
+    if(wrap) wrap.style.height = Math.max(260, sups.length * 34 + 90) + 'px';
 
-    const datasets = PROBLEMA.map(k => ({
-      label: ST[k].label,
-      data: sups.map(s => porSup[s][k]),
-      backgroundColor: ST[k].cor, borderWidth:0,
+    const datasets = CATS.map(ct => ({
+      label: ct.label, _cat: ct.k,
+      data: sups.map(s => porSup[s][ct.k]),
+      backgroundColor: ct.cor, borderWidth:0,
       datalabels: {
-        display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) >= 3,
+        display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
         color:'#ffffff', anchor:'center', align:'center', font:{ size:10, family:'JetBrains Mono', weight:'700' }
       }
     }));
@@ -363,7 +375,7 @@
       datalabels: {
         anchor:'end', align:'right', offset:4, color:'#000000',
         font:{ size:11, family:'JetBrains Mono', weight:'700' },
-        formatter: (v, ctx) => porSup[sups[ctx.dataIndex]].total
+        formatter: (v, ctx) => porSup[sups[ctx.dataIndex]].total + ' téc.'
       }
     });
 
@@ -374,21 +386,27 @@
       plugins: typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [],
       options:{
         indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        layout:{ padding:{ right:30 } },
+        maxBarThickness: 26,
+        layout:{ padding:{ right:50 } },
         onClick: (evt, els) => {
           if(!els.length) return;
           const sup = sups[els[0].index];
-          filtro.sup = (filtro.sup === sup) ? '' : sup;   // clicar de novo limpa
+          const cat = chartSup.data.datasets[els[0].datasetIndex]._cat || '';
+          const mesmo = filtro.sup === sup && filtro.situacao === cat;
+          filtro.sup = mesmo ? '' : sup;          // clicar de novo limpa
+          filtro.situacao = mesmo ? '' : cat;
           document.getElementById('nrSup').value = filtro.sup;
+          document.getElementById('nrSituacao').value = filtro.situacao;
           renderNr();
         },
         onHover: (evt, els) => { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
         plugins:{
           legend:{ position:'bottom', labels:{ color:'#6b7590', font:{ family:'Inter', size:10 }, boxWidth:10, filter: it => it.text !== 'Total' } },
-          datalabels:{ display:true }
+          datalabels:{ display:true },
+          tooltip:{ callbacks:{ footer: items => 'Total do supervisor: ' + porSup[sups[items[0].dataIndex]].total + ' técnicos' } }
         },
         scales:{
-          x:{ stacked:true, beginAtZero:true, ticks:{ color:'#1b2440', font:{ weight:'bold' } }, grid:{ display:false } },
+          x:{ stacked:true, beginAtZero:true, ticks:{ color:'#1b2440', font:{ weight:'bold' }, precision:0 }, grid:{ display:false } },
           y:{ stacked:true, ticks:{ color:'#1b2440', font:{ size:11, weight:'bold' } }, grid:{ display:false } }
         }
       }
@@ -419,15 +437,14 @@
       ${cursos.map(k => `<th class="nr-curso"${k === filtro.curso ? ' style="color:var(--accent);"' : ''}>${esc(k)}</th>`).join('')}
     </tr>`;
 
-    document.getElementById('nrContagem').textContent = fmt(linhas.length) + ' colaborador' + (linhas.length === 1 ? '' : 'es');
+    document.getElementById('nrContagem').textContent = fmt(linhas.length) + ' técnico' + (linhas.length === 1 ? '' : 's');
     const vazio = document.getElementById('nrVazio');
     const tbody = document.getElementById('nrTbody');
     if(!linhas.length){ tbody.innerHTML = ''; vazio.style.display = ''; return; }
     vazio.style.display = 'none';
 
     tbody.innerHTML = linhas.map(c => {
-      const sit = String(c.situacao_nr || '');
-      const pillSit = sit.toUpperCase().startsWith('CONCLU') ? `<span class="pill good">${esc(sit)}</span>` : `<span class="pill bad">${esc(sit || '—')}</span>`;
+      const pillSit = pillCat(c.cat);
       const celulas = cursos.map(k => {
         const r = c.cursos[k] || { status:'SEM REGISTRO' };
         const s = ST[r.status] || ST['SEM REGISTRO'];
@@ -452,10 +469,10 @@
     const linhas = linhasTabela(baseFiltrada());
     if(!linhas.length){ alert('Nenhum colaborador para exportar com os filtros atuais.'); return; }
     const csvEsc = v => { const s = String(v ?? ''); return /[",;\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; };
-    const cab = ['Matricula','Nome','Funcao','Area','Supervisor','Coordenador','Situacao NR'].concat(cursos);
+    const cab = ['Matricula','Nome','Funcao','Area','Supervisor','Coordenador','Situacao'].concat(cursos);
     const out = [cab.map(csvEsc).join(';')];
     linhas.forEach(c => {
-      out.push([c.matricula, c.nome, c.funcao, c.area, c.supervisor, c.coordenador, c.situacao_nr]
+      out.push([c.matricula, c.nome, c.funcao, c.area, c.supervisor, c.coordenador, CAT[c.cat].label]
         .concat(cursos.map(k => {
           const r = c.cursos[k] || { status:'SEM REGISTRO' };
           return (ST[r.status] || ST['SEM REGISTRO']).label + (r.data ? ' ' + dataBr(r.data) : '');
