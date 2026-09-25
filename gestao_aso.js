@@ -2,7 +2,7 @@
 // EXAMES PERIÓDICOS (ASO) — módulo do Painel do ESER
 // ----------------------------------------------------------------------
 // Cria o item "🩺 Exames Periódicos" no menu (abaixo de Gestão de NR)
-// e a página. Dados: dados_aso.json (mesma pasta do index.html),
+// e a página. Dados: base_nr.json (automático) ou dados_aso.json, via nr_conversor.js,
 // gerado da aba "Preenchimento" da Base_NR.xlsx — SEM CPF.
 // No index.html: <script src="gestao_aso.js"></script> antes de </body>
 // ======================================================================
@@ -62,7 +62,7 @@
   const TEMPLATE = `
     <div class="panel">
       <h2>Exames Periódicos (ASO)</h2>
-      <div class="hint mono" id="asoInfo">Carregando dados_aso.json...</div>
+      <div class="hint mono" id="asoInfo">Carregando dados de ASO...</div>
 
       <div class="aso-filtros">
         <label class="aso-lbl" for="asoSup">Supervisor</label>
@@ -147,9 +147,9 @@
   // ---------------------------------------------------------------- dados
   async function carregarAso(){
     try{
-      const r = await fetch('dados_aso.json?_=' + Date.now());
-      if(!r.ok) throw new Error('HTTP ' + r.status);
-      ASO = await r.json(); asoErro = null;
+      const dados = await NRConversor.carregar();
+      if(!dados.aso) throw new Error('dados de ASO não encontrados');
+      ASO = dados.aso; asoErro = null;
       popularFiltros();
     }catch(e){ asoErro = e.message; console.error('[Exames Periódicos]', e); }
     const pg = document.getElementById('pagina-aso');
@@ -195,10 +195,10 @@
     const info = document.getElementById('asoInfo');
     if(!info) return;
     if(asoErro){
-      info.textContent = 'Não foi possível carregar dados_aso.json (' + asoErro + '). Confira se o arquivo está na mesma pasta do index.html.';
+      info.textContent = 'Não foi possível carregar os dados de ASO (' + asoErro + '). Confira se base_nr.json ou dados_aso.json está na mesma pasta do index.html.';
       info.style.color = '#dc2626'; return;
     }
-    if(!ASO){ info.textContent = 'Carregando dados_aso.json...'; return; }
+    if(!ASO){ info.textContent = 'Carregando dados de ASO...'; return; }
     info.style.color = '';
     info.textContent = 'Base atualizada em ' + dataBr(ASO.atualizado_em) + ' · ' + fmt((ASO.exames || []).length) +
       ' colaboradores · situação calculada com a data de hoje (' + hoje0().toLocaleDateString('pt-BR') + ')';
