@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------
 // Este arquivo cria sozinho o item "🦺 Gestão de NR" no menu lateral
 // (logo abaixo de Gestão de Frotas) e a página correspondente.
-// Os dados vêm de dados_nr.json (mesma pasta do index.html).
+// Os dados vêm de base_nr.json (automático) ou dados_nr.json, via nr_conversor.js.
 // No index.html basta UMA linha, logo antes de </body>:
 //   <script src="gestao_nr.js"></script>
 // ======================================================================
@@ -88,7 +88,7 @@
   const TEMPLATE = `
     <div class="panel">
       <h2>Gestão de NR — Técnicos</h2>
-      <div class="hint mono" id="nrInfo">Carregando dados_nr.json...</div>
+      <div class="hint mono" id="nrInfo">Carregando dados de NR...</div>
 
       <div class="nr-filtros">
         <label class="nr-lbl" for="nrCoord">Coordenador</label>
@@ -190,9 +190,9 @@
   // ---------------------------------------------------------------- dados
   async function carregarNr(){
     try{
-      const r = await fetch('dados_nr.json?_=' + Date.now());
-      if(!r.ok) throw new Error('HTTP ' + r.status);
-      NR = await r.json();
+      const dados = await NRConversor.carregar();
+      if(!dados.nr) throw new Error('dados de NR não encontrados');
+      NR = dados.nr;
       nrErro = null;
       popularFiltros();
     }catch(e){
@@ -267,11 +267,11 @@
     const info = document.getElementById('nrInfo');
     if(!info) return;
     if(nrErro){
-      info.textContent = 'Não foi possível carregar dados_nr.json (' + nrErro + '). Confira se o arquivo está na mesma pasta do index.html.';
+      info.textContent = 'Não foi possível carregar os dados de NR (' + nrErro + '). Confira se base_nr.json ou dados_nr.json está na mesma pasta do index.html.';
       info.style.color = '#dc2626';
       return;
     }
-    if(!NR){ info.textContent = 'Carregando dados_nr.json...'; return; }
+    if(!NR){ info.textContent = 'Carregando dados de NR...'; return; }
     info.style.color = '';
     info.textContent = 'Base NR atualizada em ' + dataBr(NR.atualizado_em).replace(/\/(\d{2})$/, '/20$1') +
       ' · ' + fmt((NR.colaboradores || []).filter(c => !c.saiu).length) + ' técnicos ativos na base';
