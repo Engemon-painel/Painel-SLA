@@ -2000,7 +2000,27 @@ function renderHeadcount(){
     }).join('');
   }
 
+  // Últimos 8 meses até o mês atual + meses FUTUROS que já tenham
+  // admissão/demissão lançada na base do CLARO (ex.: contratados de Outubro),
+  // até 3 meses à frente. Meses futuros aparecem como "(previsto)" e ficam
+  // fora do cálculo de turnover.
   const meses8 = ultimosNMesesHc(8);
+  (function incluirMesesFuturos(){
+    const hojeRef = new Date();
+    const chaveAtual = hojeRef.getFullYear() * 12 + hojeRef.getMonth();
+    let maxChave = chaveAtual;
+    COLABORADORES.filter(c => canonContratoHc(c.contrato) === 'CLARO').forEach(c => {
+      [c.dataAdmis, c.dataDemissao].forEach(dt => {
+        if(!dt || !/^\d{4}-\d{2}/.test(dt)) return;
+        const k = Number(dt.slice(0,4)) * 12 + Number(dt.slice(5,7)) - 1;
+        if(k > maxChave && k <= chaveAtual + 3) maxChave = k;
+      });
+    });
+    for(let k = chaveAtual + 1; k <= maxChave; k++){
+      const ano = Math.floor(k / 12), mes = k % 12;
+      meses8.push({ ano, mes, futuro: true, label: MES_PT_ARR[mes] + '/' + pad2hc(ano % 100) + ' (previsto)' });
+    }
+  })();
   const admPorMes = meses8.map(()=>0);
   const demPorMes = meses8.map(()=>0);
 
@@ -2047,6 +2067,7 @@ function renderHeadcount(){
   // Meses sem nenhum ativo no fechamento ficam com turnover null, pra
   // não dividir por zero.
   const turnoverPct = meses8.map((m, i) => {
+    if(m.futuro) return null;
     const ativosFechamento = evolucaoDados[i];
     if(!ativosFechamento || ativosFechamento <= 0) return null;
     return (demPorMes[i] / ativosFechamento) * 100;
@@ -2059,13 +2080,14 @@ function renderHeadcount(){
   // pelo tamanho da equipe em cada mês.
   const turnoverMedioLabelEl = document.getElementById('turnoverMedioLabel');
   if(turnoverMedioLabelEl){
-    const somaDemitidos = demPorMes.reduce((a,b) => a+b, 0);
-    const ativosValidos = evolucaoDados.filter(v => v > 0);
+    const idxPassados = meses8.map((m, i) => m.futuro ? -1 : i).filter(i => i >= 0);
+    const somaDemitidos = idxPassados.reduce((a, i) => a + demPorMes[i], 0);
+    const ativosValidos = idxPassados.map(i => evolucaoDados[i]).filter(v => v > 0);
     if(ativosValidos.length > 0){
       const mediaAtivos = ativosValidos.reduce((a,b) => a+b, 0) / ativosValidos.length;
       const turnoverAcumulado = (somaDemitidos / mediaAtivos) * 100;
       const primeiroMes = meses8[0].label;
-      const ultimoMes = meses8[meses8.length - 1].label;
+      const ultimoMes = meses8[idxPassados[idxPassados.length - 1]].label;
       turnoverMedioLabelEl.textContent = 'Turnover acumulado (' + primeiroMes + ' – ' + ultimoMes + '): ' + turnoverAcumulado.toFixed(1) + '% (' + somaDemitidos + ' demitidos / headcount médio ' + mediaAtivos.toFixed(0) + ')';
     } else {
       turnoverMedioLabelEl.textContent = '';
