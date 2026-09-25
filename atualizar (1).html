@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atualizar dados de NR e ASO · Painel do ESER</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="nr_conversor.js"></script>
+<style>
+  :root{ --navy:#001c39; --line:#e1e5f0; --text:#1b2440; --muted:#6b7590; --accent:#0e7c86; --good:#059669; --warn:#d97706; --bad:#dc2626; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Inter', sans-serif; color:var(--text); background:linear-gradient(180deg,#00233f 0,#001c39 260px,#f3f5fa 260px); min-height:100vh; padding:36px clamp(16px,4vw,40px) 60px; }
+  .wrap{ max-width:860px; margin:0 auto; }
+  .eyebrow{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:#7fb8e6; margin-bottom:6px; }
+  h1{ font-family:'Space Grotesk', sans-serif; color:#fff; font-size:clamp(22px,3vw,30px); margin-bottom:6px; }
+  .sub{ color:#b8cde0; font-size:14px; margin-bottom:26px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:22px; box-shadow:0 6px 20px rgba(0,20,50,.12); margin-bottom:18px; }
+  .passo{ display:flex; gap:14px; align-items:flex-start; }
+  .num{ flex:0 0 32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; font-family:'JetBrains Mono', monospace; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .passo h2{ font-family:'Space Grotesk', sans-serif; font-size:17px; margin:4px 0 6px; }
+  .passo p{ font-size:13.5px; color:var(--muted); line-height:1.5; }
+  #zona{ display:block; margin-top:14px; border:2px dashed #b9c6d6; border-radius:14px; padding:30px 16px; text-align:center; cursor:pointer; transition:.15s; background:#f7f9fc; }
+  #zona.sobre{ border-color:var(--accent); background:rgba(14,124,134,.06); }
+  #zona strong{ display:block; font-size:15px; margin-bottom:4px; }
+  #zona span{ font-size:12.5px; color:var(--muted); }
+  .btn{ display:inline-flex; align-items:center; gap:8px; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700; padding:11px 18px; border-radius:999px; border:0; background:var(--accent); color:#fff; cursor:pointer; text-decoration:none; }
+  .btn:hover{ background:#0a5f66; }
+  .btn[disabled]{ background:#b9c6d6; cursor:not-allowed; }
+  .btn.alt{ background:#24292f; }
+  .btns{ display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-top:14px; }
+  .kpi{ background:#f7f9fc; border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .kpi b{ display:block; font-family:'JetBrains Mono', monospace; font-size:22px; }
+  .kpi small{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .aviso{ margin-top:12px; font-size:13px; line-height:1.5; padding:10px 12px; border-radius:10px; }
+  .aviso.ok{ background:rgba(5,150,105,.1); color:#065f46; }
+  .aviso.warn{ background:rgba(217,119,6,.12); color:#7c4a03; }
+  .aviso.erro{ background:rgba(220,38,38,.1); color:#991b1b; }
+  .aviso ul{ margin:6px 0 0 18px; }
+  code{ font-family:'JetBrains Mono', monospace; font-size:12px; background:#eef1f5; padding:1px 6px; border-radius:5px; }
+  .oculto{ display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Painel do ESER · Engemon OP Services</div>
+  <h1>Atualizar dados de NR e Exames</h1>
+  <div class="sub">A planilha é lida aqui no seu navegador e não é enviada para lugar nenhum. O CPF não vai para o painel.</div>
+
+  <div class="card">
+    <div class="passo">
+      <div class="num">1</div>
+      <div style="flex:1">
+        <h2>Escolha a planilha Base_NR.xlsx</h2>
+        <p>Precisa ter as abas <code>BASE</code>, <code>Base_Supervisores</code> e <code>Preenchimento</code>.</p>
+        <label id="zona">
+          <input type="file" id="arquivo" accept=".xlsx,.xlsm,.xls" class="oculto">
+          <strong>📂 Clique aqui ou arraste a planilha</strong>
+          <span id="zonaTxt">Base_NR.xlsx</span>
+        </label>
+        <div id="statusOrg" class="aviso warn oculto"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card oculto" id="resultado">
+    <div class="passo">
+      <div class="num">2</div>
+      <div style="flex:1">
+        <h2>Confira e baixe os 2 arquivos</h2>
+        <div class="kpis" id="kpis"></div>
+        <div id="avisos"></div>
+        <div class="btns">
+          <button class="btn" id="baixarNr">⬇ dados_nr.json</button>
+          <button class="btn" id="baixarAso">⬇ dados_aso.json</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card oculto" id="passo3">
+    <div class="passo">
+      <div class="num">3</div>
+      <div style="flex:1">
+        <h2>Suba os 2 arquivos no GitHub</h2>
+        <p>Clique no botão abaixo, arraste os dois arquivos que você acabou de baixar e clique em <b>Commit changes</b> (Confirmar alterações). Eles substituem os antigos. Em 1 a 3 minutos o painel mostra os dados novos. Depois é só dar <b>Ctrl+F5</b>.</p>
+        <div class="btns">
+          <a class="btn alt" href="https://github.com/Engemon-painel/Painel-SLA/upload/main" target="_blank" rel="noopener">↗ Abrir upload do GitHub</a>
+          <a class="btn" href="./" target="_blank" rel="noopener">↗ Abrir o painel</a>
+        </div>
+        <p style="margin-top:12px;">⚠️ Não suba a planilha <code>.xlsx</code> no GitHub: o repositório é público e ela tem CPF. Só os dois arquivos <code>.json</code>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const converter = (XLSX, wb, org, hoje) => NRConversor.converter(nome => {
+  const k = wb.SheetNames.find(x => x.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim() === nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim());
+  return k ? XLSX.utils.sheet_to_json(wb.Sheets[k], { header:1, raw:true, defval:null, blankrows:false }) : null;
+}, org, hoje);
+const pad = v => String(v).padStart(2, '0');
+
+// ----------------------------- tela -----------------------------
+let ORG = null, RESULT = null;
+const $ = id => document.getElementById(id);
+const escH = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function hojeIso(){ const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+
+fetch('dados.json?_=' + Date.now()).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+  .then(d => { ORG = d.colaboradores || []; })
+  .catch(e => {
+    ORG = [];
+    const el = $('statusOrg'); el.classList.remove('oculto');
+    el.textContent = 'Não consegui ler o dados.json do painel (' + e.message + '). Os arquivos serão gerados, mas sem matrícula/função vindas do Organograma. Abra esta página pelo endereço do painel (…github.io/Painel-SLA/atualizar.html).';
+  });
+
+function baixar(nome, obj){
+  const blob = new Blob([JSON.stringify(obj, null, 1)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+$('baixarNr').onclick = () => RESULT && baixar('dados_nr.json', RESULT.nr);
+$('baixarAso').onclick = () => RESULT && baixar('dados_aso.json', RESULT.aso);
+
+async function processar(file){
+  $('zonaTxt').textContent = 'Lendo ' + file.name + '...';
+  try{
+    if(ORG === null) await new Promise(r => { const i = setInterval(() => { if(ORG !== null){ clearInterval(i); r(); } }, 100); });
+    const wb = XLSX.read(await file.arrayBuffer(), { type:'array', cellDates:false });
+    RESULT = converter(XLSX, wb, ORG, hojeIso());
+    const r = RESULT.resumo;
+    $('zonaTxt').textContent = '✅ ' + file.name + ' lida com sucesso';
+    $('kpis').innerHTML = `
+      <div class="kpi"><small>Técnicos (NR)</small><b>${r.tecnicos}</b></div>
+      <div class="kpi"><small>Saíram da empresa</small><b>${r.saidas.length}</b></div>
+      <div class="kpi"><small>Exames (ASO)</small><b>${r.exames}</b></div>`;
+    let av = '';
+    const suspeitos = r.saidas.filter(s => s.ativoNoOrganograma);
+    if(suspeitos.length) av += `<div class="aviso warn"><b>Confira:</b> marcados como "Saiu da empresa" (não estão como Ativo na aba BASE), mas aparecem <b>ativos</b> no Organograma:<ul>${suspeitos.map(s => '<li>' + escH(s.nome) + '</li>').join('')}</ul></div>`;
+    if(r.semMatricula.length) av += `<div class="aviso warn"><b>ASO sem matrícula</b> (nome não encontrado como ativo no Organograma — confira a grafia):<ul>${r.semMatricula.map(s => '<li>' + escH(s) + '</li>').join('')}</ul></div>`;
+    if(r.desconhecidos.length) av += `<div class="aviso warn"><b>Textos novos nas colunas de curso</b> (entraram como "Avaliar"):<ul>${r.desconhecidos.slice(0, 15).map(s => '<li>' + escH(s) + '</li>').join('')}</ul></div>`;
+    if(!av) av = '<div class="aviso ok">Tudo certo, nenhum ponto para conferir.</div>';
+    $('avisos').innerHTML = av;
+    $('resultado').classList.remove('oculto'); $('passo3').classList.remove('oculto');
+    $('resultado').scrollIntoView({ behavior:'smooth', block:'start' });
+  }catch(e){
+    console.error(e);
+    $('zonaTxt').textContent = 'Clique ou arraste de novo';
+    $('avisos').innerHTML = '<div class="aviso erro"><b>Erro:</b> ' + escH(e.message) + '</div>';
+    $('kpis').innerHTML = ''; $('resultado').classList.remove('oculto'); $('passo3').classList.add('oculto');
+  }
+}
+$('arquivo').onchange = e => { const f = e.target.files[0]; if(f) processar(f); };
+const zona = $('zona');
+['dragenter','dragover'].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.add('sobre'); }));
+['dragleave','drop'].forEach(ev => zona.addEventListener(ev, e => { e.preventDefault(); zona.classList.remove('sobre'); }));
+zona.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if(f) processar(f); });
+</script>
+</body>
+</html>
