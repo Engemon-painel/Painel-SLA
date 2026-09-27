@@ -73,8 +73,13 @@
       display:flex; align-items:center; justify-content:center; background:#eef3f8; }
     #telaInicial .ti-nome{ font-weight:700; font-size:15px; }
     #telaInicial .ti-desc{ font-size:11.5px; color:#6b7590; line-height:1.35; }
-    #telaInicial .ti-data{ margin-top:4px; font-family:'JetBrains Mono', monospace; font-size:10.5px; font-weight:600; color:#0e7c86;
-      background:rgba(14,124,134,.08); padding:3px 8px; border-radius:999px; }
+    #telaInicial .ti-data{ margin-top:6px; display:inline-flex; align-items:center; gap:6px; max-width:100%; white-space:nowrap;
+      font-family:'JetBrains Mono', monospace; font-size:11px; color:#0e7c86; background:rgba(14,124,134,.08);
+      padding:4px 10px; border-radius:999px; }
+    #telaInicial .ti-data .rot{ font-family:'Inter', sans-serif; font-size:10.5px; color:#6b7590; font-weight:500; }
+    #telaInicial .ti-data b{ font-weight:700; }
+    #telaInicial .ti-data.velho{ color:#b45309; background:rgba(217,119,6,.12); }
+    #telaInicial .ti-data.velho .rot{ color:#b45309; }
     #telaInicial .ti-badge{ position:absolute; top:12px; right:12px; background:#dc2626; color:#fff; font-family:'JetBrains Mono', monospace;
       font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px; }
     #telaInicial .ti-card.ti-grupo{ background:linear-gradient(160deg,#ffffff 0%, #e6f2f3 100%); }
@@ -150,12 +155,12 @@
   }
   function buscarHorarios(){
     const repo = repoAtual(); if(!repo) return;
-    const CHAVE = 'tiHorarios:' + repo, VALIDADE = 10 * 60 * 1000;
+    const CHAVE = 'tiHorarios2:' + repo, VALIDADE = 10 * 60 * 1000;
     try{
       const c = JSON.parse(sessionStorage.getItem(CHAVE) || 'null');
       if(c && Date.now() - c.em < VALIDADE){ HORARIOS = c.h; return; }
     }catch(e){}
-    const arquivos = ['dados.json', 'base_nr.json'];
+    const arquivos = ['dados.json', 'base_nr.json', 'dados_escala.json'];
     Promise.all(arquivos.map(a =>
       fetch('https://api.github.com/repos/' + repo + '/commits?per_page=1&path=' + encodeURIComponent(a))
         .then(r => r.ok ? r.json() : [])
@@ -169,31 +174,47 @@
       if(document.body.classList.contains('modo-inicio')) desenhar();
     });
   }
-  const executado = arq => HORARIOS[arq] ? 'Script executado em ' + fmtDataHora(HORARIOS[arq]) : '';
+  // ---- rótulo de data de cada card: { rot, val, dica, velho }
+  const dmCurto = iso => iso ? iso.slice(8,10) + '/' + iso.slice(5,7) : '';
+  const diasAtras = iso => { if(!iso) return 0; const p = iso.split('-'); return Math.floor((new Date(hojeIso() + 'T00:00:00') - new Date(+p[0], +p[1]-1, +p[2])) / 86400000); };
+  const LIMITE_DIAS = 2;   // mais velho que isso = etiqueta laranja
+  function etiqueta(rot, dataIso, hora, dicaExtra){
+    if(!dataIso) return null;
+    const dias = diasAtras(dataIso);
+    const velho = dias > LIMITE_DIAS;
+    const val = dmCurto(dataIso) + (hora ? ' às ' + hora : '');
+    let dica = rot + ' ' + isoParaBr(dataIso) + (hora ? ' às ' + hora : '') + (dicaExtra ? ' · ' + dicaExtra : '');
+    if(velho) dica += ' · sem atualização há ' + dias + ' dias — confira o fluxo';
+    return { rot, val, dica, velho };
+  }
+  function doCommit(arq){
+    if(!HORARIOS[arq]) return null;
+    const d = new Date(HORARIOS[arq]); if(isNaN(d)) return null;
+    const iso = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    return etiqueta('Atualizado', iso, pad2(d.getHours()) + ':' + pad2(d.getMinutes()), 'horário em que o script rodou');
+  }
 
   function datasDasAreas(){
     const txt = document.getElementById('loadStatus')?.textContent || '';
     const geral = (txt.match(/atualizados em (\d{4}-\d{2}-\d{2})/) || [])[1] || '';
     const baseAte = brParaIso((txt.match(/base até (\d{2}\/\d{2}\/\d{4})/) || [])[1]);
-    const atualizado = geral ? 'Atualizado em ' + isoParaBr(geral) : '';
+    const atualizado = etiqueta('Atualizado', geral);
 
     const colab = (typeof COLABORADORES !== 'undefined' && Array.isArray(COLABORADORES)) ? COLABORADORES : [];
     const movimento = maiorAteHoje(colab.flatMap(c => [c.dataAdmis, c.dataDemissao]));
 
-    const vagas = (typeof VAGAS !== 'undefined' && Array.isArray(VAGAS)) ? VAGAS : [];
-    const ultimaVaga = maiorAteHoje(vagas.flatMap(v => [v.dataCriacaoRequisicao, v.requisicaoAprovada, v.fechamento, v.dataIntegracao].map(brParaIso)));
-
-    const eser = baseAte ? 'Incidentes até ' + isoParaBr(baseAte) : atualizado;
+    const eser = etiqueta('Incidentes até', baseAte) || atualizado;
+    const escala = window.EscalaInfo && window.EscalaInfo.atualizado_em;
     return {
       eser,
       'nav-consolidado': eser, 'nav-area': eser, 'nav-site': eser, 'nav-fca': eser, 'nav-infra': eser,
-      'nav-organograma': movimento ? 'Última movimentação ' + isoParaBr(movimento) : atualizado,
-      'nav-vagas': executado('dados.json') || (ultimaVaga ? 'Última requisição ' + isoParaBr(ultimaVaga) : atualizado),
-      'nav-frota': executado('dados.json') || atualizado,
+      'nav-organograma': movimento ? { rot:'Última movimentação', val: dmCurto(movimento), dica:'Última admissão/demissão em ' + isoParaBr(movimento), velho:false } : atualizado,
+      'nav-vagas': doCommit('dados.json') || atualizado,
+      'nav-frota': doCommit('dados.json') || atualizado,
       'nav-bancohoras': atualizado,
-      'nav-nr': executado('base_nr.json') || (datasNrAso.nr ? 'Base atualizada em ' + isoParaBr(datasNrAso.nr) : ''),
-      'nav-escala': (window.EscalaInfo && window.EscalaInfo.atualizado_em) ? 'Escala atualizada em ' + isoParaBr(window.EscalaInfo.atualizado_em) : '',
-      'nav-aso': executado('base_nr.json') || (datasNrAso.aso ? 'Base atualizada em ' + isoParaBr(datasNrAso.aso) : '')
+      'nav-nr': doCommit('base_nr.json') || etiqueta('Atualizado', datasNrAso.nr),
+      'nav-aso': doCommit('base_nr.json') || etiqueta('Atualizado', datasNrAso.aso),
+      'nav-escala': doCommit('dados_escala.json') || etiqueta('Atualizado', escala)
     };
   }
   function buscarDatasNrAso(){
@@ -207,7 +228,7 @@
     }).catch(() => {});
   }
   let DATAS = {};
-  const linhaData = txt => txt ? `<span class="ti-data">🕒 ${esc(txt)}</span>` : '';
+  const linhaData = e => e ? `<span class="ti-data${e.velho ? ' velho' : ''}" title="${esc(e.dica)}">${e.velho ? '⚠️' : '🕒'} <span class="rot">${esc(e.rot)}</span> <b>${esc(e.val)}</b></span>` : '';
 
   function cardHtml(it, i){
     return `<button type="button" class="ti-card" data-nav="${esc(it.id)}" style="animation-delay:${i*45}ms">
