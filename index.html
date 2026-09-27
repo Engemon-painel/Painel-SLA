@@ -1422,7 +1422,7 @@ async function carregarDados(){
         if(p.length === 3){
           const dtBase = new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
           const diasAtraso = Math.floor((new Date() - dtBase) / 86400000);
-          if(diasAtraso > 2){ defasada = true; txt += ' ⚠ base com ' + diasAtraso + ' dias de atraso'; }
+          // aviso de atraso da base removido (não é necessário)
         }
       }
       status.textContent = txt;
