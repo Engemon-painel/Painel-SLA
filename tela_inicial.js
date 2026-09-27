@@ -203,7 +203,9 @@
     const colab = (typeof COLABORADORES !== 'undefined' && Array.isArray(COLABORADORES)) ? COLABORADORES : [];
     const movimento = maiorAteHoje(colab.flatMap(c => [c.dataAdmis, c.dataDemissao]));
 
-    const eser = etiqueta('Incidentes até', baseAte) || atualizado;
+    const eserEt = etiqueta('Incidentes até', baseAte);
+    if(eserEt){ eserEt.velho = false; eserEt.dica = 'Incidentes até ' + isoParaBr(baseAte); }   // sem aviso de atraso no ESER
+    const eser = eserEt || atualizado;
     const escala = window.EscalaInfo && window.EscalaInfo.atualizado_em;
     return {
       eser,
