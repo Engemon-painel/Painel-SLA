@@ -171,6 +171,32 @@
     return (d - a) / (86400000 * 30.44);
   }
 
+  // Dias corridos entre admissão e demissão (null se faltar data).
+  function tempoCasaDias(r){
+    const a = dataIso(r.dataAdmis), d = dataIso(r.dataDemissao);
+    if(!a || !d || d < a) return null;
+    return Math.round((d - a) / 86400000);
+  }
+
+  // Texto amigável a partir de uma quantidade de dias:
+  //   menos de 1 mês  -> "22 dias"
+  //   menos de 1 ano  -> "2 meses e 5 dias"
+  //   1 ano ou mais   -> "1 ano e 3 meses"
+  function formatarDias(dias){
+    if(dias === null || dias === undefined || isNaN(dias)) return '—';
+    dias = Math.round(dias);
+    const pl = (n, s, p) => n + ' ' + (n === 1 ? s : p);
+    if(dias < 30) return pl(dias, 'dia', 'dias');
+    if(dias < 365){
+      const meses = Math.floor(dias / 30.44);
+      const resto = Math.round(dias - meses * 30.44);
+      return resto > 0 ? pl(meses, 'mês', 'meses') + ' e ' + pl(resto, 'dia', 'dias') : pl(meses, 'mês', 'meses');
+    }
+    const anos = Math.floor(dias / 365.25);
+    const meses = Math.floor((dias - anos * 365.25) / 30.44);
+    return meses > 0 ? pl(anos, 'ano', 'anos') + ' e ' + pl(meses, 'mês', 'meses') : pl(anos, 'ano', 'anos');
+  }
+
   function filtrados(){
     const hoje = new Date();
     const inicio12 = new Date(hoje.getFullYear(), hoje.getMonth() - 11, 1);
@@ -238,7 +264,7 @@
 
     // KPIs
     const porTipo = contar(itens, 'tipoDesligamento');
-    const casas = itens.map(tempoCasaMeses).filter(v => v !== null);
+    const casas = itens.map(tempoCasaDias).filter(v => v !== null);
     const mediaCasa = casas.length ? casas.reduce((a,b)=>a+b,0) / casas.length : null;
     const ate90 = itens.filter(r => { const m = tempoCasaMeses(r); return m !== null && m < 3; }).length;
     const causas = contar(itens, 'causaPareto');
@@ -247,7 +273,7 @@
     document.getElementById('toKpiRow').innerHTML =
       `<div class="kpi"><div class="label">🔄 Desligamentos</div><div class="value" style="color:${C.accent}">${total.toLocaleString('pt-BR')}</div></div>` +
       porTipo.slice(0, 3).map(([k, q], i) => `<div class="kpi"><div class="label">${esc(k)}</div><div class="value" style="color:${PALETA[(i+1) % PALETA.length]}">${q}</div><div class="delta">${total ? (q/total*100).toFixed(1) : 0}% do total</div></div>`).join('') +
-      `<div class="kpi"><div class="label">⏳ Tempo médio de casa</div><div class="value">${mediaCasa === null ? '—' : mediaCasa.toFixed(1) + ' m'}</div><div class="delta">meses entre admissão e demissão</div></div>` +
+      `<div class="kpi"><div class="label">⏳ Tempo médio de casa</div><div class="value" style="font-size:20px;">${formatarDias(mediaCasa)}</div><div class="delta">entre admissão e demissão</div></div>` +
       `<div class="kpi" ${ate90 ? `style="border-color:${C.bad}; box-shadow:0 0 0 2px ${C.bad} inset;"` : ''}><div class="label">⚠️ Saíram em até 90 dias</div><div class="value" style="color:${ate90 ? C.bad : C.good}">${ate90}</div><div class="delta">${total ? (ate90/total*100).toFixed(1) : 0}% do total</div></div>` +
       (topCausa ? `<div class="kpi"><div class="label">🥇 Principal causa</div><div class="value" style="font-size:16px;">${esc(topCausa[0])}</div><div class="delta">${topCausa[1]} (${(topCausa[1]/total*100).toFixed(1)}%)</div></div>` : '');
 
@@ -380,11 +406,12 @@
     }).sort((a,b) => String(b.dataDemissao || '').localeCompare(String(a.dataDemissao || '')));
     document.getElementById('toContagem').textContent = lista.length.toLocaleString('pt-BR') + ' desligamento' + (lista.length === 1 ? '' : 's');
     body.innerHTML = lista.length ? lista.map(r => {
-      const m = tempoCasaMeses(r);
+      const dias = tempoCasaDias(r);
+      const corCasa = dias !== null && dias < 90 ? ` style="color:${C.bad} !important;"` : '';
       return `<tr>
         <td class="mono" style="font-size:12px;">${dataBr(r.dataDemissao)}</td>
         <td class="mono" style="font-size:12px;">${dataBr(r.dataAdmis)}</td>
-        <td class="num">${m === null ? '—' : m.toFixed(1) + ' m'}</td>
+        <td class="num"${corCasa}>${formatarDias(dias)}</td>
         <td>${esc(r.nome) || '—'}</td>
         <td>${esc(r.supervisor) || '—'}</td>
         <td>${esc(r.tipoDesligamento) || '—'}</td>
@@ -397,10 +424,10 @@
     const itens = filtrados();
     if(!itens.length){ alert('Nenhum desligamento para exportar com os filtros atuais.'); return; }
     const csv = s => { const t = String(s ?? ''); return /[",;\n\r]/.test(t) ? '"' + t.replace(/"/g,'""') + '"' : t; };
-    const linhas = [['DtDemissao','DataAdmis','TempoCasaMeses','Nome','Matricula','Supervisor','TipoDesligamento','CausaPareto','OQueEntra'].join(';')];
+    const linhas = [['DtDemissao','DataAdmis','TempoCasaDias','TempoCasa','Nome','Matricula','Supervisor','TipoDesligamento','CausaPareto','OQueEntra'].join(';')];
     itens.forEach(r => {
-      const m = tempoCasaMeses(r);
-      linhas.push([dataBr(r.dataDemissao), dataBr(r.dataAdmis), m === null ? '' : m.toFixed(1).replace('.', ','), r.nome, r.matricula, r.supervisor, r.tipoDesligamento, r.causaPareto, r.oQueEntra].map(csv).join(';'));
+      const dias = tempoCasaDias(r);
+      linhas.push([dataBr(r.dataDemissao), dataBr(r.dataAdmis), dias === null ? '' : dias, formatarDias(dias), r.nome, r.matricula, r.supervisor, r.tipoDesligamento, r.causaPareto, r.oQueEntra].map(csv).join(';'));
     });
     const blob = new Blob(['\uFEFF' + linhas.join('\r\n')], { type:'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
