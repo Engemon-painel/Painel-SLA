@@ -21,6 +21,7 @@
   let periodo = '12m';      // '12m' | 'ano' | 'todos'
   let supervisorFiltro = '';
   let tipoFiltro = '';
+  let casaFiltro = '';      // '' | '30' | '90'
   let busca = '';
   const charts = {};
 
@@ -73,6 +74,12 @@
           <select id="toSupervisor" class="mono" style="${selStyle}"><option value="">Todos</option></select>
           <label class="mono" style="${lblStyle} margin-left:8px;">Tipo</label>
           <select id="toTipo" class="mono" style="${selStyle}"><option value="">Todos</option></select>
+          <label class="mono" style="${lblStyle} margin-left:8px;">Tempo de casa</label>
+          <select id="toCasa" class="mono" style="${selStyle} min-width:150px;">
+            <option value="">Todos</option>
+            <option value="30">Até 30 dias</option>
+            <option value="90">Até 90 dias</option>
+          </select>
           <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" id="toExportar">⬇ Exportar (CSV)</button>
         </div>
 
@@ -136,6 +143,7 @@
     document.getElementById('toPeriodo').onchange = e => { periodo = e.target.value; render(); };
     document.getElementById('toSupervisor').onchange = e => { supervisorFiltro = e.target.value; render(); };
     document.getElementById('toTipo').onchange = e => { tipoFiltro = e.target.value; render(); };
+    document.getElementById('toCasa').onchange = e => { casaFiltro = e.target.value; render(); };
     document.getElementById('toExportar').onclick = exportarCsv;
     let t;
     document.getElementById('toBusca').addEventListener('input', e => {
@@ -209,6 +217,10 @@
       }
       if(supervisorFiltro && norm(r.supervisor) !== supervisorFiltro) return false;
       if(tipoFiltro && (norm(r.tipoDesligamento) || 'Não informado') !== tipoFiltro) return false;
+      if(casaFiltro){
+        const dias = tempoCasaDias(r);
+        if(dias === null || dias > Number(casaFiltro)) return false;
+      }
       return true;
     });
   }
@@ -266,7 +278,8 @@
     const porTipo = contar(itens, 'tipoDesligamento');
     const casas = itens.map(tempoCasaDias).filter(v => v !== null);
     const mediaCasa = casas.length ? casas.reduce((a,b)=>a+b,0) / casas.length : null;
-    const ate90 = itens.filter(r => { const m = tempoCasaMeses(r); return m !== null && m < 3; }).length;
+    const ate30 = itens.filter(r => { const d = tempoCasaDias(r); return d !== null && d <= 30; }).length;
+    const ate90 = itens.filter(r => { const d = tempoCasaDias(r); return d !== null && d <= 90; }).length;
     const causas = contar(itens, 'causaPareto');
     const topCausa = causas[0];
 
@@ -274,7 +287,8 @@
       `<div class="kpi"><div class="label">🔄 Desligamentos</div><div class="value" style="color:${C.accent}">${total.toLocaleString('pt-BR')}</div></div>` +
       porTipo.slice(0, 3).map(([k, q], i) => `<div class="kpi"><div class="label">${esc(k)}</div><div class="value" style="color:${PALETA[(i+1) % PALETA.length]}">${q}</div><div class="delta">${total ? (q/total*100).toFixed(1) : 0}% do total</div></div>`).join('') +
       `<div class="kpi"><div class="label">⏳ Tempo médio de casa</div><div class="value" style="font-size:20px;">${formatarDias(mediaCasa)}</div><div class="delta">entre admissão e demissão</div></div>` +
-      `<div class="kpi" ${ate90 ? `style="border-color:${C.bad}; box-shadow:0 0 0 2px ${C.bad} inset;"` : ''}><div class="label">⚠️ Saíram em até 90 dias</div><div class="value" style="color:${ate90 ? C.bad : C.good}">${ate90}</div><div class="delta">${total ? (ate90/total*100).toFixed(1) : 0}% do total</div></div>` +
+      `<div class="kpi" style="cursor:pointer; ${ate30 ? `border-color:${C.bad}; box-shadow:0 0 0 2px ${C.bad} inset;` : ''}" onclick="document.getElementById('toCasa').value='30'; document.getElementById('toCasa').onchange({target:{value:'30'}});" title="Clique para listar só quem saiu em até 30 dias"><div class="label">🚨 Saíram em até 30 dias</div><div class="value" style="color:${ate30 ? C.bad : C.good}">${ate30}</div><div class="delta">${total ? (ate30/total*100).toFixed(1) : 0}% do total</div></div>` +
+      `<div class="kpi" style="cursor:pointer; ${ate90 ? `border-color:${C.warn}; box-shadow:0 0 0 2px ${C.warn} inset;` : ''}" onclick="document.getElementById('toCasa').value='90'; document.getElementById('toCasa').onchange({target:{value:'90'}});" title="Clique para listar só quem saiu em até 90 dias"><div class="label">⚠️ Saíram em até 90 dias</div><div class="value" style="color:${ate90 ? C.warn : C.good}">${ate90}</div><div class="delta">${total ? (ate90/total*100).toFixed(1) : 0}% do total</div></div>` +
       (topCausa ? `<div class="kpi"><div class="label">🥇 Principal causa</div><div class="value" style="font-size:16px;">${esc(topCausa[0])}</div><div class="delta">${topCausa[1]} (${(topCausa[1]/total*100).toFixed(1)}%)</div></div>` : '');
 
     // Pareto
@@ -356,18 +370,22 @@
     });
 
     // Tempo de casa (faixas)
+    // Faixas em DIAS corridos entre admissão e demissão.
     const faixas = [
-      { nome:'Até 3 meses', min:0, max:3 }, { nome:'3 a 6 meses', min:3, max:6 },
-      { nome:'6 a 12 meses', min:6, max:12 }, { nome:'1 a 2 anos', min:12, max:24 },
-      { nome:'Mais de 2 anos', min:24, max:Infinity }
+      { nome:'Até 30 dias',   min:0,   max:30 },
+      { nome:'31 a 90 dias',  min:31,  max:90 },
+      { nome:'3 a 6 meses',   min:91,  max:182 },
+      { nome:'6 a 12 meses',  min:183, max:365 },
+      { nome:'1 a 2 anos',    min:366, max:730 },
+      { nome:'Mais de 2 anos', min:731, max:Infinity }
     ];
-    const qtdFaixa = faixas.map(f => itens.filter(r => { const m = tempoCasaMeses(r); return m !== null && m >= f.min && m < f.max; }).length);
-    const semData = itens.filter(r => tempoCasaMeses(r) === null).length;
+    const qtdFaixa = faixas.map(f => itens.filter(r => { const d = tempoCasaDias(r); return d !== null && d >= f.min && d <= f.max; }).length);
+    const semData = itens.filter(r => tempoCasaDias(r) === null).length;
     const labelsFaixa = faixas.map(f => f.nome).concat(semData ? ['Sem data'] : []);
     novoChart('toCasaChart', {
       type:'bar',
       data:{ labels: labelsFaixa, datasets:[{ label:'Desligamentos', data: qtdFaixa.concat(semData ? [semData] : []),
-        backgroundColor: [C.bad, C.warn, '#2563eb', C.accent, C.good, '#9ca3af'], borderRadius:4, datalabels: rotulo }] },
+        backgroundColor: [C.bad, C.warn, '#2563eb', C.accent, C.good, '#5e34b5', '#9ca3af'], borderRadius:4, datalabels: rotulo }] },
       options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, datalabels:{display:true} }, scales: escalas(false) }
     });
 
