@@ -311,7 +311,7 @@
       <div class="grid" style="grid-template-columns:1.4fr 1fr;">
         <div class="panel">
           <h2>Realizado x Meta Diária</h2>
-          <div class="hint">Barras: realizado por dia · Meta original: planejado ÷ dias úteis · Meta de recuperação: necessário por dia</div>
+          <div class="hint">Meta do dia = meta original + o que faltou nos dias anteriores · barra verde = bateu a meta do dia, vermelha = não bateu</div>
           <div style="position:relative;height:300px;"><canvas id="pv-op-diario"></canvas></div>
         </div>
         <div class="panel">
@@ -413,31 +413,69 @@
         <div class="delta" style="color:${COR.muted}">no ritmo atual até o fim do mês</div></div>`;
 
     // gráfico Realizado x Meta Diária
+    // Meta do dia = meta original do dia + o que ficou faltando nos dias anteriores
+    // (meta acumulada até hoje − realizado acumulado até ontem). Se sobrou, abate do dia seguinte.
+    // Dias depois de D-1 usam a meta de recuperação (o que falta ÷ dias úteis restantes).
     const porDia = {};
     exec.forEach(r => { if (r.d) porDia[r.d] = (porDia[r.d] || 0) + 1; });
     const metaOriginal = total / duMes;
+    const realDia = [], metaDia = [], deficitAnt = [], corBarra = [];
+    let du = 0, realAcumAnt = 0;
+    dias.forEach(d => {
+      const feito = porDia[d.data] || 0;
+      if (d.util) du++;
+      let meta = null, deficit = null;
+      if (d.util) {
+        if (d.data <= ref) {
+          const planAcum = metaOriginal * du;
+          meta = Math.max(0, planAcum - realAcumAnt);
+          deficit = meta - metaOriginal;
+        } else {
+          meta = necessario;
+          deficit = necessario - metaOriginal;
+        }
+      }
+      realDia.push(d.data <= ref || feito ? feito : null);
+      metaDia.push(meta === null ? null : Math.round(meta * 100) / 100);
+      deficitAnt.push(deficit);
+      corBarra.push(meta === null ? 'rgba(107,117,144,.55)' : feito >= meta - 0.005 ? 'rgba(5,150,105,.8)' : 'rgba(220,38,38,.75)');
+      realAcumAnt += feito;
+    });
+
     const cv = raiz.querySelector('#pv-op-diario');
     if (graficoDiario) graficoDiario.destroy();
     graficoDiario = new Chart(cv, {
       data: {
         labels: dias.map(d => String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5)),
         datasets: [
-          { type: 'bar', label: 'Realizado Dia', data: dias.map(d => porDia[d.data] || 0),
-            backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 3, order: 2,
+          { type: 'bar', label: 'Realizado Dia', data: realDia, backgroundColor: corBarra, borderRadius: 3, order: 3,
             datalabels: { display: c => c.dataset.data[c.dataIndex] > 0, anchor: 'end', align: 'top', color: '#000',
               font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
-          { type: 'line', label: 'Meta Original', data: dias.map(() => Math.round(metaOriginal * 100) / 100),
-            borderColor: '#1b2440', borderWidth: 2, pointRadius: 0, order: 1, datalabels: { display: false } },
-          { type: 'line', label: 'Meta de Recuperação', data: dias.map(() => Math.round(necessario * 100) / 100),
-            borderColor: COR.warn, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, order: 1, datalabels: { display: false } }
+          { type: 'line', label: 'Meta do Dia (com acúmulo)', data: metaDia, spanGaps: false,
+            borderColor: COR.warn, backgroundColor: COR.warn, borderWidth: 2, stepped: 'middle',
+            pointRadius: 3, pointHoverRadius: 5, order: 1,
+            datalabels: { display: c => c.dataset.data[c.dataIndex] !== null, align: 'top', offset: 4, color: COR.warn,
+              font: { size: 9, family: 'JetBrains Mono', weight: '700' }, formatter: v => Math.round(v) } },
+          { type: 'line', label: 'Meta Original', data: dias.map(d => d.util ? Math.round(metaOriginal * 100) / 100 : null),
+            borderColor: '#6b7590', borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, order: 2, spanGaps: true,
+            datalabels: { display: false } }
         ]
       },
       plugins: typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [],
       options: {
         responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 14 } },
         interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { labels: { color: COR.muted, font: { family: 'Inter', size: 11 }, boxWidth: 12 } },
-          tooltip: { callbacks: { label: c => `${c.dataset.label}: ${dec(c.parsed.y)}` } } },
+        plugins: {
+          legend: { labels: { color: COR.muted, font: { family: 'Inter', size: 11 }, boxWidth: 12 } },
+          tooltip: { callbacks: {
+            label: c => c.parsed.y === null ? null : `${c.dataset.label}: ${dec(c.parsed.y)}`,
+            afterBody: it => {
+              const i = it[0].dataIndex, dAnt = deficitAnt[i];
+              if (dAnt === null) return 'Dia não útil';
+              return dAnt >= 0 ? `Acúmulo dos dias anteriores: +${dec(dAnt)}` : `Sobra dos dias anteriores: ${dec(dAnt)}`;
+            } } }
+        },
         scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
           y: { beginAtZero: true, grid: { color: '#e1e5f0' } } }
       }
