@@ -34,6 +34,19 @@
   const semAcento = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const executorDoTipo = t => EXECUTOR_POR_TIPO[semAcento(t).replace(/^preventiva infra - /, '')] || 'Outros';
 
+  // ---- HISTÓRICO MENSAL (meses fechados) — edite/acrescente aqui ----
+  // O mês atual entra sozinho, calculado da base (dados_preventiva.json).
+  const HISTORICO_MENSAL = [
+    { mes: '2026-01', programadas: 920,  executadas: 482 },
+    { mes: '2026-02', programadas: 961,  executadas: 896 },
+    { mes: '2026-03', programadas: 978,  executadas: 848 },
+    { mes: '2026-04', programadas: 1092, executadas: 810 },
+    { mes: '2026-05', programadas: 1407, executadas: 1196 },
+    { mes: '2026-06', programadas: 1446, executadas: 1284 },
+    { mes: '2026-07', programadas: 1327, executadas: 1264 },
+    { mes: '2026-08', programadas: 1267, executadas: 1216 }
+  ];
+
   const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
                  'Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -116,10 +129,17 @@
 
       <div class="kpi-row" id="pv-kpis"></div>
 
-      <div class="panel" style="margin-bottom:16px;">
-        <h2>Realizado x Meta — Acumulado</h2>
-        <div class="hint">Meta distribuída pelos dias úteis do mês · realizado pela data de conclusão</div>
-        <div class="pv-cv"><canvas id="pv-canvas"></canvas></div>
+      <div class="grid">
+        <div class="panel">
+          <h2>Realizado x Meta — Acumulado</h2>
+          <div class="hint">Meta distribuída pelos dias úteis do mês · realizado pela data de conclusão</div>
+          <div class="pv-cv"><canvas id="pv-canvas"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2>Visão mensal</h2>
+          <div class="hint">Programadas x Executadas · mês atual calculado da base (sem filtros)</div>
+          <div class="pv-cv"><canvas id="pv-mensal"></canvas></div>
+        </div>
       </div>
 
       <div class="panel">
@@ -211,6 +231,7 @@
           <span style="font-size:15px;color:${COR.muted};font-weight:600;">Em aberto <span style="color:#1b2440">${fmt(aberto)}</span></span></div></div>`;
 
     grafico_(regs, dias, ref, duMes, planejado);
+    graficoMensal_();
     tabela(regs);
   }
 
@@ -256,6 +277,59 @@
     };
     if (grafico) grafico.destroy();
     grafico = new Chart(raiz.querySelector('#pv-canvas'), cfg);
+  }
+
+  let graficoMensal = null;
+  function graficoMensal_() {
+    const ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const serie = HISTORICO_MENSAL.filter(h => h.mes !== dados.mes).map(h => ({ ...h }));
+    serie.push({ mes: dados.mes, programadas: dados.registros.length,
+      executadas: dados.registros.filter(r => r.st === 'Executada').length, atual: true });
+    serie.sort((a, b) => a.mes.localeCompare(b.mes));
+    const rot = serie.map(h => ABREV[+h.mes.slice(5) - 1] + '/' + h.mes.slice(2, 4) + (h.atual ? '*' : ''));
+    const pcts = serie.map(h => h.programadas ? h.executadas / h.programadas * 100 : 0);
+    const corPct = p => p >= 100 ? '#059669' : p >= 95 ? '#d97706' : '#dc2626';
+    const temLabels = typeof ChartDataLabels !== 'undefined';
+
+    if (graficoMensal) graficoMensal.destroy();
+    graficoMensal = new Chart(raiz.querySelector('#pv-mensal'), {
+      data: {
+        labels: rot,
+        datasets: [
+          { type: 'bar', label: 'Programadas', data: serie.map(h => h.programadas),
+            backgroundColor: 'rgba(107,117,144,.6)', borderRadius: 5, order: 2,
+            datalabels: { color: '#000', anchor: 'end', align: 'top', font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
+          { type: 'bar', label: 'Executadas', data: serie.map(h => h.executadas),
+            backgroundColor: 'rgba(14,124,134,.8)', borderRadius: 5, order: 2,
+            datalabels: { color: '#000', anchor: 'end', align: 'top', font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
+          { type: 'line', label: '% Execução', data: pcts, yAxisID: 'y1', order: 1,
+            borderColor: '#d97706', backgroundColor: '#d97706', tension: .3, pointRadius: 4,
+            pointBackgroundColor: pcts.map(corPct), pointBorderColor: pcts.map(corPct),
+            datalabels: { align: 'top', offset: 6, color: c => corPct(pcts[c.dataIndex]),
+              font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => Math.round(v) + '%',
+              backgroundColor: 'rgba(255,255,255,.85)', borderRadius: 4, padding: { top: 1, bottom: 1, left: 4, right: 4 } } },
+          { type: 'line', label: 'Meta 100%', data: serie.map(() => 100), yAxisID: 'y1', order: 1,
+            borderColor: '#000', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, datalabels: { display: false } }
+        ]
+      },
+      plugins: temLabels ? [ChartDataLabels] : [],
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 10 } },
+        plugins: {
+          legend: { labels: { color: '#6b7590', font: { family: 'Inter', size: 11 }, boxWidth: 12 } },
+          tooltip: { callbacks: {
+            label: c => c.dataset.yAxisID === 'y1' ? `${c.dataset.label}: ${c.parsed.y.toFixed(1).replace('.', ',')}%` : `${c.dataset.label}: ${fmt(c.parsed.y)}`,
+            footer: it => serie[it[0].dataIndex].atual ? 'Mês atual (parcial)' : '' } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#1b2440', font: { weight: 'bold' } } },
+          y: { beginAtZero: true, max: Math.ceil(Math.max(...serie.map(h => h.programadas)) * 1.75 / 200) * 200, grid: { display: false }, ticks: { color: '#1b2440' } },
+          y1: { position: 'right', min: 0, max: 110, grid: { display: false },
+            ticks: { color: '#1b2440', callback: v => v <= 100 ? v + '%' : '' } }
+        }
+      }
+    });
   }
 
   function tabela(regs) {
@@ -525,7 +599,7 @@
     raiz.querySelector('#pv-aba-geral').style.display = aba === 'geral' ? '' : 'none';
     raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
     if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); if (graficoDiario) graficoDiario.resize(); }
-    else if (grafico) grafico.resize();
+    else { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); }
   }
 
   async function montar(idContainer) {
@@ -543,7 +617,7 @@
     }
   }
 
-  window.PainelPreventiva = { montar, redesenhar: () => grafico && grafico.resize() };
+  window.PainelPreventiva = { montar, redesenhar: () => { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => montar());
   else montar();
 })();
