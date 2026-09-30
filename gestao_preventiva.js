@@ -94,11 +94,14 @@
     .pv-rolagem{max-height:420px;overflow:auto;border-radius:8px}
     .pv-tab-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
     .pv-tab-topo .search input{min-width:240px}
-    .pv-abas{display:flex;gap:6px;margin:0 0 16px;flex-wrap:wrap}
-    .pv-aba{font-family:'JetBrains Mono',monospace;font-size:12px;padding:8px 16px;border-radius:999px;border:1px solid var(--line,#e1e5f0);
-      color:var(--muted,#6b7590);cursor:pointer;background:var(--panel,#fff);transition:.15s}
-    .pv-aba:hover{border-color:var(--accent,#0e7c86);color:var(--text,#1b2440)}
-    .pv-aba.ativa{background:var(--accent,#0e7c86);color:#fff;border-color:var(--accent,#0e7c86);font-weight:600}
+    .pv-layout{display:flex;gap:20px;align-items:flex-start}
+    .pv-menu{width:200px;flex:0 0 200px;background:var(--panel,#fff);border:1px solid var(--line,#e1e5f0);border-radius:14px;
+      padding:10px;position:sticky;top:20px;box-shadow:0 2px 8px rgba(27,36,64,.06)}
+    .pv-menu .nav-group{margin-bottom:0}
+    .pv-menu .nav-group-label{cursor:default}
+    .pv-menu .nav-group-label:hover{color:var(--muted,#6b7590)}
+    .pv-conteudo{flex:1;min-width:0}
+    @media (max-width:860px){.pv-layout{flex-direction:column}.pv-menu{width:100%;position:static}}
     .pv-legenda{display:flex;flex-direction:column;gap:9px;font-size:12.5px;color:var(--text,#1b2440)}
     .pv-legenda i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:-1px}
     .pv-legenda b.n{font-family:'JetBrains Mono',monospace;margin-left:4px}
@@ -114,10 +117,17 @@
     const [a, m] = dados.mes.split('-').map(Number);
     raiz.innerHTML = `
     <div class="pv">
-      <div class="pv-abas">
-        <button type="button" class="pv-aba ativa" data-aba="geral">📊 Visão Geral</button>
-        <button type="button" class="pv-aba" data-aba="op">🛠️ Operação</button>
-      </div>
+      <div class="pv-layout">
+      <nav class="pv-menu">
+        <div class="nav-group">
+          <div class="nav-group-label"><span>Preventiva</span></div>
+          <div class="nav-group-items">
+            <div class="nav-item pv-aba active" data-aba="geral"><span class="nav-icon">📊</span> Visão Geral</div>
+            <div class="nav-item pv-aba" data-aba="op"><span class="nav-icon">🛠️</span> Operação</div>
+          </div>
+        </div>
+      </nav>
+      <div class="pv-conteudo">
       <div id="pv-aba-geral">
       <div class="pv-filtros">
         ${FILTROS.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
@@ -132,12 +142,10 @@
       <div class="grid">
         <div class="panel">
           <h2>Realizado x Meta — Acumulado</h2>
-          <div class="hint">Meta distribuída pelos dias úteis do mês · realizado pela data de conclusão</div>
           <div class="pv-cv"><canvas id="pv-canvas"></canvas></div>
         </div>
         <div class="panel">
           <h2>Visão mensal</h2>
-          <div class="hint">Programadas x Executadas · mês atual calculado da base (sem filtros)</div>
           <div class="pv-cv"><canvas id="pv-mensal"></canvas></div>
         </div>
       </div>
@@ -157,6 +165,8 @@
       </div>
       </div>
       <div id="pv-aba-op" style="display:none;"></div>
+      </div>
+      </div>
     </div>`;
 
     raiz.querySelectorAll('.pv-aba').forEach(bt => bt.addEventListener('click', () => trocarAba(bt.dataset.aba)));
@@ -385,12 +395,10 @@
       <div class="grid" style="grid-template-columns:1.4fr 1fr;">
         <div class="panel">
           <h2>Realizado x Meta Diária</h2>
-          <div class="hint">Meta do dia = meta original + o que faltou nos dias anteriores · barra verde = bateu a meta do dia, vermelha = não bateu</div>
           <div style="position:relative;height:300px;"><canvas id="pv-op-diario"></canvas></div>
         </div>
         <div class="panel">
           <h2>Entrega por Equipe Responsável</h2>
-          <div class="hint">Executadas ÷ planejadas no mês</div>
           <div id="pv-op-equipes" style="display:flex;flex-direction:column;gap:22px;margin-top:18px;"></div>
         </div>
       </div>
@@ -405,7 +413,7 @@
         <div class="pv-rolagem" style="max-height:560px;"><table class="pv-op-tab">
           <thead><tr><th>WO</th><th>Site</th><th>Tipo de Infra</th><th>Equipe Responsável - Engemon</th>
           <th class="num">% Inventário</th><th>Nº do chamado / Acesso</th><th>Infratel OK</th><th>Tipo de Preventiva</th>
-          <th style="text-align:center;">Status Final</th><th class="num">% Cronograma Infratel</th><th>Relatórios Entregues</th><th>Expurgo</th></tr></thead>
+          <th class="num">% Cronograma Infratel</th><th>Relatórios Entregues</th><th>Expurgo</th></tr></thead>
           <tbody id="pv-op-tbody"></tbody></table></div>
       </div>`;
     alvo.querySelectorAll('.pv-op-filtros select').forEach(s =>
@@ -436,11 +444,9 @@
     const traco = v => v ? v : '--';
 
     raiz.querySelector('#pv-op-kpis').innerHTML = `
-      <div class="kpi"><div class="label">📄 Relatórios Entregues | Total</div>
-        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
-          <span>${traco(relEntregues && fmt(relEntregues))}</span><span class="pv-sep">|</span><span>${fmt(totalRel)}</span></div>
-        <div class="delta" style="color:${COR.muted}">% Volume total <b style="color:#1b2440">${relEntregues ? pct(relEntregues / planejado * 100) : '--'}</b>
-          · % Relatórios <b style="color:#1b2440">${relEntregues && totalRel ? pct(relEntregues / totalRel * 100) : '--'}</b></div></div>
+      <div class="kpi"><div class="label">📄 Total Relatórios EPS</div>
+        <div class="value">${fmt(totalRel)}</div>
+        <div class="delta" style="color:${COR.muted}">Zeladoria, SDAI, Gerador, Termografia e SPDA</div></div>
       <div class="kpi"><div class="label">🚫 Qtd Expurgo</div>
         <div class="value"><span style="color:${COR.warn}">${fmt(expurgo)}</span></div>
         <div class="delta" style="color:${COR.muted}">% Expurgo <b style="color:#1b2440">${pct(planejado ? expurgo / planejado * 100 : 0)}</b></div></div>`;
@@ -582,20 +588,18 @@
       .sort((a, b) => String(a.w).localeCompare(String(b.w)));
     raiz.querySelector('#pv-op-qtd').textContent = fmt(lista.length);
     raiz.querySelector('#pv-op-tbody').innerHTML = lista.map(r => {
-      const cor = r.st === 'Executada' ? corStatusFinal(r) : '';
-      const status = cor ? `<span class="pv-sf ${cor}">${esc(r.st)}</span>` : `<span class="pv-sf">${esc(r.st)}</span>`;
       return `<tr>
         <td class="mono" style="font-size:12px;">${esc(r.w)}</td><td>${esc(r.si)}</td><td>${esc(r.ti) || '-'}</td><td>${esc(r.x)}</td>
         <td class="num">${r.pi === null || r.pi === undefined ? '' : fmt(r.pi)}</td><td class="mono" style="font-size:12px;">${esc(r.ch)}</td>
         <td>${r.io === 'OK' ? '<span class="pill good">OK</span>' : `<span class="pill bad">${esc(r.io) || '—'}</span>`}</td>
-        <td>Preventiva infra - ${esc(r.t)}</td><td style="text-align:center;">${status}</td>
+        <td>Preventiva infra - ${esc(r.t)}</td>
         <td class="num">${fmtPct(r.pc)}</td><td>${esc(r.er)}</td><td>${esc(r.xp)}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="12" style="text-align:center;color:#6b7590">Nenhuma preventiva encontrada</td></tr>';
+    }).join('') || '<tr><td colspan="11" style="text-align:center;color:#6b7590">Nenhuma preventiva encontrada</td></tr>';
   }
 
   function trocarAba(aba) {
-    raiz.querySelectorAll('.pv-aba').forEach(b => b.classList.toggle('ativa', b.dataset.aba === aba));
+    raiz.querySelectorAll('.pv-aba').forEach(b => b.classList.toggle('active', b.dataset.aba === aba));
     raiz.querySelector('#pv-aba-geral').style.display = aba === 'geral' ? '' : 'none';
     raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
     if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); if (graficoDiario) graficoDiario.resize(); }
