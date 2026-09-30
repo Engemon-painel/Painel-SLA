@@ -34,7 +34,7 @@
     'nav-fca':         'Fora do prazo e justificativas',
     'nav-infra':       'Tipo de infra e unidade responsável',
     'nav-organograma': 'Headcount, admissões e equipe',
-    'nav-Preventiva': 'Status',
+    'nav-preventiva':  'Realizado x meta das preventivas do mês',
     'nav-vagas':       'Requisições e recrutamento',
     'nav-frota':       'Veículos, status e gastos',
     'nav-bancohoras':  'Banco de horas e extras',
@@ -161,7 +161,7 @@
       const c = JSON.parse(sessionStorage.getItem(CHAVE) || 'null');
       if(c && Date.now() - c.em < VALIDADE){ HORARIOS = c.h; return; }
     }catch(e){}
-    const arquivos = ['dados.json', 'base_nr.json', 'dados_escala.json'];
+    const arquivos = ['dados.json', 'base_nr.json', 'dados_escala.json', 'dados_preventiva.json'];
     Promise.all(arquivos.map(a =>
       fetch('https://api.github.com/repos/' + repo + '/commits?per_page=1&path=' + encodeURIComponent(a))
         .then(r => r.ok ? r.json() : [])
@@ -217,7 +217,8 @@
       'nav-bancohoras': atualizado,
       'nav-nr': doCommit('base_nr.json') || etiqueta('Atualizado', datasNrAso.nr),
       'nav-aso': doCommit('base_nr.json') || etiqueta('Atualizado', datasNrAso.aso),
-      'nav-escala': doCommit('dados_escala.json') || etiqueta('Atualizado', escala)
+      'nav-escala': doCommit('dados_escala.json') || etiqueta('Atualizado', escala),
+      'nav-preventiva': doCommit('dados_preventiva.json')
     };
   }
   function buscarDatasNrAso(){
