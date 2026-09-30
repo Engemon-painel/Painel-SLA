@@ -141,12 +141,12 @@
 
       <div class="grid">
         <div class="panel">
-          <h2>Realizado x Meta — Acumulado</h2>
-          <div class="pv-cv"><canvas id="pv-canvas"></canvas></div>
-        </div>
-        <div class="panel">
           <h2>Visão mensal</h2>
           <div class="pv-cv"><canvas id="pv-mensal"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2>Realizado x Meta — Acumulado</h2>
+          <div class="pv-cv"><canvas id="pv-canvas"></canvas></div>
         </div>
       </div>
 
@@ -270,18 +270,22 @@
           datalabels: { align: 'bottom', color: '#000000' } }
       ]},
       options: {
-        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16, bottom: 6 } },
+        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 18, bottom: 6, right: 26 } },
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8 } },
           tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.parsed.y)}` } },
           datalabels: temLabels ? {
             display: c => { const i = c.dataIndex, v = c.dataset.data;
-              return v[i] != null && (i === 0 || v[i] !== v[i - 1]) && i % 2 === 0 || i === v.length - 1 && v[i] != null; },
+              if (v[i] == null) return false;
+              let ult = v.length - 1; while (ult > 0 && v[ult] == null) ult--;
+              if (i === ult) return true;                       // sempre mostra o último valor
+              if (i >= ult - 2) return false;                   // evita encavalar com o último
+              return i % 3 === 0 && (i === 0 || v[i] !== v[i - 1]); },
             font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => fmt(v)
           } : undefined
         },
-        scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } }, x: { grid: { display: false } } }
+        scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { callback: v => fmt(v) } }, x: { grid: { display: false } } }
       },
       plugins: temLabels ? [ChartDataLabels] : []
     };
