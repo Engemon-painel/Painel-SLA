@@ -34,6 +34,7 @@
     'nav-fca':         'Fora do prazo e justificativas',
     'nav-infra':       'Tipo de infra e unidade responsável',
     'nav-organograma': 'Headcount, admissões e equipe',
+    'nav-Preventiva': 'Status',
     'nav-vagas':       'Requisições e recrutamento',
     'nav-frota':       'Veículos, status e gastos',
     'nav-bancohoras':  'Banco de horas e extras',
