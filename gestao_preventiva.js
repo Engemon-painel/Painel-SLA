@@ -20,16 +20,25 @@
 
   const FILTROS = [
     { k: 'st', rotulo: 'Status' },
-    { k: 'x',  rotulo: 'Executor' },
+    { k: 'ex', rotulo: 'Executor' },
     { k: 't',  rotulo: 'Tipo Preventiva' },
-    { k: 'e',  rotulo: 'Equipe Responsável' }
+    { k: 'x',  rotulo: 'Equipe Responsável' }
   ];
+
+  // Executor definido pelo Tipo de Preventiva
+  const EXECUTOR_POR_TIPO = {
+    'energia': 'MOP', 'climatizacao': 'MOP',
+    'zeladoria': 'EPS', 'sdai': 'EPS', 'gerador': 'EPS',
+    'inspecao termografica': 'EPS', 'spda': 'EPS'
+  };
+  const semAcento = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const executorDoTipo = t => EXECUTOR_POR_TIPO[semAcento(t).replace(/^preventiva infra - /, '')] || 'Outros';
 
   const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
                  'Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   let dados = null, grafico = null, raiz = null;
-  const sel = { st: '', x: '', t: '', e: '' };
+  const sel = { st: '', ex: '', t: '', x: '' };
   let busca = '';
 
   const fmt = n => n.toLocaleString('pt-BR');
@@ -136,7 +145,7 @@
           <input id="pv-busca" type="search" placeholder="Buscar site, WO, município..."></div>
         <div class="pv-rolagem"><table>
           <thead><tr><th>Status</th><th>Site</th><th>Site Infratel</th><th>Município</th><th>Tipo</th>
-          <th>Tipologia</th><th>Equipe</th><th>Executor</th><th>WO</th></tr></thead>
+          <th>Tipologia</th><th>Executor</th><th>Equipe</th><th>Supervisão</th><th>WO</th></tr></thead>
           <tbody id="pv-tbody"></tbody></table></div>
       </div>
     </div>`;
@@ -243,12 +252,12 @@
 
   function tabela(regs) {
     const lista = regs.filter(r => r.st !== 'Executada').filter(r => !busca ||
-      [r.s, r.si, r.w, r.m, r.t, r.e, r.x, r.tp].some(v => String(v ?? '').toLowerCase().includes(busca)));
+      [r.s, r.si, r.w, r.m, r.t, r.e, r.x, r.ex, r.tp].some(v => String(v ?? '').toLowerCase().includes(busca)));
     raiz.querySelector('#pv-qtd-tab').textContent = fmt(lista.length);
     raiz.querySelector('#pv-tbody').innerHTML = lista.map(r => `<tr>
       <td><span class="pv-st ${esc(r.st)}">${esc(r.st)}</span></td><td>${esc(r.s)}</td><td>${esc(r.si)}</td>
-      <td>${esc(r.m)}</td><td>${esc(r.t)}</td><td>${esc(r.tp)}</td><td>${esc(r.e)}</td><td>${esc(r.x)}</td><td>${esc(r.w)}</td>
-    </tr>`).join('') || '<tr><td colspan="9" style="text-align:center;color:#5b6275">Nenhuma preventiva pendente</td></tr>';
+      <td>${esc(r.m)}</td><td>${esc(r.t)}</td><td>${esc(r.tp)}</td><td>${esc(r.ex)}</td><td>${esc(r.x)}</td><td>${esc(r.e)}</td><td>${esc(r.w)}</td>
+    </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;color:#5b6275">Nenhuma preventiva pendente</td></tr>';
   }
 
   async function montar(idContainer) {
@@ -258,6 +267,7 @@
     try {
       dados = window.DADOS_PREVENTIVA ||
         await fetch(ARQUIVO_JSON + '?v=' + Date.now(), { cache: 'no-store' }).then(r => { if (!r.ok) throw r.status; return r.json(); });
+      dados.registros.forEach(r => { r.ex = executorDoTipo(r.t); });
       esqueleto();
       atualizar();
     } catch (e) {
