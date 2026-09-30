@@ -67,40 +67,20 @@
 
   function estilos() {
     if (document.getElementById('pv-estilos')) return;
+    // Usa as mesmas classes do painel (.signal-strip, .kpi-row, .kpi, .panel, .pill);
+    // aqui ficam só os ajustes específicos da Preventiva.
     const css = `
-    .pv{--pv-azul:#0b1f8f;--pv-azul2:#1e88e5;--pv-borda:#e3e6ee;--pv-txt:#1b1f2a;--pv-sub:#5b6275;--pv-card:#fff;
-        font-family:inherit;color:var(--pv-txt)}
-    .pv-topo{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;gap:12px;flex-wrap:wrap}
-    .pv-topo h2{margin:0;font-size:20px}.pv-topo small{color:var(--pv-sub)}
-    .pv-filtros{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:12px}
-    .pv-f{background:var(--pv-card);border:1px solid var(--pv-borda);border-radius:8px;padding:8px 10px}
-    .pv-f label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;color:var(--pv-sub);margin-bottom:4px}
-    .pv-f select{width:100%;padding:6px;border:1px solid var(--pv-borda);border-radius:5px;background:#fff;font:inherit}
-    .pv-kpis{display:grid;grid-template-columns:1fr 2fr 1fr 1fr;gap:10px;margin-bottom:12px}
-    .pv-card{background:var(--pv-card);border:1px solid var(--pv-borda);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
-    .pv-num{border-left:3px solid var(--pv-txt);padding-left:10px}
-    .pv-num b{display:block;font-size:24px;line-height:1.1}.pv-num span{font-size:13px;color:var(--pv-sub)}
-    .pv-par{display:grid;grid-template-columns:1fr auto;gap:10px}
-    .pv-barra{height:22px;background:#d0d0d0;border-radius:3px;overflow:hidden}
-    .pv-barra i{display:block;height:100%;background:var(--pv-azul);transition:width .4s}
-    .pv-tag{border-radius:4px;padding:8px 10px}.pv-tag span{font-size:13px;opacity:.75}.pv-tag b{display:block;font-size:16px}
-    .pv-tag.azul{background:#e8f2fd}.pv-tag.amarelo{background:#fff8a8}
-    .pv-tag.verde{background:#c8ecd0}.pv-tag.laranja{background:#ffe0b2}.pv-tag.vermelho{background:#ffb3b3}
-    .pv-graf{background:var(--pv-card);border:1px solid var(--pv-borda);border-radius:8px;padding:12px 14px;margin-bottom:12px}
-    .pv-graf h3,.pv-tab h3{margin:0 0 8px;font-size:15px;text-align:center}
-    .pv-graf .pv-cv{position:relative;height:360px}
-    .pv-tab{background:var(--pv-card);border:1px solid var(--pv-borda);border-radius:8px;padding:12px 14px}
-    .pv-tab-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
-    .pv-tab-topo h3{margin:0;text-align:left}
-    .pv-tab input{padding:6px 10px;border:1px solid var(--pv-borda);border-radius:5px;min-width:220px;font:inherit}
-    .pv-rolagem{max-height:380px;overflow:auto}
-    .pv-tab table{width:100%;border-collapse:collapse;font-size:13px}
-    .pv-tab th{position:sticky;top:0;background:var(--pv-azul);color:#fff;text-align:left;padding:7px 8px;white-space:nowrap}
-    .pv-tab td{padding:6px 8px;border-bottom:1px solid var(--pv-borda);white-space:nowrap}
-    .pv-st{padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600}
-    .pv-st.Pendente{background:#ffe0b2}.pv-st.Aberta{background:#fff8a8}
-    @media (max-width:900px){.pv-kpis{grid-template-columns:1fr 1fr}.pv-kpis .pv-largo{grid-column:1/-1}}
-    @media (max-width:520px){.pv-kpis{grid-template-columns:1fr}}`;
+    .pv-filtros{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+    .pv-filtros label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#6b7590);text-transform:uppercase;letter-spacing:.05em}
+    .pv-filtros label:not(:first-child){margin-left:8px}
+    .pv-filtros select{font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--line,#e1e5f0);background:var(--panel,#fff);color:var(--text,#1b2440);min-width:150px}
+    .pv-sub{font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:var(--muted,#6b7590);text-transform:uppercase;margin-left:4px}
+    .pv-sep{color:var(--line,#e1e5f0)}
+    #pv-kpis{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+    .pv-cv{position:relative;height:360px}
+    .pv-rolagem{max-height:420px;overflow:auto;border-radius:8px}
+    .pv-tab-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .pv-tab-topo .search input{min-width:240px}`;
     const st = document.createElement('style'); st.id = 'pv-estilos'; st.textContent = css;
     document.head.appendChild(st);
   }
@@ -109,40 +89,30 @@
     const [a, m] = dados.mes.split('-').map(Number);
     raiz.innerHTML = `
     <div class="pv">
-      <div class="pv-topo"><h2>Preventiva · ${MESES[m - 1]}/${a}</h2>
-        <small>Atualizado em ${esc(dados.gerado_em || '')}</small></div>
-      <div class="pv-filtros">${FILTROS.map(f => `
-        <div class="pv-f"><label>${f.rotulo}</label><select data-k="${f.k}"></select></div>`).join('')}
+      <div class="pv-filtros">
+        ${FILTROS.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
+        <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);margin-left:auto;">
+          ${MESES[m - 1]}/${a} · atualizado em ${esc(dados.gerado_em || '')}</span>
       </div>
-      <div class="pv-kpis">
-        <div class="pv-card">
-          <div class="pv-num"><b id="pv-plan"></b><span>Planejado no Mês</span></div>
-          <div class="pv-tag azul"><span>Dias Úteis no Mês</span><b id="pv-du-mes"></b></div>
-        </div>
-        <div class="pv-card pv-largo">
-          <div class="pv-par">
-            <div class="pv-num"><b id="pv-prog"></b><span>Progresso em D-1</span></div>
-            <div class="pv-num"><b id="pv-du"></b><span>Dias Úteis</span></div>
-          </div>
-          <div class="pv-barra"><i id="pv-barra"></i></div>
-          <div class="pv-par">
-            <div class="pv-num"><b id="pv-entrega"></b><span>% Entrega</span></div>
-            <div class="pv-num"><b id="pv-pd1"></b><span>% Planejado em D-1</span></div>
-          </div>
-        </div>
-        <div class="pv-card">
-          <div class="pv-num"><b id="pv-saldo"></b><span>Saldo</span></div>
-          <div class="pv-tag" id="pv-ader-box"><span>Aderência</span><b id="pv-ader"></b></div>
-        </div>
-        <div class="pv-card">
-          <div class="pv-num"><b id="pv-pend"></b><span>Pendentes</span></div>
-          <div class="pv-tag amarelo"><span>Em Aberto</span><b id="pv-aberto"></b></div>
-        </div>
+
+      <div class="signal-strip" id="pv-signal" title="Aderência em D-1"></div>
+
+      <div class="kpi-row" id="pv-kpis"></div>
+
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Realizado x Meta — Acumulado</h2>
+        <div class="hint">Meta distribuída pelos dias úteis do mês · realizado pela data de conclusão</div>
+        <div class="pv-cv"><canvas id="pv-canvas"></canvas></div>
       </div>
-      <div class="pv-graf"><h3>Realizado x Meta — Acumulado</h3><div class="pv-cv"><canvas id="pv-canvas"></canvas></div></div>
-      <div class="pv-tab">
-        <div class="pv-tab-topo"><h3>Preventivas não executadas (<span id="pv-qtd-tab">0</span>)</h3>
-          <input id="pv-busca" type="search" placeholder="Buscar site, WO, município..."></div>
+
+      <div class="panel">
+        <div class="pv-tab-topo">
+          <h2>Preventivas não executadas (<span id="pv-qtd-tab">0</span>)</h2>
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
+            <input id="pv-busca" type="search" placeholder="Buscar site, WO, município...">
+          </div>
+        </div>
         <div class="pv-rolagem"><table>
           <thead><tr><th>Status</th><th>Site</th><th>Site Infratel</th><th>Município</th><th>Tipo</th>
           <th>Tipologia</th><th>Executor</th><th>Equipe</th><th>Supervisão</th><th>WO</th></tr></thead>
@@ -150,7 +120,7 @@
       </div>
     </div>`;
 
-    raiz.querySelectorAll('.pv-f select').forEach(s =>
+    raiz.querySelectorAll('.pv-filtros select').forEach(s =>
       s.addEventListener('change', () => { sel[s.dataset.k] = s.value; atualizar(); }));
     raiz.querySelector('#pv-busca').addEventListener('input', e => { busca = e.target.value.toLowerCase(); tabela(filtrar()); });
   }
@@ -161,7 +131,7 @@
 
   // Opções de cada filtro respeitam os demais filtros (como slicers do Power BI)
   function opcoes() {
-    raiz.querySelectorAll('.pv-f select').forEach(s => {
+    raiz.querySelectorAll('.pv-filtros select').forEach(s => {
       const k = s.dataset.k;
       const vals = [...new Set(filtrar(k).map(r => r[k]))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
       if (sel[k] && !vals.includes(sel[k])) vals.push(sel[k]);
@@ -169,6 +139,11 @@
         vals.map(v => `<option value="${esc(v)}"${v === sel[k] ? ' selected' : ''}>${esc(v)}</option>`).join('');
     });
   }
+
+  const COR = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590' };
+  // Meta 100% (verde) · a partir de 95% é o 2º patamar (laranja) · abaixo de 95% vermelho
+  const META_ADER = 100, PATAMAR2_ADER = 95;
+  const corAder = p => p >= META_ADER ? COR.good : p >= PATAMAR2_ADER ? COR.warn : COR.bad;
 
   function atualizar() {
     opcoes();
@@ -180,27 +155,39 @@
 
     const planejado = regs.length;
     const planD1 = Math.round(planejado * duRef / duMes);
-    const executadas = regs.filter(r => r.st === 'Executada');
-    const realTotal = executadas.length;   // igual ao Power BI: todo o realizado lançado
-    const realD1 = realTotal;
-    const pendentes = regs.filter(r => r.st !== 'Executada').length;
+    const realizado = regs.filter(r => r.st === 'Executada').length;   // igual ao Power BI
+    const pendentes = planejado - realizado;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
-    const saldo = realD1 - planD1;
-    const ader = planD1 ? realD1 / planD1 * 100 : 0;
+    const saldo = realizado - planD1;
+    const ader = planD1 ? realizado / planD1 * 100 : 0;
+    const entrega = planejado ? realizado / planejado * 100 : 0;
 
-    const $ = id => raiz.querySelector('#' + id);
-    $('pv-plan').textContent = fmt(planejado);
-    $('pv-du-mes').textContent = duMes;
-    $('pv-prog').textContent = `${fmt(realD1)} / ${fmt(planD1)}`;
-    $('pv-du').textContent = `${duRef} / ${duMes}`;
-    $('pv-barra').style.width = Math.min(100, planD1 ? realD1 / planD1 * 100 : 0) + '%';
-    $('pv-entrega').textContent = pct(planejado ? realTotal / planejado * 100 : 0);
-    $('pv-pd1').textContent = pct(duRef / duMes * 100);
-    $('pv-saldo').textContent = (saldo > 0 ? '+' : '') + fmt(saldo);
-    $('pv-ader').textContent = pct(ader);
-    $('pv-ader-box').className = 'pv-tag ' + (ader >= 95 ? 'verde' : ader >= 90 ? 'laranja' : 'vermelho');
-    $('pv-pend').textContent = fmt(pendentes);
-    $('pv-aberto').textContent = fmt(aberto);
+    // faixa de sinal (30 blocos) = aderência em D-1
+    const strip = raiz.querySelector('#pv-signal');
+    const on = Math.round(Math.min(1, ader / META_ADER) * 30);
+    strip.innerHTML = Array.from({ length: 30 }, (_, i) =>
+      `<div style="background:${i < on ? 'rgba(5,150,105,.7)' : 'rgba(220,38,38,.7)'}"></div>`).join('');
+
+    raiz.querySelector('#pv-kpis').innerHTML = `
+      <div class="kpi"><div class="label">📋 Planejado no Mês</div>
+        <div class="value">${fmt(planejado)}</div>
+        <div class="delta" style="color:${COR.muted}">${duMes} dias úteis no mês</div></div>
+      <div class="kpi"><div class="label">✅ Realizado / Meta D-1</div>
+        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
+          <span style="color:${COR.good}">${fmt(realizado)}</span><span class="pv-sep">|</span><span>${fmt(planD1)}</span></div>
+        <div class="delta" style="color:${COR.muted}">${pct(entrega)} de entrega no mês</div></div>
+      <div class="kpi"><div class="label">📅 Dias Úteis (D-1)</div>
+        <div class="value" style="white-space:nowrap;">${duRef}<span class="pv-sub">decorridos</span>
+          <span style="color:${COR.muted}"> / </span>${duMes - duRef}<span class="pv-sub">${duMes - duRef === 1 ? 'restante' : 'restantes'}</span></div>
+        <div class="delta" style="color:${COR.muted}">${pct(duRef / duMes * 100)} dos dias úteis do mês</div></div>
+      <div class="kpi"><div class="label">📈 Aderência</div>
+        <div class="value"><span style="color:${corAder(ader)}">${pct(ader)}</span></div>
+        <div class="delta" style="color:${corAder(ader)}">${ader >= META_ADER ? '▲ meta batida' : ader >= PATAMAR2_ADER ? '● 2º patamar (≥95%)' : '▼ abaixo de 95%'} · saldo ${(saldo > 0 ? '+' : '') + fmt(saldo)}</div>
+        <div class="delta" style="color:${COR.muted}">Meta 100% · 2º patamar 95%</div></div>
+      <div class="kpi"><div class="label">⚠️ Pendentes</div>
+        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
+          <span style="color:${COR.bad}">${fmt(pendentes)}</span><span class="pv-sep">|</span>
+          <span style="font-size:15px;color:${COR.muted};font-weight:600;">Em aberto <span style="color:#1b2440">${fmt(aberto)}</span></span></div></div>`;
 
     grafico_(regs, dias, ref, duMes, planejado);
     tabela(regs);
@@ -223,12 +210,12 @@
     const cfg = {
       type: 'line',
       data: { labels: rot, datasets: [
-        { label: 'Planejado Acumulado', data: plan, borderColor: '#1e88e5', backgroundColor: '#1e88e5',
+        { label: 'Planejado Acumulado', data: plan, borderColor: '#6b7590', backgroundColor: '#6b7590',
           borderDash: [3, 4], borderWidth: 2, pointStyle: 'rect', pointRadius: 4, tension: 0,
-          datalabels: { align: 'top', color: '#1b1f2a' } },
-        { label: 'Realizado Acumulado', data: real, borderColor: '#0b1f8f', backgroundColor: '#0b1f8f',
+          datalabels: { align: 'top', color: '#6b7590' } },
+        { label: 'Realizado Acumulado', data: real, borderColor: '#0e7c86', backgroundColor: '#0e7c86',
           borderWidth: 3, pointRadius: 4, tension: 0.25, spanGaps: false,
-          datalabels: { align: 'bottom', color: '#1b1f2a' } }
+          datalabels: { align: 'bottom', color: '#000000' } }
       ]},
       options: {
         responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16, bottom: 6 } },
@@ -239,7 +226,7 @@
           datalabels: temLabels ? {
             display: c => { const i = c.dataIndex, v = c.dataset.data;
               return v[i] != null && (i === 0 || v[i] !== v[i - 1]) && i % 2 === 0 || i === v.length - 1 && v[i] != null; },
-            font: { size: 11 }, formatter: v => fmt(v)
+            font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => fmt(v)
           } : undefined
         },
         scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } }, x: { grid: { display: false } } }
@@ -255,9 +242,9 @@
       [r.s, r.si, r.w, r.m, r.t, r.e, r.x, r.ex, r.tp].some(v => String(v ?? '').toLowerCase().includes(busca)));
     raiz.querySelector('#pv-qtd-tab').textContent = fmt(lista.length);
     raiz.querySelector('#pv-tbody').innerHTML = lista.map(r => `<tr>
-      <td><span class="pv-st ${esc(r.st)}">${esc(r.st)}</span></td><td>${esc(r.s)}</td><td>${esc(r.si)}</td>
+      <td><span class="pill ${r.st === 'Aberta' ? 'warn' : 'bad'}">${esc(r.st)}</span></td><td>${esc(r.s)}</td><td>${esc(r.si)}</td>
       <td>${esc(r.m)}</td><td>${esc(r.t)}</td><td>${esc(r.tp)}</td><td>${esc(r.ex)}</td><td>${esc(r.x)}</td><td>${esc(r.e)}</td><td>${esc(r.w)}</td>
-    </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;color:#5b6275">Nenhuma preventiva pendente</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;color:#6b7590">Nenhuma preventiva pendente</td></tr>';
   }
 
   async function montar(idContainer) {
