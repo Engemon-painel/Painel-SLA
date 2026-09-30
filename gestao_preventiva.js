@@ -80,15 +80,32 @@
     .pv-cv{position:relative;height:360px}
     .pv-rolagem{max-height:420px;overflow:auto;border-radius:8px}
     .pv-tab-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-    .pv-tab-topo .search input{min-width:240px}`;
+    .pv-tab-topo .search input{min-width:240px}
+    .pv-abas{display:flex;gap:6px;margin:0 0 16px;flex-wrap:wrap}
+    .pv-aba{font-family:'JetBrains Mono',monospace;font-size:12px;padding:8px 16px;border-radius:999px;border:1px solid var(--line,#e1e5f0);
+      color:var(--muted,#6b7590);cursor:pointer;background:var(--panel,#fff);transition:.15s}
+    .pv-aba:hover{border-color:var(--accent,#0e7c86);color:var(--text,#1b2440)}
+    .pv-aba.ativa{background:var(--accent,#0e7c86);color:#fff;border-color:var(--accent,#0e7c86);font-weight:600}
+    .pv-legenda{display:flex;flex-direction:column;gap:9px;font-size:12.5px;color:var(--text,#1b2440)}
+    .pv-legenda i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+    .pv-legenda b.n{font-family:'JetBrains Mono',monospace;margin-left:4px}
+    .pv-op-tab td{white-space:nowrap}
+    .pv-sf{display:inline-block;min-width:92px;text-align:center;padding:3px 8px;border-radius:4px;font-weight:600;font-size:12px}
+    .pv-sf.verde{background:#16a34a;color:#fff}.pv-sf.amarelo{background:#facc15;color:#1b2440}.pv-sf.vermelho{background:#dc2626;color:#fff}`;
     const st = document.createElement('style'); st.id = 'pv-estilos'; st.textContent = css;
     document.head.appendChild(st);
   }
 
   function esqueleto() {
+    opMontada = false;
     const [a, m] = dados.mes.split('-').map(Number);
     raiz.innerHTML = `
     <div class="pv">
+      <div class="pv-abas">
+        <button type="button" class="pv-aba ativa" data-aba="geral">📊 Visão Geral</button>
+        <button type="button" class="pv-aba" data-aba="op">🛠️ Operação</button>
+      </div>
+      <div id="pv-aba-geral">
       <div class="pv-filtros">
         ${FILTROS.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
         <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);margin-left:auto;">
@@ -118,7 +135,11 @@
           <th>Tipologia</th><th>Executor</th><th>Equipe</th><th>Supervisão</th><th>WO</th></tr></thead>
           <tbody id="pv-tbody"></tbody></table></div>
       </div>
+      </div>
+      <div id="pv-aba-op" style="display:none;"></div>
     </div>`;
+
+    raiz.querySelectorAll('.pv-aba').forEach(bt => bt.addEventListener('click', () => trocarAba(bt.dataset.aba)));
 
     raiz.querySelectorAll('.pv-filtros select').forEach(s =>
       s.addEventListener('change', () => { sel[s.dataset.k] = s.value; atualizar(); }));
@@ -247,6 +268,136 @@
     </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;color:#6b7590">Nenhuma preventiva pendente</td></tr>';
   }
 
+  // ======================= ABA OPERAÇÃO =======================
+  const FILTROS_OP = [
+    { k: 'xpF', rotulo: 'Expurgo' },
+    { k: 'st',  rotulo: 'Status' },
+    { k: 'ex',  rotulo: 'Executor' },
+    { k: 't',   rotulo: 'Tipo Preventiva' },
+    { k: 'io',  rotulo: 'Infratel OK' },
+    { k: 'x',   rotulo: 'Equipe Responsável' }
+  ];
+  const selOp = { xpF: '', st: '', ex: '', t: '', io: '', x: '' };
+  let buscaOp = '', opMontada = false;
+
+  const temRelatorio = r => String(r.er || '').trim() !== '';
+  const fmtPct = v => v === null || v === undefined ? '' : (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+
+  // Cor do "Status Final" (legenda do Power BI):
+  //  verde    = Executada: Infratel 100% + relatório recebido (MOP não exige relatório)
+  //  amarelo  = Divergência: relatório recebido, porém Infratel 0%
+  //  vermelho = Verificar: Infratel 100%, porém sem relatório entregue (EPS)
+  function corStatusFinal(r) {
+    const rel = temRelatorio(r), infra100 = r.pc === 1, infra0 = r.pc === 0;
+    if (r.ex === 'MOP') return infra100 ? 'verde' : '';
+    if (infra100 && rel) return 'verde';
+    if (rel && infra0) return 'amarelo';
+    if (infra100 && !rel) return 'vermelho';
+    return '';
+  }
+
+  function filtrarOp(ignorar) {
+    return dados.registros.filter(r => FILTROS_OP.every(f => f.k === ignorar || !selOp[f.k] || r[f.k] === selOp[f.k]));
+  }
+
+  function montarOp() {
+    const alvo = raiz.querySelector('#pv-aba-op');
+    alvo.innerHTML = `
+      <div class="pv-filtros pv-op-filtros">
+        ${FILTROS_OP.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
+      </div>
+      <div class="kpi-row" id="pv-op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));"></div>
+      <div class="panel">
+        <div class="pv-tab-topo">
+          <h2>Preventivas (<span id="pv-op-qtd">0</span>)</h2>
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
+            <input id="pv-op-busca" type="search" placeholder="Buscar WO, site, chamado...">
+          </div>
+        </div>
+        <div class="pv-rolagem" style="max-height:560px;"><table class="pv-op-tab">
+          <thead><tr><th>WO</th><th>Site</th><th>Tipo de Infra</th><th>Equipe Responsável - Engemon</th>
+          <th class="num">% Inventário</th><th>Nº do chamado / Acesso</th><th>Infratel OK</th><th>Tipo de Preventiva</th>
+          <th style="text-align:center;">Status Final</th><th class="num">% Cronograma Infratel</th><th>Relatórios Entregues</th><th>Expurgo</th></tr></thead>
+          <tbody id="pv-op-tbody"></tbody></table></div>
+      </div>`;
+    alvo.querySelectorAll('.pv-op-filtros select').forEach(s =>
+      s.addEventListener('change', () => { selOp[s.dataset.k] = s.value; atualizarOp(); }));
+    alvo.querySelector('#pv-op-busca').addEventListener('input', e => { buscaOp = e.target.value.toLowerCase(); tabelaOp(filtrarOp()); });
+    opMontada = true;
+  }
+
+  function opcoesOp() {
+    raiz.querySelectorAll('.pv-op-filtros select').forEach(s => {
+      const k = s.dataset.k;
+      const vals = [...new Set(filtrarOp(k).map(r => r[k]))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+      if (selOp[k] && !vals.includes(selOp[k])) vals.push(selOp[k]);
+      s.innerHTML = '<option value="">Todos</option>' +
+        vals.map(v => `<option value="${esc(v)}"${v === selOp[k] ? ' selected' : ''}>${esc(v)}</option>`).join('');
+    });
+  }
+
+  function atualizarOp() {
+    opcoesOp();
+    const regs = filtrarOp();
+    const planejado = regs.length;
+    const realizado = regs.filter(r => r.st === 'Executada').length;
+    const entrega = planejado ? realizado / planejado * 100 : 0;
+    const totalRel = regs.filter(r => r.ex === 'EPS').length;
+    const relEntregues = regs.filter(temRelatorio).length;
+    const expurgo = regs.filter(r => r.xp).length;
+    const cores = { verde: 0, amarelo: 0, vermelho: 0 };
+    regs.forEach(r => { if (r.st === 'Executada') { const c = corStatusFinal(r); if (c) cores[c]++; } });
+    const traco = v => v ? v : '--';
+
+    raiz.querySelector('#pv-op-kpis').innerHTML = `
+      <div class="kpi"><div class="label">📋 Planejado no Mês</div>
+        <div class="value">${fmt(planejado)}</div>
+        <div class="delta" style="color:${COR.muted}">% Entrega <b style="color:#1b2440">${pct(entrega)}</b></div></div>
+      <div class="kpi"><div class="label">📄 Relatórios Entregues | Total</div>
+        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
+          <span>${traco(relEntregues && fmt(relEntregues))}</span><span class="pv-sep">|</span><span>${fmt(totalRel)}</span></div>
+        <div class="delta" style="color:${COR.muted}">% Volume total <b style="color:#1b2440">${relEntregues ? pct(relEntregues / planejado * 100) : '--'}</b>
+          · % Relatórios <b style="color:#1b2440">${relEntregues && totalRel ? pct(relEntregues / totalRel * 100) : '--'}</b></div></div>
+      <div class="kpi"><div class="label">🚫 Qtd Expurgo</div>
+        <div class="value"><span style="color:${COR.warn}">${fmt(expurgo)}</span></div>
+        <div class="delta" style="color:${COR.muted}">% Expurgo <b style="color:#1b2440">${pct(planejado ? expurgo / planejado * 100 : 0)}</b></div></div>
+      <div class="kpi"><div class="label">Legenda "Executada"</div>
+        <div class="pv-legenda">
+          <span><i style="background:#16a34a"></i><b>Executada:</b> Infratel 100% + relatório recebido <b class="n">${fmt(cores.verde)}</b></span>
+          <span><i style="background:#facc15"></i><b>Divergência:</b> relatório recebido, Infratel 0% <b class="n">${fmt(cores.amarelo)}</b></span>
+          <span><i style="background:#dc2626"></i><b>Verificar:</b> Infratel 100%, sem relatório <b class="n">${fmt(cores.vermelho)}</b></span>
+        </div></div>`;
+
+    tabelaOp(regs);
+  }
+
+  function tabelaOp(regs) {
+    const lista = regs.filter(r => !buscaOp ||
+      [r.w, r.si, r.s, r.ch, r.t, r.ti, r.x, r.m].some(v => String(v ?? '').toLowerCase().includes(buscaOp)))
+      .sort((a, b) => String(a.w).localeCompare(String(b.w)));
+    raiz.querySelector('#pv-op-qtd').textContent = fmt(lista.length);
+    raiz.querySelector('#pv-op-tbody').innerHTML = lista.map(r => {
+      const cor = r.st === 'Executada' ? corStatusFinal(r) : '';
+      const status = cor ? `<span class="pv-sf ${cor}">${esc(r.st)}</span>` : `<span class="pv-sf">${esc(r.st)}</span>`;
+      return `<tr>
+        <td class="mono" style="font-size:12px;">${esc(r.w)}</td><td>${esc(r.si)}</td><td>${esc(r.ti) || '-'}</td><td>${esc(r.x)}</td>
+        <td class="num">${r.pi === null || r.pi === undefined ? '' : fmt(r.pi)}</td><td class="mono" style="font-size:12px;">${esc(r.ch)}</td>
+        <td>${r.io === 'OK' ? '<span class="pill good">OK</span>' : `<span class="pill bad">${esc(r.io) || '—'}</span>`}</td>
+        <td>Preventiva infra - ${esc(r.t)}</td><td style="text-align:center;">${status}</td>
+        <td class="num">${fmtPct(r.pc)}</td><td>${esc(r.er)}</td><td>${esc(r.xp)}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="12" style="text-align:center;color:#6b7590">Nenhuma preventiva encontrada</td></tr>';
+  }
+
+  function trocarAba(aba) {
+    raiz.querySelectorAll('.pv-aba').forEach(b => b.classList.toggle('ativa', b.dataset.aba === aba));
+    raiz.querySelector('#pv-aba-geral').style.display = aba === 'geral' ? '' : 'none';
+    raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
+    if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); }
+    else if (grafico) grafico.resize();
+  }
+
   async function montar(idContainer) {
     raiz = document.getElementById(idContainer || CONTAINER_PADRAO);
     if (!raiz) return;
@@ -254,7 +405,7 @@
     try {
       dados = window.DADOS_PREVENTIVA ||
         await fetch(ARQUIVO_JSON + '?v=' + Date.now(), { cache: 'no-store' }).then(r => { if (!r.ok) throw r.status; return r.json(); });
-      dados.registros.forEach(r => { r.ex = executorDoTipo(r.t); });
+      dados.registros.forEach(r => { r.ex = executorDoTipo(r.t); r.xpF = r.xp || 'Sem expurgo'; });
       esqueleto();
       atualizar();
     } catch (e) {
