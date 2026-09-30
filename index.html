@@ -229,8 +229,8 @@
     <div class="month-strip">
       <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
       <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
-      <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
-      <a class="link-base" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Organograma (Excel)</a>
+      <a class="link-base" id="linkBaseEser" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
+      <a class="link-base" id="linkOrganograma" href="https://engemonbr-my.sharepoint.com/:x:/r/personal/marcia_nascimento_engemon_com_br/_layouts/15/Doc.aspx?sourcedoc=%7B4EA69A47-4D0C-4CD2-821D-2A9B261771E2%7D&file=Base%20com%20Historico%201.xlsx&action=default" target="_blank" rel="noopener">↗ Organograma (Excel)</a>
     </div>
   </div>
 </header>
@@ -5625,5 +5625,22 @@ setInterval(carregarDados, 5 * 60 * 1000);
 <script src="gestao_turnover.js"></script>
 <script src="gestao_preventiva.js"></script>
 <script src="tela_inicial.js"></script>
+  <script>
+// Botões do cabeçalho: "Abrir base" só no ESER · "Organograma (Excel)" só no Organograma
+(function(){
+  const ESER = ['consolidado', 'area', 'site', 'fca', 'infra'];
+  const visivel = id => { const el = document.getElementById('pagina-' + id); return !!el && el.offsetParent !== null; };
+  function ajustarLinks(){
+    const base = document.getElementById('linkBaseEser');
+    const org  = document.getElementById('linkOrganograma');
+    if(base) base.style.display = ESER.some(visivel) ? '' : 'none';
+    if(org)  org.style.display  = visivel('organograma') ? '' : 'none';
+  }
+  document.addEventListener('click', e => {
+    if(e.target.closest('.nav-item, .ti-card, #tiFoco button')) setTimeout(ajustarLinks, 0);
+  });
+  window.addEventListener('load', () => setTimeout(ajustarLinks, 300));
+})();
+</script>
 </body>
 </html>
