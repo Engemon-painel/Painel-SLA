@@ -306,7 +306,20 @@
       <div class="pv-filtros pv-op-filtros">
         ${FILTROS_OP.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
       </div>
-      <div class="kpi-row" id="pv-op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));"></div>
+      <div class="kpi-row" id="pv-op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:14px;"></div>
+      <div class="kpi-row" id="pv-op-ritmo" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));"></div>
+      <div class="grid" style="grid-template-columns:1.4fr 1fr;">
+        <div class="panel">
+          <h2>Realizado x Meta Diária</h2>
+          <div class="hint">Barras: realizado por dia · Meta original: planejado ÷ dias úteis · Meta de recuperação: necessário por dia</div>
+          <div style="position:relative;height:300px;"><canvas id="pv-op-diario"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2>Entrega por Equipe Responsável</h2>
+          <div class="hint">Executadas ÷ planejadas no mês</div>
+          <div id="pv-op-equipes" style="display:flex;flex-direction:column;gap:22px;margin-top:18px;"></div>
+        </div>
+      </div>
       <div class="panel">
         <div class="pv-tab-topo">
           <h2>Preventivas (<span id="pv-op-qtd">0</span>)</h2>
@@ -346,14 +359,9 @@
     const totalRel = regs.filter(r => r.ex === 'EPS').length;
     const relEntregues = regs.filter(temRelatorio).length;
     const expurgo = regs.filter(r => r.xp).length;
-    const cores = { verde: 0, amarelo: 0, vermelho: 0 };
-    regs.forEach(r => { if (r.st === 'Executada') { const c = corStatusFinal(r); if (c) cores[c]++; } });
     const traco = v => v ? v : '--';
 
     raiz.querySelector('#pv-op-kpis').innerHTML = `
-      <div class="kpi"><div class="label">📋 Planejado no Mês</div>
-        <div class="value">${fmt(planejado)}</div>
-        <div class="delta" style="color:${COR.muted}">% Entrega <b style="color:#1b2440">${pct(entrega)}</b></div></div>
       <div class="kpi"><div class="label">📄 Relatórios Entregues | Total</div>
         <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
           <span>${traco(relEntregues && fmt(relEntregues))}</span><span class="pv-sep">|</span><span>${fmt(totalRel)}</span></div>
@@ -361,15 +369,99 @@
           · % Relatórios <b style="color:#1b2440">${relEntregues && totalRel ? pct(relEntregues / totalRel * 100) : '--'}</b></div></div>
       <div class="kpi"><div class="label">🚫 Qtd Expurgo</div>
         <div class="value"><span style="color:${COR.warn}">${fmt(expurgo)}</span></div>
-        <div class="delta" style="color:${COR.muted}">% Expurgo <b style="color:#1b2440">${pct(planejado ? expurgo / planejado * 100 : 0)}</b></div></div>
-      <div class="kpi"><div class="label">Legenda "Executada"</div>
-        <div class="pv-legenda">
-          <span><i style="background:#16a34a"></i><b>Executada:</b> Infratel 100% + relatório recebido <b class="n">${fmt(cores.verde)}</b></span>
-          <span><i style="background:#facc15"></i><b>Divergência:</b> relatório recebido, Infratel 0% <b class="n">${fmt(cores.amarelo)}</b></span>
-          <span><i style="background:#dc2626"></i><b>Verificar:</b> Infratel 100%, sem relatório <b class="n">${fmt(cores.vermelho)}</b></span>
-        </div></div>`;
+        <div class="delta" style="color:${COR.muted}">% Expurgo <b style="color:#1b2440">${pct(planejado ? expurgo / planejado * 100 : 0)}</b></div></div>`;
 
+    ritmoOp(regs);
     tabelaOp(regs);
+  }
+
+  let graficoDiario = null;
+  function ritmoOp(regs) {
+    const dias = diasDoMes(dados.mes);
+    const ref = dataReferencia(dados.mes);
+    const duMes = dias.filter(d => d.util).length || 1;
+    const duRef = dias.filter(d => d.util && d.data <= ref).length;
+    const restantes = duMes - duRef;
+
+    const total = regs.length;
+    const exec = regs.filter(r => r.st === 'Executada');
+    const realizadas = exec.length;
+    const realD1 = exec.filter(r => r.d && r.d <= ref).length;
+    const media = duRef ? realD1 / duRef : 0;
+    const necessario = restantes > 0 ? Math.max(0, total - realD1) / restantes : 0;
+    const capacidade = Math.round(realD1 + media * restantes);
+    const projecao = total ? capacidade / total * 100 : 0;
+    const dec = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    raiz.querySelector('#pv-op-ritmo').innerHTML = `
+      <div class="kpi"><div class="label">✅ Realizadas | Total WO</div>
+        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
+          <span style="color:${COR.good}">${fmt(realizadas)}</span><span class="pv-sep">|</span><span>${fmt(total)}</span></div>
+        <div class="delta" style="color:${COR.muted}">% Entrega <b style="color:#1b2440">${pct(total ? realizadas / total * 100 : 0)}</b></div></div>
+      <div class="kpi"><div class="label">📊 Média Realizada Dia</div>
+        <div class="value">${dec(media)}</div>
+        <div class="delta" style="color:${COR.muted}">${fmt(realD1)} em ${duRef} dias úteis</div></div>
+      <div class="kpi"><div class="label">🎯 Necessário por Dia</div>
+        <div class="value"><span style="color:${necessario > media ? COR.bad : COR.good}">${dec(necessario)}</span></div>
+        <div class="delta" style="color:${COR.muted}">para fechar ${fmt(total)} no mês</div></div>
+      <div class="kpi"><div class="label">📅 Dias Úteis Restantes</div>
+        <div class="value">${restantes}</div>
+        <div class="delta" style="color:${COR.muted}">${duRef} / ${duMes} dias úteis</div></div>
+      <div class="kpi"><div class="label">🔮 Capacidade | % Projeção D-1</div>
+        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
+          <span>${fmt(capacidade)}</span><span class="pv-sep">|</span><span style="color:${corAder(projecao)}">${pct(projecao)}</span></div>
+        <div class="delta" style="color:${COR.muted}">no ritmo atual até o fim do mês</div></div>`;
+
+    // gráfico Realizado x Meta Diária
+    const porDia = {};
+    exec.forEach(r => { if (r.d) porDia[r.d] = (porDia[r.d] || 0) + 1; });
+    const metaOriginal = total / duMes;
+    const cv = raiz.querySelector('#pv-op-diario');
+    if (graficoDiario) graficoDiario.destroy();
+    graficoDiario = new Chart(cv, {
+      data: {
+        labels: dias.map(d => String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5)),
+        datasets: [
+          { type: 'bar', label: 'Realizado Dia', data: dias.map(d => porDia[d.data] || 0),
+            backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 3, order: 2,
+            datalabels: { display: c => c.dataset.data[c.dataIndex] > 0, anchor: 'end', align: 'top', color: '#000',
+              font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
+          { type: 'line', label: 'Meta Original', data: dias.map(() => Math.round(metaOriginal * 100) / 100),
+            borderColor: '#1b2440', borderWidth: 2, pointRadius: 0, order: 1, datalabels: { display: false } },
+          { type: 'line', label: 'Meta de Recuperação', data: dias.map(() => Math.round(necessario * 100) / 100),
+            borderColor: COR.warn, borderWidth: 2, borderDash: [6, 4], pointRadius: 0, order: 1, datalabels: { display: false } }
+        ]
+      },
+      plugins: typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [],
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { labels: { color: COR.muted, font: { family: 'Inter', size: 11 }, boxWidth: 12 } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label}: ${dec(c.parsed.y)}` } } },
+        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, grid: { color: '#e1e5f0' } } }
+      }
+    });
+
+    // barras por Equipe Responsável
+    const porEquipe = {};
+    regs.forEach(r => {
+      const k = r.x || 'Sem equipe';
+      porEquipe[k] = porEquipe[k] || { feitas: 0, total: 0 };
+      porEquipe[k].total++;
+      if (r.st === 'Executada') porEquipe[k].feitas++;
+    });
+    raiz.querySelector('#pv-op-equipes').innerHTML = Object.keys(porEquipe).sort().map(k => {
+      const { feitas, total: tot } = porEquipe[k];
+      const p = tot ? feitas / tot * 100 : 0;
+      const cor = p >= 100 ? '#16a34a' : p >= 80 ? '#eab308' : '#dc2626';
+      return `<div style="display:grid;grid-template-columns:110px 1fr auto;gap:12px;align-items:center;">
+        <b style="font-size:13px;text-align:right;">${esc(k)}</b>
+        <div><div style="background:#e5e7eb;border-radius:999px;height:14px;overflow:hidden;">
+          <div style="width:${Math.min(100, p)}%;background:${cor};height:100%;border-radius:999px;"></div></div>
+          <div class="mono" style="font-size:11px;color:${COR.muted};margin-top:4px;">${p.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</div></div>
+        <b class="mono" style="font-size:13px;">${fmt(feitas)} / ${fmt(tot)}</b></div>`;
+    }).join('') || `<div style="color:${COR.muted}">Sem dados</div>`;
   }
 
   function tabelaOp(regs) {
@@ -394,7 +486,7 @@
     raiz.querySelectorAll('.pv-aba').forEach(b => b.classList.toggle('ativa', b.dataset.aba === aba));
     raiz.querySelector('#pv-aba-geral').style.display = aba === 'geral' ? '' : 'none';
     raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
-    if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); }
+    if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); if (graficoDiario) graficoDiario.resize(); }
     else if (grafico) grafico.resize();
   }
 
