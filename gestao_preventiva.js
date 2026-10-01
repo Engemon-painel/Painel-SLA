@@ -378,6 +378,15 @@
   ];
   const selOp = { xpF: '', st: '', ex: '', t: '', io: '', x: '' };
   let buscaOp = '', opMontada = false;
+  // Nomes que aparecem na coluna Executor da Validação mas não são técnicos
+  // de campo (ex: validador/chancelador incluído por engano) — edite/acrescente
+  // aqui conforme aparecerem novos casos.
+  const NAO_TECNICOS = new Set([
+    'Lilian da Silva Canelli',
+    'André João do Prado Silva',
+    'Thiago Patricio'
+  ]);
+
   const FILTROS_TEC = [
     { k: 't', rotulo: 'Tipo de Preventiva' },
     { k: 'x', rotulo: 'Equipe' }
@@ -643,7 +652,7 @@
   // Validação) entram na produtividade.
   function filtrarTec(ignorar) {
     return dados.registros.filter(r =>
-      r.st === 'Executada' && r.tec &&
+      r.st === 'Executada' && r.tec && !NAO_TECNICOS.has(r.tec) &&
       FILTROS_TEC.every(f => f.k === ignorar || !selTec[f.k] || r[f.k] === selTec[f.k]));
   }
 
