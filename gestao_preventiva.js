@@ -207,10 +207,13 @@
     const planejado = regs.length;
     const planD1 = Math.round(planejado * duRef / duMes);
     const realizado = regs.filter(r => r.st === 'Executada').length;   // igual ao Power BI
+    // Realizado limitado a D-1 (ontem): evita que um upload parcial de hoje já marcado
+    // como "Executada" infle a aderência antes do dia fechar.
+    const realizadoD1 = regs.filter(r => r.st === 'Executada' && (!r.d || r.d <= ref)).length;
     const pendentes = planejado - realizado;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
-    const saldo = realizado - planD1;
-    const ader = planD1 ? realizado / planD1 * 100 : 0;
+    const saldo = realizadoD1 - planD1;
+    const ader = planD1 ? realizadoD1 / planD1 * 100 : 0;
     const entrega = planejado ? realizado / planejado * 100 : 0;
 
     // faixa de sinal (30 blocos) = aderência em D-1
