@@ -612,7 +612,7 @@
       <div class="panel">
         <div class="pv-rolagem" style="max-height:560px;">
           <table>
-            <thead><tr><th>Técnico</th><th class="num">Executadas</th><th class="num">% do Total</th></tr></thead>
+            <thead><tr><th>Técnico</th><th class="num">Qtd WO</th><th class="num">Dias Trabalhados</th><th>Tipos de Preventiva</th></tr></thead>
             <tbody id="pv-tec-tbody"></tbody>
           </table>
         </div>
@@ -624,20 +624,28 @@
   function atualizarTec() { renderTec(); }
 
   function renderTec() {
-    const regs = filtrar().filter(r => r.st === 'Executada');
+    const base = Array.isArray(dados.validacoes) ? dados.validacoes : [];
     const porTec = {};
-    regs.forEach(r => {
-      const nome = r.tec || 'Sem técnico identificado';
-      porTec[nome] = (porTec[nome] || 0) + 1;
+    base.forEach(v => {
+      const nome = v.tec || 'Sem técnico identificado';
+      if (!porTec[nome]) porTec[nome] = { qtd: 0, dias: new Set(), tipos: {} };
+      porTec[nome].qtd++;
+      if (v.d) porTec[nome].dias.add(v.d);
+      if (v.tipo) porTec[nome].tipos[v.tipo] = (porTec[nome].tipos[v.tipo] || 0) + 1;
     });
-    const totalExec = regs.length || 1;
-    let linhas = Object.entries(porTec).sort((a, b) => b[1] - a[1]);
+
+    let linhas = Object.entries(porTec).sort((a, b) => b[1].qtd - a[1].qtd);
     if (buscaTec) linhas = linhas.filter(([nome]) => nome.toLowerCase().includes(buscaTec));
 
     raiz.querySelector('#pv-tec-qtd').textContent = fmt(linhas.length);
-    raiz.querySelector('#pv-tec-tbody').innerHTML = linhas.map(([nome, qtd]) => `<tr>
-      <td>${esc(nome)}</td><td class="num mono">${fmt(qtd)}</td><td class="num mono">${pct(qtd / totalExec * 100)}</td>
-    </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:#6b7590">Nenhum técnico encontrado</td></tr>';
+    raiz.querySelector('#pv-tec-tbody').innerHTML = linhas.map(([nome, info]) => {
+      const tiposTxt = Object.entries(info.tipos).sort((a, b) => b[1] - a[1])
+        .map(([tipo, n]) => `${esc(tipo)} (${n})`).join(', ') || '--';
+      return `<tr>
+        <td>${esc(nome)}</td><td class="num mono">${fmt(info.qtd)}</td>
+        <td class="num mono">${fmt(info.dias.size)}</td><td style="font-size:12px;">${tiposTxt}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="4" style="text-align:center;color:#6b7590">Nenhum técnico encontrado</td></tr>';
   }
 
   function tabelaOp(regs) {
