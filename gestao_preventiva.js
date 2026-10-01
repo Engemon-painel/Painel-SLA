@@ -379,7 +379,7 @@
   const selOp = { xpF: '', st: '', ex: '', t: '', io: '', x: '' };
   let buscaOp = '', opMontada = false;
   const FILTROS_TEC = [
-    { k: 'tipo', rotulo: 'Tipo de Preventiva' },
+    { k: 't', rotulo: 'Tipo de Preventiva' },
     { k: 'x', rotulo: 'Equipe' }
   ];
   const selTec = { tipo: '', x: '' };
@@ -638,15 +638,19 @@
 
   function atualizarTec() { renderTec(); }
 
-  function filtrarValidacoes(ignorar) {
-    const base = Array.isArray(dados.validacoes) ? dados.validacoes : [];
-    return base.filter(v => FILTROS_TEC.every(f => f.k === ignorar || !selTec[f.k] || v[f.k] === selTec[f.k]));
+  // Base: dados.registros (Atualização_Preventiva), uma linha por preventiva
+  // de verdade — só preventivas Executadas e com técnico identificado (via
+  // Validação) entram na produtividade.
+  function filtrarTec(ignorar) {
+    return dados.registros.filter(r =>
+      r.st === 'Executada' && r.tec &&
+      FILTROS_TEC.every(f => f.k === ignorar || !selTec[f.k] || r[f.k] === selTec[f.k]));
   }
 
   function opcoesTec() {
     raiz.querySelectorAll('.pv-filtros select').forEach(s => {
       const k = s.dataset.k;
-      const vals = [...new Set(filtrarValidacoes(k).map(v => v[k]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+      const vals = [...new Set(filtrarTec(k).map(r => r[k]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
       if (selTec[k] && !vals.includes(selTec[k])) vals.push(selTec[k]);
       s.innerHTML = '<option value="">Todos</option>' +
         vals.map(v => `<option value="${esc(v)}"${v === selTec[k] ? ' selected' : ''}>${esc(v)}</option>`).join('');
@@ -655,13 +659,14 @@
 
   function renderTec() {
     opcoesTec();
-    const base = filtrarValidacoes();
+    const base = filtrarTec();
     const porTec = {};
-    base.forEach(v => {
-      const nome = v.tec || 'Sem técnico identificado';
+    base.forEach(r => {
+      const nome = r.tec;
       if (!porTec[nome]) porTec[nome] = { qtd: 0, dias: new Set() };
       porTec[nome].qtd++;
-      if (v.d) porTec[nome].dias.add(v.d);
+      const dataRef = r.ini || r.d;
+      if (dataRef) porTec[nome].dias.add(dataRef);
     });
 
     let linhas = Object.entries(porTec).map(([nome, info]) => {
@@ -670,7 +675,7 @@
     }).sort((a, b) => b.qtd - a.qtd);
     if (buscaTec) linhas = linhas.filter(l => l.nome.toLowerCase().includes(buscaTec));
 
-    const totalWo = base.length;
+    const totalWo = base.length; // já é contagem de preventivas reais (1 linha = 1 WO)
     const mediaGeral = linhas.length ? linhas.reduce((s, l) => s + l.media, 0) / linhas.length : 0;
     raiz.querySelector('#pv-tec-kpis').innerHTML = `
       <div class="kpi"><div class="label">👷 Técnicos</div><div class="value">${fmt(linhas.length)}</div></div>
