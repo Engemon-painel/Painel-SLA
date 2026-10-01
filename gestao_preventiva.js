@@ -107,7 +107,11 @@
     .pv-legenda b.n{font-family:'JetBrains Mono',monospace;margin-left:4px}
     .pv-op-tab td{white-space:nowrap}
     .pv-sf{display:inline-block;min-width:92px;text-align:center;padding:3px 8px;border-radius:4px;font-weight:600;font-size:12px}
-    .pv-sf.verde{background:#16a34a;color:#fff}.pv-sf.amarelo{background:#facc15;color:#1b2440}.pv-sf.vermelho{background:#dc2626;color:#fff}`;
+    .pv-sf.verde{background:#16a34a;color:#fff}.pv-sf.amarelo{background:#facc15;color:#1b2440}.pv-sf.vermelho{background:#dc2626;color:#fff}
+    .pv-tec-tab tbody tr:nth-child(even){background:rgba(107,117,144,.05)}
+    .pv-tec-tab tbody tr:hover{background:rgba(14,124,134,.08)}
+    .pv-tec-tab th,.pv-tec-tab td{padding:10px 12px}
+    .pv-tec-tab td:first-child{font-weight:600}`;
     const st = document.createElement('style'); st.id = 'pv-estilos'; st.textContent = css;
     document.head.appendChild(st);
   }
@@ -374,6 +378,11 @@
   ];
   const selOp = { xpF: '', st: '', ex: '', t: '', io: '', x: '' };
   let buscaOp = '', opMontada = false;
+  const FILTROS_TEC = [
+    { k: 'tipo', rotulo: 'Tipo de Preventiva' },
+    { k: 'x', rotulo: 'Equipe' }
+  ];
+  const selTec = { tipo: '', x: '' };
   let buscaTec = '', tecMontada = false;
 
   const temRelatorio = r => String(r.er || '').trim() !== '';
@@ -602,50 +611,78 @@
   function montarTec() {
     const alvo = raiz.querySelector('#pv-aba-tec');
     alvo.innerHTML = `
-      <div class="pv-tab-topo">
-        <h2>Produtividade por Técnico (<span id="pv-tec-qtd">0</span> técnicos)</h2>
-        <div class="search">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
-          <input id="pv-tec-busca" type="search" placeholder="Buscar técnico...">
-        </div>
+      <div class="pv-filtros">
+        ${FILTROS_TEC.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
       </div>
+      <div class="kpi-row" id="pv-tec-kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:14px;"></div>
       <div class="panel">
+        <div class="pv-tab-topo">
+          <h2>Produtividade por Técnico (<span id="pv-tec-qtd">0</span>)</h2>
+          <div class="search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
+            <input id="pv-tec-busca" type="search" placeholder="Buscar técnico...">
+          </div>
+        </div>
         <div class="pv-rolagem" style="max-height:560px;">
-          <table>
-            <thead><tr><th>Técnico</th><th class="num">Qtd WO</th><th class="num">Dias Trabalhados</th><th>Tipos de Preventiva</th></tr></thead>
+          <table class="pv-tec-tab">
+            <thead><tr><th>Técnico</th><th class="num">Qtd WO</th><th class="num">Dias Trabalhados</th><th class="num">Média WO/Dia</th></tr></thead>
             <tbody id="pv-tec-tbody"></tbody>
           </table>
         </div>
       </div>`;
+    alvo.querySelectorAll('.pv-filtros select').forEach(s =>
+      s.addEventListener('change', () => { selTec[s.dataset.k] = s.value; renderTec(); }));
     alvo.querySelector('#pv-tec-busca').addEventListener('input', e => { buscaTec = e.target.value.toLowerCase(); renderTec(); });
     tecMontada = true;
   }
 
   function atualizarTec() { renderTec(); }
 
-  function renderTec() {
+  function filtrarValidacoes(ignorar) {
     const base = Array.isArray(dados.validacoes) ? dados.validacoes : [];
+    return base.filter(v => FILTROS_TEC.every(f => f.k === ignorar || !selTec[f.k] || v[f.k] === selTec[f.k]));
+  }
+
+  function opcoesTec() {
+    raiz.querySelectorAll('.pv-filtros select').forEach(s => {
+      const k = s.dataset.k;
+      const vals = [...new Set(filtrarValidacoes(k).map(v => v[k]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+      if (selTec[k] && !vals.includes(selTec[k])) vals.push(selTec[k]);
+      s.innerHTML = '<option value="">Todos</option>' +
+        vals.map(v => `<option value="${esc(v)}"${v === selTec[k] ? ' selected' : ''}>${esc(v)}</option>`).join('');
+    });
+  }
+
+  function renderTec() {
+    opcoesTec();
+    const base = filtrarValidacoes();
     const porTec = {};
     base.forEach(v => {
       const nome = v.tec || 'Sem técnico identificado';
-      if (!porTec[nome]) porTec[nome] = { qtd: 0, dias: new Set(), tipos: {} };
+      if (!porTec[nome]) porTec[nome] = { qtd: 0, dias: new Set() };
       porTec[nome].qtd++;
       if (v.d) porTec[nome].dias.add(v.d);
-      if (v.tipo) porTec[nome].tipos[v.tipo] = (porTec[nome].tipos[v.tipo] || 0) + 1;
     });
 
-    let linhas = Object.entries(porTec).sort((a, b) => b[1].qtd - a[1].qtd);
-    if (buscaTec) linhas = linhas.filter(([nome]) => nome.toLowerCase().includes(buscaTec));
+    let linhas = Object.entries(porTec).map(([nome, info]) => {
+      const dias = info.dias.size;
+      return { nome, qtd: info.qtd, dias, media: dias ? info.qtd / dias : 0 };
+    }).sort((a, b) => b.qtd - a.qtd);
+    if (buscaTec) linhas = linhas.filter(l => l.nome.toLowerCase().includes(buscaTec));
+
+    const totalWo = base.length;
+    const mediaGeral = linhas.length ? linhas.reduce((s, l) => s + l.media, 0) / linhas.length : 0;
+    raiz.querySelector('#pv-tec-kpis').innerHTML = `
+      <div class="kpi"><div class="label">👷 Técnicos</div><div class="value">${fmt(linhas.length)}</div></div>
+      <div class="kpi"><div class="label">🧾 Total WO</div><div class="value">${fmt(totalWo)}</div></div>
+      <div class="kpi"><div class="label">📊 Média Geral WO/Dia</div><div class="value">${mediaGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>`;
 
     raiz.querySelector('#pv-tec-qtd').textContent = fmt(linhas.length);
-    raiz.querySelector('#pv-tec-tbody').innerHTML = linhas.map(([nome, info]) => {
-      const tiposTxt = Object.entries(info.tipos).sort((a, b) => b[1] - a[1])
-        .map(([tipo, n]) => `${esc(tipo)} (${n})`).join(', ') || '--';
-      return `<tr>
-        <td>${esc(nome)}</td><td class="num mono">${fmt(info.qtd)}</td>
-        <td class="num mono">${fmt(info.dias.size)}</td><td style="font-size:12px;">${tiposTxt}</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="4" style="text-align:center;color:#6b7590">Nenhum técnico encontrado</td></tr>';
+    raiz.querySelector('#pv-tec-tbody').innerHTML = linhas.map(l => `<tr>
+      <td>${esc(l.nome)}</td><td class="num mono">${fmt(l.qtd)}</td>
+      <td class="num mono">${fmt(l.dias)}</td>
+      <td class="num mono" style="font-weight:700;color:${COR.accent}">${l.media.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#6b7590">Nenhum técnico encontrado</td></tr>';
   }
 
   function tabelaOp(regs) {
