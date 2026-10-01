@@ -124,6 +124,7 @@
           <div class="nav-group-items">
             <div class="nav-item pv-aba active" data-aba="geral"><span class="nav-icon">📊</span> Visão Geral</div>
             <div class="nav-item pv-aba" data-aba="op"><span class="nav-icon">🛠️</span> Operação</div>
+            <div class="nav-item pv-aba" data-aba="tec"><span class="nav-icon">👷</span> Produtividade</div>
           </div>
         </div>
       </nav>
@@ -165,6 +166,7 @@
       </div>
       </div>
       <div id="pv-aba-op" style="display:none;"></div>
+      <div id="pv-aba-tec" style="display:none;"></div>
       </div>
       </div>
     </div>`;
@@ -372,6 +374,7 @@
   ];
   const selOp = { xpF: '', st: '', ex: '', t: '', io: '', x: '' };
   let buscaOp = '', opMontada = false;
+  let buscaTec = '', tecMontada = false;
 
   const temRelatorio = r => String(r.er || '').trim() !== '';
   const fmtPct = v => v === null || v === undefined ? '' : (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
@@ -591,6 +594,52 @@
     }).join('') || `<div style="color:${COR.muted}">Sem dados</div>`;
   }
 
+  // ======================= ABA PRODUTIVIDADE (POR TÉCNICO) =======================
+  // Depende do campo r.tec em cada registro — nome do técnico, obtido via JOIN
+  // entre a aba Atualização_Preventiva (WO) e a aba Validação (coluna Executor),
+  // feito na geração do dados_preventiva.json. Sem esse campo, tudo cai em
+  // "Sem técnico identificado".
+  function montarTec() {
+    const alvo = raiz.querySelector('#pv-aba-tec');
+    alvo.innerHTML = `
+      <div class="pv-tab-topo">
+        <h2>Produtividade por Técnico (<span id="pv-tec-qtd">0</span> técnicos)</h2>
+        <div class="search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
+          <input id="pv-tec-busca" type="search" placeholder="Buscar técnico...">
+        </div>
+      </div>
+      <div class="panel">
+        <div class="pv-rolagem" style="max-height:560px;">
+          <table>
+            <thead><tr><th>Técnico</th><th class="num">Executadas</th><th class="num">% do Total</th></tr></thead>
+            <tbody id="pv-tec-tbody"></tbody>
+          </table>
+        </div>
+      </div>`;
+    alvo.querySelector('#pv-tec-busca').addEventListener('input', e => { buscaTec = e.target.value.toLowerCase(); renderTec(); });
+    tecMontada = true;
+  }
+
+  function atualizarTec() { renderTec(); }
+
+  function renderTec() {
+    const regs = filtrar().filter(r => r.st === 'Executada');
+    const porTec = {};
+    regs.forEach(r => {
+      const nome = r.tec || 'Sem técnico identificado';
+      porTec[nome] = (porTec[nome] || 0) + 1;
+    });
+    const totalExec = regs.length || 1;
+    let linhas = Object.entries(porTec).sort((a, b) => b[1] - a[1]);
+    if (buscaTec) linhas = linhas.filter(([nome]) => nome.toLowerCase().includes(buscaTec));
+
+    raiz.querySelector('#pv-tec-qtd').textContent = fmt(linhas.length);
+    raiz.querySelector('#pv-tec-tbody').innerHTML = linhas.map(([nome, qtd]) => `<tr>
+      <td>${esc(nome)}</td><td class="num mono">${fmt(qtd)}</td><td class="num mono">${pct(qtd / totalExec * 100)}</td>
+    </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:#6b7590">Nenhum técnico encontrado</td></tr>';
+  }
+
   function tabelaOp(regs) {
     const lista = regs.filter(r => !buscaOp ||
       [r.w, r.si, r.s, r.ch, r.t, r.ti, r.x, r.m].some(v => String(v ?? '').toLowerCase().includes(buscaOp)))
@@ -611,7 +660,9 @@
     raiz.querySelectorAll('.pv-aba').forEach(b => b.classList.toggle('active', b.dataset.aba === aba));
     raiz.querySelector('#pv-aba-geral').style.display = aba === 'geral' ? '' : 'none';
     raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
+    raiz.querySelector('#pv-aba-tec').style.display = aba === 'tec' ? '' : 'none';
     if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); if (graficoDiario) graficoDiario.resize(); }
+    else if (aba === 'tec') { if (!tecMontada) montarTec(); atualizarTec(); }
     else { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); }
   }
 
