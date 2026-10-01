@@ -156,6 +156,11 @@
       </div>
 
       <div class="panel">
+        <h2>Execução Diária do Mês</h2>
+        <div class="pv-cv"><canvas id="pv-diario-mes"></canvas></div>
+      </div>
+
+      <div class="panel">
         <div class="pv-tab-topo">
           <h2>Preventivas não executadas (<span id="pv-qtd-tab">0</span>)</h2>
           <div class="search">
@@ -252,6 +257,7 @@
           <span style="font-size:15px;color:${COR.muted};font-weight:600;">Em aberto <span style="color:#1b2440">${fmt(aberto)}</span></span></div></div>`;
 
     grafico_(regs, dias, ref, duMes, planejado);
+    graficoDiarioMes_(regs, dias, ref, duMes, planejado);
     graficoMensal_();
     tabela(regs);
   }
@@ -302,6 +308,52 @@
     };
     if (grafico) grafico.destroy();
     grafico = new Chart(raiz.querySelector('#pv-canvas'), cfg);
+  }
+
+  let graficoDiarioMes = null;
+  function graficoDiarioMes_(regs, dias, ref, duMes, planejado) {
+    const porDia = {};
+    regs.forEach(r => { if (r.st === 'Executada' && r.d) porDia[r.d] = (porDia[r.d] || 0) + 1; });
+    const metaDiaria = Math.round(planejado / duMes * 100) / 100;
+
+    const rot = dias.map(d => String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5));
+    const realDia = dias.map(d => d.data <= ref || porDia[d.data] ? (porDia[d.data] || 0) : null);
+    const metaDia = dias.map(d => d.util ? metaDiaria : null);
+    const corBarra = dias.map(d => {
+      if (!d.util) return 'rgba(107,117,144,.35)';
+      const feito = porDia[d.data] || 0;
+      if (d.data > ref) return 'rgba(107,117,144,.35)';
+      return feito >= metaDiaria ? 'rgba(5,150,105,.8)' : 'rgba(220,38,38,.65)';
+    });
+
+    const temLabels = typeof ChartDataLabels !== 'undefined';
+    if (graficoDiarioMes) graficoDiarioMes.destroy();
+    graficoDiarioMes = new Chart(raiz.querySelector('#pv-diario-mes'), {
+      data: {
+        labels: rot,
+        datasets: [
+          { type: 'bar', label: 'Executado no Dia', data: realDia, backgroundColor: corBarra, borderRadius: 3, order: 2,
+            datalabels: { display: c => c.dataset.data[c.dataIndex] > 0, anchor: 'end', align: 'top', color: '#000',
+              font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
+          { type: 'line', label: 'Meta Diária', data: metaDia, borderColor: COR.warn, backgroundColor: COR.warn,
+            borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, spanGaps: true, order: 1, datalabels: { display: false } }
+        ]
+      },
+      plugins: temLabels ? [ChartDataLabels] : [],
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 14 } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: COR.muted, font: { family: 'Inter', size: 11 }, boxWidth: 12 } },
+          tooltip: { callbacks: { label: c => c.parsed.y == null ? null : `${c.dataset.label}: ${fmt(c.parsed.y)}` } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+          y: { beginAtZero: true, grid: { color: '#e1e5f0' } }
+        }
+      }
+    });
   }
 
   let graficoMensal = null;
@@ -722,7 +774,7 @@
     raiz.querySelector('#pv-aba-tec').style.display = aba === 'tec' ? '' : 'none';
     if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); if (graficoDiario) graficoDiario.resize(); }
     else if (aba === 'tec') { if (!tecMontada) montarTec(); atualizarTec(); }
-    else { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); }
+    else { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); if (graficoDiarioMes) graficoDiarioMes.resize(); }
   }
 
   async function montar(idContainer) {
