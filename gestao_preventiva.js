@@ -409,8 +409,8 @@
       <div class="pv-filtros pv-op-filtros">
         ${FILTROS_OP.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
       </div>
-      <div class="kpi-row" id="pv-op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-bottom:14px;"></div>
-      <div class="kpi-row" id="pv-op-ritmo" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));"></div>
+      <div class="kpi-row" id="pv-op-ritmo" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px;"></div>
+      <div class="kpi-row" id="pv-op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));"></div>
       <div class="grid" style="grid-template-columns:1.4fr 1fr;">
         <div class="panel">
           <h2>Realizado x Meta Diária</h2>
