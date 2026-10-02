@@ -1397,7 +1397,16 @@ function mesclarMesesForcados(mesesReais, mesesForcados){
   });
   return combinados;
 }
-
+// Incidentes que não devem aparecer no painel (lista de exclusão manual)
+const INCIDENTES_EXCLUIDOS = new Set([
+  'INC000006003097',
+  'INC000006003174'
+]);
+function semExcluidos(lista){
+  return (lista || []).filter(p =>
+    !INCIDENTES_EXCLUIDOS.has(String((p && p.incidente) || '').trim().toUpperCase())
+  );
+}
 async function carregarDados(){
   const status = document.getElementById('loadStatus');
   try{
@@ -1410,13 +1419,13 @@ async function carregarDados(){
     SEMANAL_6H = data.semanal6h && data.semanal6h.length ? data.semanal6h : data.semanal;
     DIARIO_4H = data.diario || [];
     DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
-    PENDENTES_FCA = data.pendentesFca || [];
-    FCA_TIPO_DIVERGENTE = data.fcaTipoDivergente || [];
+    PENDENTES_FCA = semExcluidos(data.pendentesFca);
+    FCA_TIPO_DIVERGENTE = semExcluidos(data.fcaTipoDivergente);
     COLABORADORES = data.colaboradores || [];
     FROTA = data.frota || [];
     VAGAS = data.vagas || [];
     BANCO_HORAS = data.bancoHoras || [];
-    INCIDENTES_POR_SITE = data.incidentesPorSite || [];
+    INCIDENTES_POR_SITE = semExcluidos(data.incidentesPorSite);
     SITES_BASE = data.sitesBase || [];
     DADOS = DADOS_4H;
     SEMANAL = SEMANAL_4H;
