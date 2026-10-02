@@ -1014,6 +1014,9 @@
     <div class="pagina" id="pagina-preventiva" style="display:none;">
       <div id="sec-preventiva"></div>
     </div>
+    <div class="pagina" id="pagina-afaz" style="display:none;">
+      <div id="sec-afaz"></div>
+    </div>
   </main>
 </div>
 
@@ -1294,7 +1297,7 @@ function rankingSitesClaroEngemon(mesesJanela, todosMeses, limiteEngemon){
 }
 
 // ---- Navegação por páginas (menu lateral) ----
-const PAGINAS = ['consolidado', 'area', 'site', 'fca', 'infra', 'organograma', 'vagas', 'frota', 'bancohoras', 'preventiva'];
+const PAGINAS = ['consolidado', 'area', 'site', 'fca', 'infra', 'organograma', 'vagas', 'frota', 'bancohoras', 'preventiva', 'afaz'];
 
 function toggleNavGroup(id){
   const group = document.getElementById(id);
@@ -1314,6 +1317,7 @@ function mostrarPagina(nome){
   if(nome === 'frota' && typeof renderFrota === 'function') renderFrota();
   if(nome === 'bancohoras' && typeof renderBancoHoras === 'function') renderBancoHoras();
   if(nome === 'preventiva' && window.PainelPreventiva) setTimeout(() => PainelPreventiva.redesenhar(), 50);
+  if(nome === 'afaz' && window.PainelAFAZ && PainelAFAZ.redesenhar) setTimeout(() => PainelAFAZ.redesenhar(), 50);
 }
 
 const cor = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590', line:'#e1e5f0', text:'#1b2440' };
@@ -5625,6 +5629,7 @@ setInterval(carregarDados, 5 * 60 * 1000);
 <script src="gestao_escala.js"></script>
 <script src="gestao_turnover.js"></script>
 <script src="gestao_preventiva.js"></script>
+<script src="gestao_afaz.js"></script>
 <script src="tela_inicial.js"></script>
 <script src="trava_senha.js"></script>
   <script>
