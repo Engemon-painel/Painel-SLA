@@ -614,6 +614,10 @@
       </div>
       <div class="kpi-row" id="pv-tec-kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:14px;"></div>
       <div class="panel">
+        <h2>Top 10 Técnicos (Qtd WO)</h2>
+        <div style="position:relative;height:280px;"><canvas id="pv-tec-chart"></canvas></div>
+      </div>
+      <div class="panel">
         <div class="pv-tab-topo">
           <h2>Produtividade por Técnico (<span id="pv-tec-qtd">0</span>)</h2>
           <div class="search">
@@ -623,7 +627,7 @@
         </div>
         <div class="pv-rolagem" style="max-height:560px;">
           <table class="pv-tec-tab">
-            <thead><tr><th>Técnico</th><th class="num">Qtd WO</th><th class="num">Dias Trabalhados</th><th class="num">Média WO/Dia</th></tr></thead>
+            <thead><tr><th>#</th><th>Técnico</th><th>Equipe</th><th class="num">Qtd WO</th><th class="num">% do Total</th><th class="num">Dias Trabalhados</th><th class="num">Média WO/Dia</th></tr></thead>
             <tbody id="pv-tec-tbody"></tbody>
           </table>
         </div>
@@ -655,37 +659,71 @@
     });
   }
 
+  let graficoTec = null;
   function renderTec() {
     opcoesTec();
     const base = filtrarTec();
     const porTec = {};
     base.forEach(r => {
       const nome = r.tec;
-      if (!porTec[nome]) porTec[nome] = { qtd: 0, dias: new Set() };
+      if (!porTec[nome]) porTec[nome] = { qtd: 0, dias: new Set(), x: r.x || '' };
       porTec[nome].qtd++;
       const dataRef = r.ini || r.d;
       if (dataRef) porTec[nome].dias.add(dataRef);
+      if (!porTec[nome].x && r.x) porTec[nome].x = r.x;
     });
 
-    let linhas = Object.entries(porTec).map(([nome, info]) => {
-      const dias = info.dias.size;
-      return { nome, qtd: info.qtd, dias, media: dias ? info.qtd / dias : 0 };
-    }).sort((a, b) => b.qtd - a.qtd);
-    if (buscaTec) linhas = linhas.filter(l => l.nome.toLowerCase().includes(buscaTec));
-
     const totalWo = base.length; // já é contagem de preventivas reais (1 linha = 1 WO)
-    const mediaGeral = linhas.length ? linhas.reduce((s, l) => s + l.media, 0) / linhas.length : 0;
+    let linhasTodas = Object.entries(porTec).map(([nome, info]) => {
+      const dias = info.dias.size;
+      return { nome, qtd: info.qtd, dias, media: dias ? info.qtd / dias : 0, x: info.x,
+        pctTotal: totalWo ? info.qtd / totalWo * 100 : 0 };
+    }).sort((a, b) => b.qtd - a.qtd);
+
+    const mediaGeral = linhasTodas.length ? linhasTodas.reduce((s, l) => s + l.media, 0) / linhasTodas.length : 0;
+
     raiz.querySelector('#pv-tec-kpis').innerHTML = `
-      <div class="kpi"><div class="label">👷 Técnicos</div><div class="value">${fmt(linhas.length)}</div></div>
+      <div class="kpi"><div class="label">👷 Técnicos</div><div class="value">${fmt(linhasTodas.length)}</div></div>
       <div class="kpi"><div class="label">🧾 Total WO</div><div class="value">${fmt(totalWo)}</div></div>
       <div class="kpi"><div class="label">📊 Média Geral WO/Dia</div><div class="value">${mediaGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>`;
 
+    // Gráfico Top 10 por Qtd WO
+    const top10 = linhasTodas.slice(0, 10);
+    if (graficoTec) graficoTec.destroy();
+    graficoTec = new Chart(raiz.querySelector('#pv-tec-chart'), {
+      type: 'bar',
+      data: {
+        labels: top10.map(l => l.nome),
+        datasets: [{ label: 'Qtd WO', data: top10.map(l => l.qtd),
+          backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 4,
+          datalabels: { anchor: 'end', align: 'end', color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' } } }]
+      },
+      plugins: typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [],
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        layout: { padding: { right: 28 } },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `Qtd WO: ${fmt(c.parsed.x)}` } } },
+        scales: { x: { beginAtZero: true, grid: { color: '#e1e5f0' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
+      }
+    });
+
+    // Tabela (aplica busca)
+    let linhas = linhasTodas;
+    if (buscaTec) linhas = linhas.filter(l => l.nome.toLowerCase().includes(buscaTec));
+
     raiz.querySelector('#pv-tec-qtd').textContent = fmt(linhas.length);
-    raiz.querySelector('#pv-tec-tbody').innerHTML = linhas.map(l => `<tr>
-      <td>${esc(l.nome)}</td><td class="num mono">${fmt(l.qtd)}</td>
-      <td class="num mono">${fmt(l.dias)}</td>
-      <td class="num mono" style="font-weight:700;color:${COR.accent}">${l.media.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#6b7590">Nenhum técnico encontrado</td></tr>';
+    raiz.querySelector('#pv-tec-tbody').innerHTML = linhas.map((l, i) => {
+      const corMedia = l.media >= mediaGeral ? COR.good : COR.bad;
+      return `<tr>
+        <td class="mono" style="color:${COR.muted}">${i + 1}</td>
+        <td>${esc(l.nome)}</td>
+        <td>${l.x ? `<span class="pill">${esc(l.x)}</span>` : '--'}</td>
+        <td class="num mono">${fmt(l.qtd)}</td>
+        <td class="num mono">${pct(l.pctTotal)}</td>
+        <td class="num mono">${fmt(l.dias)}</td>
+        <td class="num mono" style="font-weight:700;color:${corMedia}">${l.media.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" style="text-align:center;color:#6b7590">Nenhum técnico encontrado</td></tr>';
   }
 
   function tabelaOp(regs) {
@@ -710,7 +748,7 @@
     raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
     raiz.querySelector('#pv-aba-tec').style.display = aba === 'tec' ? '' : 'none';
     if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); if (graficoDiario) graficoDiario.resize(); }
-    else if (aba === 'tec') { if (!tecMontada) montarTec(); atualizarTec(); }
+    else if (aba === 'tec') { if (!tecMontada) montarTec(); atualizarTec(); if (graficoTec) graficoTec.resize(); }
     else { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); }
   }
 
