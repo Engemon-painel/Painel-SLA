@@ -215,7 +215,7 @@
 
     const planejado = regs.length;
     const planD1 = Math.round(planejado * duRef / duMes);
-    const realizado = regs.filter(executadaNoMes).length;
+    const realizado = regs.filter(r => r.st === 'Executada').length;   // cards contam tudo; só os gráficos filtram por data
     const pendentes = planejado - realizado;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
     // Aderência comparada com a meta proporcional ATÉ HOJE (não até amanhã):
@@ -462,7 +462,7 @@
     opcoesOp();
     const regs = filtrarOp();
     const planejado = regs.length;
-    const realizado = regs.filter(executadaNoMes).length;
+    const realizado = regs.filter(r => r.st === 'Executada').length;
     const entrega = planejado ? realizado / planejado * 100 : 0;
     const totalRel = regs.filter(r => r.ex === 'EPS').length;
     const relEntregues = regs.filter(temRelatorio).length;
@@ -490,7 +490,7 @@
     const restantes = duMes - duRef;
 
     const total = regs.length;
-    const exec = regs.filter(executadaNoMes);
+    const exec = regs.filter(r => r.st === 'Executada');
     const realizadas = exec.length;
     const realD1 = exec.filter(r => r.d && r.d <= ref).length;
     const media = duRef ? realD1 / duRef : 0;
@@ -593,7 +593,7 @@
       const k = r.x || 'Sem equipe';
       porEquipe[k] = porEquipe[k] || { feitas: 0, total: 0 };
       porEquipe[k].total++;
-      if (executadaNoMes(r)) porEquipe[k].feitas++;
+      if (r.st === 'Executada') porEquipe[k].feitas++;
     });
     raiz.querySelector('#pv-op-equipes').innerHTML = Object.keys(porEquipe).sort().map(k => {
       const { feitas, total: tot } = porEquipe[k];
@@ -648,7 +648,7 @@
   // Validação) entram na produtividade.
   function filtrarTec(ignorar) {
     return dados.registros.filter(r =>
-      executadaNoMes(r) && r.tec &&
+      r.st === 'Executada' && r.tec &&
       FILTROS_TEC.every(f => f.k === ignorar || !selTec[f.k] || r[f.k] === selTec[f.k]));
   }
 
