@@ -35,6 +35,7 @@
     'nav-infra':       'Tipo de infra e unidade responsável',
     'nav-organograma': 'Headcount, admissões e equipe',
     'nav-preventiva':  'Realizado x meta das preventivas do mês',
+    'nav-afaz':        'Backlog, entrantes e prioritários pendentes',
     'nav-vagas':       'Requisições e recrutamento',
     'nav-frota':       'Veículos, status e gastos',
     'nav-bancohoras':  'Banco de horas e extras',
@@ -212,13 +213,14 @@
       eser,
       'nav-consolidado': eser, 'nav-area': eser, 'nav-site': eser, 'nav-fca': eser, 'nav-infra': eser,
       'nav-organograma': movimento ? { rot:'Última movimentação', val: dmCurto(movimento), dica:'Última admissão/demissão em ' + isoParaBr(movimento), velho:false } : atualizado,
-      'nav-vagas': doCommit('dados.json') || atualizado,
+     'nav-vagas': doCommit('dados.json') || atualizado,
       'nav-frota': doCommit('dados.json') || atualizado,
       'nav-bancohoras': atualizado,
       'nav-nr': doCommit('base_nr.json') || etiqueta('Atualizado', datasNrAso.nr),
       'nav-aso': doCommit('base_nr.json') || etiqueta('Atualizado', datasNrAso.aso),
       'nav-escala': doCommit('dados_escala.json') || etiqueta('Atualizado', escala),
-      'nav-preventiva': doCommit('dados_preventiva.json')
+      'nav-preventiva': doCommit('dados_preventiva.json'),
+      'nav-afaz': doCommit('dados_afaz.json')
     };
   }
   function buscarDatasNrAso(){
