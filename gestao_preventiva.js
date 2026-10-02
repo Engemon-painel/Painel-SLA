@@ -60,6 +60,10 @@
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+  // "Executada" só conta se a Data Fim - Consolidado (r.d) estiver preenchida
+  // e dentro do mês corrente (dados.mes) — vazia ou de outro mês não conta.
+  const executadaNoMes = r => r.st === 'Executada' && !!r.d && r.d.slice(0, 7) === dados.mes;
+
   function diasDoMes(mes) {
     const [a, m] = mes.split('-').map(Number);
     const out = [];
@@ -211,7 +215,7 @@
 
     const planejado = regs.length;
     const planD1 = Math.round(planejado * duRef / duMes);
-    const realizado = regs.filter(r => r.st === 'Executada').length;   // igual ao Power BI
+    const realizado = regs.filter(executadaNoMes).length;
     const pendentes = planejado - realizado;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
     // Aderência comparada com a meta proporcional ATÉ HOJE (não até amanhã):
@@ -257,16 +261,9 @@
 
   function grafico_(regs, dias, ref, duMes, planejado) {
     const porDia = {};
-    const primeiroDia = dias[0].data, ultimoDia = dias[dias.length - 1].data;
-    // Executados sem data (Data Fim em branco) ou com data fora do mês corrente
-    // caem no dia de referência (D-1/hoje), para que o total acumulado do
-    // gráfico sempre bata com o total real de "Executada" (evita o gráfico
-    // mostrar menos do que o card "Realizado / Meta D-1").
-    regs.forEach(r => {
-      if (r.st !== 'Executada') return;
-      const d = (r.d && r.d >= primeiroDia && r.d <= ultimoDia) ? r.d : ref;
-      porDia[d] = (porDia[d] || 0) + 1;
-    });
+    // Só conta quem tem Data Fim - Consolidado preenchida e dentro do mês
+    // corrente — vazia ou de outro mês não entra na contagem.
+    regs.forEach(r => { if (executadaNoMes(r)) porDia[r.d] = (porDia[r.d] || 0) + 1; });
     let du = 0, acum = 0;
     const rot = [], plan = [], real = [];
     dias.forEach(d => {
@@ -317,7 +314,7 @@
     const ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     const serie = HISTORICO_MENSAL.filter(h => h.mes !== dados.mes).map(h => ({ ...h }));
     serie.push({ mes: dados.mes, programadas: dados.registros.length,
-      executadas: dados.registros.filter(r => r.st === 'Executada').length, atual: true });
+      executadas: dados.registros.filter(executadaNoMes).length, atual: true });
     serie.sort((a, b) => a.mes.localeCompare(b.mes));
     const rot = serie.map(h => ABREV[+h.mes.slice(5) - 1] + '/' + h.mes.slice(2, 4) + (h.atual ? '*' : ''));
     const pcts = serie.map(h => h.programadas ? h.executadas / h.programadas * 100 : 0);
@@ -465,7 +462,7 @@
     opcoesOp();
     const regs = filtrarOp();
     const planejado = regs.length;
-    const realizado = regs.filter(r => r.st === 'Executada').length;
+    const realizado = regs.filter(executadaNoMes).length;
     const entrega = planejado ? realizado / planejado * 100 : 0;
     const totalRel = regs.filter(r => r.ex === 'EPS').length;
     const relEntregues = regs.filter(temRelatorio).length;
@@ -493,7 +490,7 @@
     const restantes = duMes - duRef;
 
     const total = regs.length;
-    const exec = regs.filter(r => r.st === 'Executada');
+    const exec = regs.filter(executadaNoMes);
     const realizadas = exec.length;
     const realD1 = exec.filter(r => r.d && r.d <= ref).length;
     const media = duRef ? realD1 / duRef : 0;
@@ -596,7 +593,7 @@
       const k = r.x || 'Sem equipe';
       porEquipe[k] = porEquipe[k] || { feitas: 0, total: 0 };
       porEquipe[k].total++;
-      if (r.st === 'Executada') porEquipe[k].feitas++;
+      if (executadaNoMes(r)) porEquipe[k].feitas++;
     });
     raiz.querySelector('#pv-op-equipes').innerHTML = Object.keys(porEquipe).sort().map(k => {
       const { feitas, total: tot } = porEquipe[k];
@@ -651,7 +648,7 @@
   // Validação) entram na produtividade.
   function filtrarTec(ignorar) {
     return dados.registros.filter(r =>
-      r.st === 'Executada' && r.tec &&
+      executadaNoMes(r) && r.tec &&
       FILTROS_TEC.every(f => f.k === ignorar || !selTec[f.k] || r[f.k] === selTec[f.k]));
   }
 
