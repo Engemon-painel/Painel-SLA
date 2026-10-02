@@ -281,7 +281,11 @@
     }
   }
 
-  window.PainelAFAZ = { montar };
+  function redesenhar() {
+    [gStatus, gEquipe, gPrioridade, gAging, gSemanal, gEntrantesAcum].forEach(g => { if (g) g.resize(); });
+  }
+
+  window.PainelAFAZ = { montar, redesenhar };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => montar());
   else montar();
 })();
