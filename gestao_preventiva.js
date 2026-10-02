@@ -44,7 +44,8 @@
     { mes: '2026-05', programadas: 1407, executadas: 1196 },
     { mes: '2026-06', programadas: 1446, executadas: 1284 },
     { mes: '2026-07', programadas: 1327, executadas: 1264 },
-    { mes: '2026-08', programadas: 1267, executadas: 1216 }
+    { mes: '2026-08', programadas: 1267, executadas: 1216 },
+    { mes: '2026-09', programadas: 1484, executadas: 1420 }
   ];
 
   const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
@@ -256,7 +257,16 @@
 
   function grafico_(regs, dias, ref, duMes, planejado) {
     const porDia = {};
-    regs.forEach(r => { if (r.st === 'Executada' && r.d) porDia[r.d] = (porDia[r.d] || 0) + 1; });
+    const primeiroDia = dias[0].data, ultimoDia = dias[dias.length - 1].data;
+    // Executados sem data (Data Fim em branco) ou com data fora do mês corrente
+    // caem no dia de referência (D-1/hoje), para que o total acumulado do
+    // gráfico sempre bata com o total real de "Executada" (evita o gráfico
+    // mostrar menos do que o card "Realizado / Meta D-1").
+    regs.forEach(r => {
+      if (r.st !== 'Executada') return;
+      const d = (r.d && r.d >= primeiroDia && r.d <= ultimoDia) ? r.d : ref;
+      porDia[d] = (porDia[d] || 0) + 1;
+    });
     let du = 0, acum = 0;
     const rot = [], plan = [], real = [];
     dias.forEach(d => {
@@ -614,10 +624,6 @@
       </div>
       <div class="kpi-row" id="pv-tec-kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:14px;"></div>
       <div class="panel">
-        <h2>Top 10 Técnicos (Qtd WO)</h2>
-        <div style="position:relative;height:280px;"><canvas id="pv-tec-chart"></canvas></div>
-      </div>
-      <div class="panel">
         <div class="pv-tab-topo">
           <h2>Produtividade por Técnico (<span id="pv-tec-qtd">0</span>)</h2>
           <div class="search">
@@ -659,7 +665,6 @@
     });
   }
 
-  let graficoTec = null;
   function renderTec() {
     opcoesTec();
     const base = filtrarTec();
@@ -686,26 +691,6 @@
       <div class="kpi"><div class="label">👷 Técnicos</div><div class="value">${fmt(linhasTodas.length)}</div></div>
       <div class="kpi"><div class="label">🧾 Total WO</div><div class="value">${fmt(totalWo)}</div></div>
       <div class="kpi"><div class="label">📊 Média Geral WO/Dia</div><div class="value">${mediaGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>`;
-
-    // Gráfico Top 10 por Qtd WO
-    const top10 = linhasTodas.slice(0, 10);
-    if (graficoTec) graficoTec.destroy();
-    graficoTec = new Chart(raiz.querySelector('#pv-tec-chart'), {
-      type: 'bar',
-      data: {
-        labels: top10.map(l => l.nome),
-        datasets: [{ label: 'Qtd WO', data: top10.map(l => l.qtd),
-          backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 4,
-          datalabels: { anchor: 'end', align: 'end', color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' } } }]
-      },
-      plugins: typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [],
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        layout: { padding: { right: 28 } },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `Qtd WO: ${fmt(c.parsed.x)}` } } },
-        scales: { x: { beginAtZero: true, grid: { color: '#e1e5f0' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
-      }
-    });
 
     // Tabela (aplica busca)
     let linhas = linhasTodas;
@@ -748,7 +733,7 @@
     raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
     raiz.querySelector('#pv-aba-tec').style.display = aba === 'tec' ? '' : 'none';
     if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); if (graficoDiario) graficoDiario.resize(); }
-    else if (aba === 'tec') { if (!tecMontada) montarTec(); atualizarTec(); if (graficoTec) graficoTec.resize(); }
+    else if (aba === 'tec') { if (!tecMontada) montarTec(); atualizarTec(); }
     else { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); }
   }
 
