@@ -1113,9 +1113,8 @@ function renderInfraTables(){
     return hay.includes(q);
   }
 
-  // NOVO: agrupa por Site (não mais uma linha por incidente) — pega o
-  // primeiro Tipo de Infra / Unidade Responsável 2 não vazios encontrados
-  // pra aquele site, e soma a quantidade de incidentes.
+  // Agrupa por Site — pega o primeiro Tipo de Infra / Unidade Responsável 2
+  // não vazios encontrados pra aquele site, e soma a quantidade de incidentes.
   function agruparPorSite(itens){
     const grupos = {};
     itens.forEach(it => {
@@ -1569,19 +1568,15 @@ function calcularNecessarioMeta(mesObj, metaPct){
   };
 }
 
-// NOVO: mesma lógica de calcularProjecaoMes/calcularNecessarioMeta, mas
-// escopada pra UMA área (SPC1-4) — usa o ritmo dos últimos 7 dias
-// DAQUELA área (via mesObj.diarioAreas) em vez do ritmo agregado de
-// todas as áreas, pra projetar quantos incidentes "Fora" a área ainda
-// pode acumular neste mês sem deixar de bater a meta.
+// Mesma lógica de calcularProjecaoMes/calcularNecessarioMeta, mas escopada
+// pra UMA área (SPC1-4).
 function calcularProjecaoMesArea(mesObj, area){
   const diarioAreasDoMes = Array.isArray(mesObj.diarioAreas) ? mesObj.diarioAreas : [];
   const todosOsDiasArea = diarioAreasDoMes.map(d => Number(d.dia)).filter(n => !isNaN(n));
   let diasCorridos = todosOsDiasArea.length ? Math.max(...todosOsDiasArea) : 0;
 
-  // ALTERADO: aplica o mesmo corte D-1 do card "Dias do Mês (D-1)" — se
-  // o mês selecionado é o mês corrente, o dia de hoje nunca conta como
-  // "corrido" (a base normalmente só fecha o dia anterior).
+  // Corte D-1: se o mês selecionado é o mês corrente, o dia de hoje nunca
+  // conta como "corrido" (a base normalmente só fecha o dia anterior).
   const nomeMesArea = mesObj.mes.split('/')[0];
   const anoCurtoArea = mesObj.mes.split('/')[1];
   const hojeArea = new Date();
@@ -1603,10 +1598,6 @@ function calcularProjecaoMesArea(mesObj, area){
 
   if(diasCorridos <= 0 || diasRestantes <= 0) return null;
 
-  // ALTERADO: projeção simplificada — média diária = tudo que já entrou
-  // até D-1 dividido pelos dias corridos, multiplicada pelos dias que
-  // ainda faltam, somada ao que já entrou. Sem peso extra pros últimos
-  // 7 dias (isso ficou só na projeção global do "Meta do mês").
   const mediaDiaria = totalAtual / diasCorridos;
   const entrantesProjetados = Math.round(mediaDiaria * diasRestantes);
 
@@ -1625,9 +1616,8 @@ function calcularProjecaoMesArea(mesObj, area){
   };
 }
 
-// NOVO: quantos "Fora" a área ainda pode acumular neste mês sem deixar
-// de bater a metaPct (ex.: 0.85), na projeção de incidentes restantes
-// só daquela área.
+// Quantos "Fora" a área ainda pode acumular neste mês sem deixar de bater
+// a metaPct (ex.: 0.85).
 function calcularNecessarioMetaArea(mesObj, area, metaPct){
   const proj = calcularProjecaoMesArea(mesObj, area);
   if(!proj){
@@ -1643,7 +1633,7 @@ function calcularNecessarioMetaArea(mesObj, area, metaPct){
   return {
     temProjecao: true, foraToleravel, foraToleravelPorDia, aderenciaNecessaria,
     jaGarantido, restantesProjetados, diasRestantes: proj.diasRestantes,
-    totalProjetado: proj.totalFinal // NOVO: volume total projetado pra área no mês
+    totalProjetado: proj.totalFinal
   };
 }
 
@@ -2019,9 +2009,8 @@ function renderHeadcount(){
   }
 
   // Últimos 8 meses até o mês atual + meses FUTUROS que já tenham
-  // admissão/demissão lançada na base do CLARO (ex.: contratados de Outubro),
-  // até 3 meses à frente. Meses futuros aparecem como "(previsto)" e ficam
-  // fora do cálculo de turnover.
+  // admissão/demissão lançada na base do CLARO, até 3 meses à frente.
+  // Meses futuros aparecem como "(previsto)" e ficam fora do turnover.
   const meses8 = ultimosNMesesHc(8);
   (function incluirMesesFuturos(){
     const hojeRef = new Date();
@@ -2050,16 +2039,8 @@ function renderHeadcount(){
     return meses8.findIndex(m => m.ano === ano && m.mes === mes);
   }
 
-  // CORRIGIDO: esses dois gráficos ficam FIXOS no contrato CLARO —
-  // travado aqui e independente do que o usuário selecionar nos filtros
-  // de Contrato/Status acima. Usam bases DIFERENTES de propósito:
-  //  - Admitidos x Demitidos: todo mundo do CLARO (ativos e inativos),
-  //    pra contar as saídas corretamente.
-  //  - Evolução da Equipe: só quem está Ativo HOJE no CLARO — ignora
-  //    completamente quem já saiu (não tenta reconstruir o histórico via
-  //    data de demissão), só olha desse grupo atual quantos já tinham
-  //    sido admitidos até o fechamento de cada mês. Isso é sempre
-  //    crescente (nunca cai por causa de demissão).
+  // Esses dois gráficos ficam FIXOS no contrato CLARO, independente dos
+  // filtros de Contrato/Status acima.
   const baseFixaClaro = COLABORADORES.filter(c => canonContratoHc(c.contrato) === 'CLARO');
   const baseFixaClaroAtivosHoje = baseFixaClaro.filter(c => c.ativo);
 
@@ -2070,9 +2051,6 @@ function renderHeadcount(){
     if(iDem !== -1) demPorMes[iDem]++;
   });
 
-  // evolucaoDados (headcount ativo no fechamento de cada mês) precisa ser
-  // calculado ANTES do gráfico Admitidos x Demitidos, porque o turnover
-  // (linha adicionada nesse mesmo gráfico) depende dele.
   const evolucaoDados = meses8.map(m => {
     const fimDoMes = new Date(m.ano, m.mes + 1, 0);
     const fimIso = fimDoMes.getFullYear() + '-' + pad2hc(fimDoMes.getMonth()+1) + '-' + pad2hc(fimDoMes.getDate());
@@ -2082,8 +2060,6 @@ function renderHeadcount(){
   });
 
   // Turnover mensal = Demitidos no mês ÷ Ativos no fechamento do mês.
-  // Meses sem nenhum ativo no fechamento ficam com turnover null, pra
-  // não dividir por zero.
   const turnoverPct = meses8.map((m, i) => {
     if(m.futuro) return null;
     const ativosFechamento = evolucaoDados[i];
@@ -2091,11 +2067,7 @@ function renderHeadcount(){
     return (demPorMes[i] / ativosFechamento) * 100;
   });
 
-  // Turnover acumulado no período mostrado (label dinâmico — hoje são os
-  // últimos 8 meses, ex.: Fev/26 a Set/26): soma de todos os demitidos do
-  // período dividida pela média do headcount ativo no fechamento de cada
-  // mês — diferente da simples média dos percentuais mensais, pondera
-  // pelo tamanho da equipe em cada mês.
+  // Turnover acumulado no período mostrado.
   const turnoverMedioLabelEl = document.getElementById('turnoverMedioLabel');
   if(turnoverMedioLabelEl){
     const idxPassados = meses8.map((m, i) => m.futuro ? -1 : i).filter(i => i >= 0);
@@ -2172,10 +2144,8 @@ function renderHeadcount(){
 
   const tecnicosAtivos = ativos.filter(c => semAcentoHc(c.areaTecnica) === 'tecnico');
 
-  // NOVO: junta "Técnicos ativos" e "Vagas abertas" pelo nome do supervisor
-  // ignorando maiúsculas/minúsculas e acentos (a aba Controle costuma trazer
-  // o nome em CAIXA ALTA, diferente do Organograma) — senão o mesmo
-  // supervisor aparecia duas vezes no gráfico, uma vez em cada grafia.
+  // Junta "Técnicos ativos" e "Vagas abertas" pelo nome do supervisor
+  // ignorando maiúsculas/minúsculas e acentos.
   const supervisorDados = {}; // chave normalizada -> { label, tecnicos, vagas }
 
   tecnicosAtivos.forEach(c => {
@@ -2185,10 +2155,7 @@ function renderHeadcount(){
     supervisorDados[key].tecnicos++;
   });
 
-  // NOVO: vagas em aberto por supervisor — a partir da aba "Controle"
-  // (VAGAS), contando as requisições cuja coluna STATUS (Etapa Atual da
-  // Vaga) esteja em uma das etapas ainda "em andamento". Comparado ao
-  // Status Req. (Aprovada/Pendente), aqui é o STATUS/etapa granular.
+  // Vagas em aberto por supervisor — a partir da aba "Controle" (VAGAS).
   const STATUS_VAGA_ABERTA = new Set([
     'aguardando aprovacao',
     'aguardando validacao da claro',
@@ -2212,11 +2179,7 @@ function renderHeadcount(){
     vagasAbertasPorSupervisor[s.label] = s.vagas;
   });
 
-  // NOVO: quadro de referência com o quadro ideal (headcount que o
-  // supervisor deveria ter), informado manualmente — não vem de nenhuma
-  // aba da planilha, por isso fica fixo aqui. Comparado (por nome,
-  // ignorando acento/maiúscula) com ativos + vagas abertas pra apontar a
-  // diferença ao lado de cada barra.
+  // Quadro ideal (headcount que o supervisor deveria ter), informado manualmente.
   const TOTAL_ESPERADO_RAW = {
     'Marcelo Rodrigues Rosa': 17,
     'Ycaro Dias de Souza': 14,
@@ -2283,9 +2246,7 @@ function renderHeadcount(){
     });
   }
 
-  // NOVO: quadrinho ao lado do gráfico com Total atual / Meta / Diferença
-  // por supervisor — tirado do gráfico (que ficava esticado demais com o
-  // texto) e colocado numa lista compacta, na mesma ordem das barras.
+  // Quadrinho ao lado do gráfico com Total atual / Meta / Diferença por supervisor.
   const resumoBox = document.getElementById('tecnicosSupervisorResumoBox');
   if(resumoBox){
     resumoBox.innerHTML = supervisoresOrdenados.map(label => {
@@ -3085,8 +3046,7 @@ function renderFrota(){
   }
 
   const total = FROTA.length;
-  // Filtro de contrato: tudo o que fica abaixo dos cards de contrato (status, gasto, gráficos,
-  // ranking, combustível e a tabela) usa só a frota do contrato selecionado.
+  // Filtro de contrato: tudo abaixo dos cards de contrato usa só a frota do contrato selecionado.
   const FROTA_F = frotaOperacaoFiltroAtual
     ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === frotaOperacaoFiltroAtual)
     : FROTA;
@@ -3372,8 +3332,7 @@ function selecionarCompetenciaBancoHoras(competencia){
   renderBancoHoras();
 }
 
-// Rótulo combinado "CC — Descrição" usado nos filtros e nos agrupamentos,
-// já que o mesmo código de C.C. deve sempre ter a mesma descrição.
+// Rótulo combinado "CC — Descrição" usado nos filtros e nos agrupamentos.
 function bancoHorasRotuloCc(v){
   const cc = normFrota(v.cc);
   const desc = normFrota(v.descricaoCC);
@@ -3381,11 +3340,7 @@ function bancoHorasRotuloCc(v){
   return cc || desc || 'Sem C.C.';
 }
 
-// Deduz o contrato (Claro/Cirion/etc.) a partir da Descrição C.C. — o
-// nome do cliente costuma aparecer embutido nesse texto (ex.: "CLARO
-// SP CAPITAL", "CIRION - BACKBONE"). Se não reconhecer nenhum contrato
-// conhecido, usa a própria Descrição C.C. como contrato (ou "Sem
-// contrato" se estiver vazia).
+// Deduz o contrato (Claro/Cirion/etc.) a partir da Descrição C.C.
 function bancoHorasContratoDeCc(v){
   const desc = semAcentoHc(v.descricaoCC);
   if(desc.includes('claro')) return 'CLARO';
@@ -3394,10 +3349,7 @@ function bancoHorasContratoDeCc(v){
   return bruto || 'Sem contrato';
 }
 
-// Todas as competências presentes na base, ordenadas cronologicamente:
-// primeiro por ano, depois por mês (ex.: Abr/25, Mai/25, ..., Jan/26,
-// Fev/26...). Aceita "mmm/aa" (ex.: "abr/25"), "aaaa-mm" ou "mm/aaaa";
-// texto em outro formato cai para ordenação alfabética no final.
+// Todas as competências presentes na base, ordenadas cronologicamente.
 const MES_ABREV_ORDEM = {
   jan:1, fev:2, mar:3, abr:4, mai:5, jun:6,
   jul:7, ago:8, set:9, out:10, nov:11, dez:12
@@ -3423,7 +3375,7 @@ function bancoHorasCompetenciasOrdenadas(){
     // Formato "mm/aaaa".
     m = c.match(/^(\d{1,2})\/(\d{4})$/);
     if(m) return Number(m[2]) * 100 + Number(m[1]);
-    // Sem reconhecimento — joga pro final, mantendo ordem alfabética entre si.
+    // Sem reconhecimento — joga pro final.
     return 999999;
   }
 
@@ -3568,7 +3520,7 @@ function renderBancoHoras(){
   const kpiRow = document.getElementById('bancoHorasKpiRow');
   if(!kpiRow) return;
 
-  // ---- Chips de competência (igual ao seletor de mês da Visão Consolidada) ----
+  // ---- Chips de competência ----
   const competenciaStrip = document.getElementById('bancoHorasCompetenciaStrip');
   if(competenciaStrip){
     const competencias = bancoHorasCompetenciasOrdenadas();
@@ -3612,10 +3564,7 @@ function renderBancoHoras(){
     bancoHorasFiltrosPopulados = true;
   }
 
-  // ---- Cards por Contrato (Claro/Cirion/...) — clicáveis, aplicam o
-  // filtro "Contrato" acima. Baseados apenas na competência selecionada
-  // (ignoram os demais filtros), pra sempre mostrar todas as opções de
-  // contrato disponíveis naquele mês. ----
+  // ---- Cards por Contrato — clicáveis ----
   const contratoKpiRow = document.getElementById('bancoHorasContratoKpiRow');
   if(contratoKpiRow){
     const baseContrato = BANCO_HORAS.filter(v => !bancoHorasCompetenciaAtual || normFrota(v.competencia) === bancoHorasCompetenciaAtual);
@@ -3645,9 +3594,6 @@ function renderBancoHoras(){
     contratoKpiRow.innerHTML = htmlContratoKpi;
   }
 
-  // Conjunto filtrado (Contrato/Competência/C.C./Situação/Confere) usado
-  // em todos os KPIs e gráficos abaixo — a busca de texto livre só afeta
-  // a tabela detalhada no final da página.
   const BH_FILTRO = bancoHorasFiltradaGeral();
 
   const total = BH_FILTRO.length;
@@ -3669,7 +3615,7 @@ function renderBancoHoras(){
     <div class="kpi"><div class="label">⚠️ Não Confere</div><div class="value" style="color:${cor.warn}">${qtdNaoConfere.toLocaleString('pt-BR')}</div></div>
   `;
 
-  // ---- Status do Banco de Horas (Positivo/Zerado/Negativo, pelo sinal do Saldo Atual) ----
+  // ---- Status do Banco de Horas (Positivo/Zerado/Negativo) ----
   const statusBancoCanvas = document.getElementById('bancoHorasStatusBancoChart');
   if(statusBancoCanvas){
     let positivos = 0, zerados = 0, negativos = 0;
@@ -3717,11 +3663,7 @@ function renderBancoHoras(){
     }
   }
 
-  // ---- Saldo Atual por Competência (barras) — histórico completo,
-  // respeitando apenas os filtros de C.C./Situação/Confere (não o mês
-  // selecionado nos chips). Mostra abaixo do título o Período da folha
-  // ATUAL (a competência mais recente da base), sempre — independente
-  // da competência selecionada nos chips.
+  // ---- Saldo Atual — Período Atual ----
   const periodoCompetenciaEl = document.getElementById('bancoHorasPeriodoCompetencia');
   if(periodoCompetenciaEl){
     const competenciasParaPeriodoAtual = bancoHorasCompetenciasOrdenadas();
@@ -3805,11 +3747,7 @@ function renderBancoHoras(){
     saldoCcBody.innerHTML = html;
   }
 
-  // ---- Evolução do Saldo Atual por Mês (histórico de Janeiro até o mês
-  // atual, do ano corrente). Respeita apenas os filtros de
-  // C.C./Situação/Confere — não o mês selecionado nos chips, já que o
-  // objetivo aqui é mostrar a tendência ao longo do tempo. Eixo X usa a
-  // Competência (mês, ex.: "fev/25"). ----
+  // ---- Evolução do Saldo Atual por Mês (ano corrente, até o mês atual) ----
   const evolucaoCanvas = document.getElementById('bancoHorasEvolucaoChart');
   if(evolucaoCanvas){
     const baseEvolucao = BANCO_HORAS.filter(v => {
@@ -3823,9 +3761,6 @@ function renderBancoHoras(){
     const anoAtualEvolucao = hojeEvolucao.getFullYear();
     const mesAtualEvolucaoNum = hojeEvolucao.getMonth() + 1; // 1-12
 
-    // Filtra pra manter só Jan-Dez do ano corrente, até o mês atual —
-    // usa a mesma chave de ordenação de bancoHorasCompetenciasOrdenadas
-    // (ano*100 + mês) pra decidir o que entra.
     const competenciasEvolucao = bancoHorasCompetenciasOrdenadas().filter(c => {
       const m = c.match(/^([A-Za-zçÇ]{3})\/(\d{2,4})$/);
       if(!m) return false;
@@ -3963,337 +3898,113 @@ function renderBancoHoras(){
 
   renderBancoHorasTabela();
 }
+
+// Filtro comum das duas exportações do FCA (mês selecionado + supervisor).
+function itensFcaDoMesParaExportar(){
+  if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
+    alert('Os dados do painel ainda não foram carregados.');
+    return null;
+  }
+  if (!Array.isArray(PENDENTES_FCA)) {
+    alert('A base de FCA não foi carregada corretamente.');
+    return null;
+  }
+  const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+  const mesObj = DADOS.meses[mesAtualIdx];
+  if (!mesObj || !mesObj.mes) {
+    alert('Não foi possível identificar o mês selecionado.');
+    return null;
+  }
+  const partesMes = String(mesObj.mes).split('/');
+  const mm = NOME_MES[partesMes[0]];
+  const anoCurto = partesMes[1];
+  if (!mm || !anoCurto) {
+    alert('Formato de mês inválido: ' + mesObj.mes);
+    return null;
+  }
+  const mesOrdAtual = '20' + anoCurto + '-' + mm;
+  const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
+  const todosDoMes = PENDENTES_FCA.filter(p => {
+    if (!p) return false;
+    if (!areasDoMes.includes(norm(p.area))) return false;
+    if (norm(p.mesOrd) !== mesOrdAtual) return false;
+    if (supervisorFiltroAtual && norm(p.supervisor) !== norm(supervisorFiltroAtual)) return false;
+    return true;
+  });
+  return { mesObj, todosDoMes };
+}
+
+function estaPendenteFca(p) {
+  const valor = p ? p.pendente : false;
+  if (valor === true || valor === 1) return true;
+  if (typeof valor === 'string') {
+    const v = valor.trim().toLowerCase();
+    return v === 'true' || v === '1' || v === 'sim';
+  }
+  return false;
+}
+
+function baixarCsvFca(colunas, linhasDados, nomeArquivo){
+  function csvEsc(v) {
+    const s = String(v ?? '');
+    if (/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  const linhasCsv = [colunas.map(csvEsc).join(';')];
+  linhasDados.forEach(l => linhasCsv.push(l.map(csvEsc).join(';')));
+  const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivo;
+  a.style.display = 'none';
+  a.setAttribute('download', nomeArquivo);
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
 function exportarFcaPreenchidoCsv(){
   try {
-    if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
-      alert('Os dados do painel ainda não foram carregados.');
-      return;
-    }
-
-    if (!Array.isArray(PENDENTES_FCA)) {
-      alert('A base de FCA não foi carregada corretamente.');
-      return;
-    }
-
-    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
-
-    const mesObj = DADOS.meses[mesAtualIdx];
-    if (!mesObj || !mesObj.mes) {
-      alert('Não foi possível identificar o mês selecionado.');
-      return;
-    }
-
-    const partesMes = String(mesObj.mes).split('/');
-    const nomeMes = partesMes[0];
-    const anoCurto = partesMes[1];
-    const mm = NOME_MES[nomeMes];
-
-    if (!mm || !anoCurto) {
-      alert('Formato de mês inválido: ' + mesObj.mes);
-      return;
-    }
-
-    const mesOrdAtual = '20' + anoCurto + '-' + mm;
-
-    const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
-
-    function estaPendente(p) {
-      const valor = p ? p.pendente : false;
-
-      if (valor === true || valor === 1) return true;
-
-      if (typeof valor === 'string') {
-        const v = valor.trim().toLowerCase();
-        return v === 'true' || v === '1' || v === 'sim';
-      }
-
-      return false;
-    }
-
-    const todosDoMes = PENDENTES_FCA.filter(p => {
-      if (!p) return false;
-
-      if (!areasDoMes.includes(norm(p.area))) return false;
-
-      if (norm(p.mesOrd) !== mesOrdAtual) return false;
-
-      if (
-        supervisorFiltroAtual &&
-        norm(p.supervisor) !== norm(supervisorFiltroAtual)
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-
-    const preenchidos = todosDoMes.filter(p => !estaPendente(p));
-
+    const r = itensFcaDoMesParaExportar();
+    if(!r) return;
+    const preenchidos = r.todosDoMes.filter(p => !estaPendenteFca(p));
     if (!preenchidos.length) {
-      console.log('--- EXPORTAÇÃO FCA ---');
-      console.log('Mês selecionado:', mesObj.mes);
-      console.log('Mês esperado:', mesOrdAtual);
-      console.log('Áreas:', areasDoMes);
-      console.log('Total PENDENTES_FCA:', PENDENTES_FCA.length);
-      console.log('Total do mês:', todosDoMes.length);
-      console.log('Supervisor:', supervisorFiltroAtual || 'Todos');
-
-      alert(
-        'Nenhum incidente preenchido para exportar.\n\n' +
-        'Mês: ' + mesObj.mes +
-        (supervisorFiltroAtual
-          ? '\nSupervisor: ' + supervisorFiltroAtual
-          : '')
-      );
+      alert('Nenhum incidente preenchido para exportar.\n\nMês: ' + r.mesObj.mes +
+        (supervisorFiltroAtual ? '\nSupervisor: ' + supervisorFiltroAtual : ''));
       return;
     }
-
-    const colunas = [
-      'Supervisor',
-      'Área',
-      'Site',
-      'Incidente',
-      'Causa',
-      'Ação',
-      'Reported',
-      'Submit',
-      'Clear',
-      'Resolved'
-    ];
-
-    function csvEsc(v) {
-      const s = String(v ?? '');
-
-      if (/[",;\n\r]/.test(s)) {
-        return '"' + s.replace(/"/g, '""') + '"';
-      }
-
-      return s;
-    }
-
-    const linhasCsv = [];
-    linhasCsv.push(colunas.map(csvEsc).join(';'));
-
-    preenchidos.forEach(p => {
-      linhasCsv.push([
-        p.supervisor || '',
-        p.area || '',
-        p.site || '',
-        p.incidente || '',
-        p.causa || '',
-        p.acao || '',
-        p.reported || '',
-        p.submit || '',
-        p.clear || '',
-        p.resolved || ''
-      ].map(csvEsc).join(';'));
-    });
-
-    const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
-
-    const blob = new Blob(
-      [csvContent],
-      { type: 'text/csv;charset=utf-8;' }
+    baixarCsvFca(
+      ['Supervisor','Área','Site','Incidente','Causa','Ação','Reported','Submit','Clear','Resolved'],
+      preenchidos.map(p => [p.supervisor || '', p.area || '', p.site || '', p.incidente || '', p.causa || '', p.acao || '', p.reported || '', p.submit || '', p.clear || '', p.resolved || '']),
+      'FCA_Preenchidos_' + r.mesObj.mes.replace('/', '-') + '.csv'
     );
-
-    const url = URL.createObjectURL(blob);
-
-    const nomeArquivo =
-      'FCA_Preenchidos_' +
-      mesObj.mes.replace('/', '-') +
-      '.csv';
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomeArquivo;
-    a.style.display = 'none';
-    a.setAttribute('download', nomeArquivo);
-
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
-
-    console.log(
-      'CSV FCA exportado com sucesso:',
-      nomeArquivo,
-      'Registros:',
-      preenchidos.length
-    );
-
   } catch (erro) {
     console.error('Erro ao exportar FCA:', erro);
-
-    alert(
-      'Ocorreu um erro ao exportar o CSV.\n\n' +
-      (erro && erro.message ? erro.message : erro)
-    );
+    alert('Ocorreu um erro ao exportar o CSV.\n\n' + (erro && erro.message ? erro.message : erro));
   }
 }
 
 function exportarFcaPendenteCsv(){
   try {
-    if (!DADOS || !DADOS.meses || !DADOS.meses.length) {
-      alert('Os dados do painel ainda não foram carregados.');
-      return;
-    }
-
-    if (!Array.isArray(PENDENTES_FCA)) {
-      alert('A base de FCA não foi carregada corretamente.');
-      return;
-    }
-
-    const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
-
-    const mesObj = DADOS.meses[mesAtualIdx];
-    if (!mesObj || !mesObj.mes) {
-      alert('Não foi possível identificar o mês selecionado.');
-      return;
-    }
-
-    const partesMes = String(mesObj.mes).split('/');
-    const nomeMes = partesMes[0];
-    const anoCurto = partesMes[1];
-    const mm = NOME_MES[nomeMes];
-
-    if (!mm || !anoCurto) {
-      alert('Formato de mês inválido: ' + mesObj.mes);
-      return;
-    }
-
-    const mesOrdAtual = '20' + anoCurto + '-' + mm;
-
-    const areasDoMes = Object.keys(areasValidas(mesObj.areas || {}));
-
-    function estaPendente(p) {
-      const valor = p ? p.pendente : false;
-
-      if (valor === true || valor === 1) return true;
-
-      if (typeof valor === 'string') {
-        const v = valor.trim().toLowerCase();
-        return v === 'true' || v === '1' || v === 'sim';
-      }
-
-      return false;
-    }
-
-    const todosDoMes = PENDENTES_FCA.filter(p => {
-      if (!p) return false;
-
-      if (!areasDoMes.includes(norm(p.area))) return false;
-
-      if (norm(p.mesOrd) !== mesOrdAtual) return false;
-
-      if (
-        supervisorFiltroAtual &&
-        norm(p.supervisor) !== norm(supervisorFiltroAtual)
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-
-    const pendentes = todosDoMes.filter(p => estaPendente(p));
-
+    const r = itensFcaDoMesParaExportar();
+    if(!r) return;
+    const pendentes = r.todosDoMes.filter(p => estaPendenteFca(p));
     if (!pendentes.length) {
-      console.log('--- EXPORTAÇÃO FCA (A preencher) ---');
-      console.log('Mês selecionado:', mesObj.mes);
-      console.log('Mês esperado:', mesOrdAtual);
-      console.log('Áreas:', areasDoMes);
-      console.log('Total PENDENTES_FCA:', PENDENTES_FCA.length);
-      console.log('Total do mês:', todosDoMes.length);
-      console.log('Supervisor:', supervisorFiltroAtual || 'Todos');
-
-      alert(
-        'Nenhum incidente a preencher para exportar.\n\n' +
-        'Mês: ' + mesObj.mes +
-        (supervisorFiltroAtual
-          ? '\nSupervisor: ' + supervisorFiltroAtual
-          : '')
-      );
+      alert('Nenhum incidente a preencher para exportar.\n\nMês: ' + r.mesObj.mes +
+        (supervisorFiltroAtual ? '\nSupervisor: ' + supervisorFiltroAtual : ''));
       return;
     }
-
-    const colunas = [
-      'Supervisor',
-      'Área',
-      'Site',
-      'Incidente',
-      'Reported',
-      'Submit',
-      'Clear',
-      'Resolved'
-    ];
-
-    function csvEsc(v) {
-      const s = String(v ?? '');
-
-      if (/[",;\n\r]/.test(s)) {
-        return '"' + s.replace(/"/g, '""') + '"';
-      }
-
-      return s;
-    }
-
-    const linhasCsv = [];
-    linhasCsv.push(colunas.map(csvEsc).join(';'));
-
-    pendentes.forEach(p => {
-      linhasCsv.push([
-        p.supervisor || '',
-        p.area || '',
-        p.site || '',
-        p.incidente || '',
-        p.reported || '',
-        p.submit || '',
-        p.clear || '',
-        p.resolved || ''
-      ].map(csvEsc).join(';'));
-    });
-
-    const csvContent = '\uFEFF' + linhasCsv.join('\r\n');
-
-    const blob = new Blob(
-      [csvContent],
-      { type: 'text/csv;charset=utf-8;' }
+    baixarCsvFca(
+      ['Supervisor','Área','Site','Incidente','Reported','Submit','Clear','Resolved'],
+      pendentes.map(p => [p.supervisor || '', p.area || '', p.site || '', p.incidente || '', p.reported || '', p.submit || '', p.clear || '', p.resolved || '']),
+      'FCA_A_Preencher_' + r.mesObj.mes.replace('/', '-') + '.csv'
     );
-
-    const url = URL.createObjectURL(blob);
-
-    const nomeArquivo =
-      'FCA_A_Preencher_' +
-      mesObj.mes.replace('/', '-') +
-      '.csv';
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomeArquivo;
-    a.style.display = 'none';
-    a.setAttribute('download', nomeArquivo);
-
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
-
-    console.log(
-      'CSV FCA (A preencher) exportado com sucesso:',
-      nomeArquivo,
-      'Registros:',
-      pendentes.length
-    );
-
   } catch (erro) {
     console.error('Erro ao exportar FCA (A preencher):', erro);
-
-    alert(
-      'Ocorreu um erro ao exportar o CSV.\n\n' +
-      (erro && erro.message ? erro.message : erro)
-    );
+    alert('Ocorreu um erro ao exportar o CSV.\n\n' + (erro && erro.message ? erro.message : erro));
   }
 }
 
@@ -4429,6 +4140,16 @@ function render(){
   const diasRestantes = Math.max(0, diasNoMesSelecionado() - diasCorridos);
   const mttrTexto = formatarMttr(mttrMedioDoMes(mesObj));
 
+  // NOVO: incidentes que ficaram abertos mais de 24h no mês selecionado
+  // (tempo de SUBMIT_DATE até CLEAR_DATE, ou RESOLVED_DATE quando a Clear
+  // está vazia — vem pronto do dados.json em "mttrValores", em segundos).
+  const valoresMttrMes = Array.isArray(mesObj.mttrValores)
+    ? mesObj.mttrValores.filter(v => typeof v === 'number' && !isNaN(v))
+    : [];
+  const temDadoAcima24h = valoresMttrMes.length > 0;
+  const qtdAcima24h = valoresMttrMes.filter(v => v > 24 * 3600).length;
+  const pctAcima24h = valoresMttrMes.length > 0 ? (qtdAcima24h / valoresMttrMes.length * 100) : 0;
+
   const kpiRow = document.getElementById('kpiRow');
   kpiRow.innerHTML = `
     <div class="kpi"><div class="label">📊 Total Indisponibilidade</div><div class="value">${t.total.toLocaleString('pt-BR')}</div></div>
@@ -4440,6 +4161,11 @@ function render(){
         <span style="color:${cor.line};">|</span>
         <span style="font-size:16px; color:${cor.muted};">MTTR <span class="mono" style="color:${cor.text}; font-size:16px; font-weight:600;">${mttrTexto}</span></span>
       </div>
+    </div>
+    <div class="kpi">
+      <div class="label">⏰ Abertos &gt; 24h</div>
+      <div class="value" style="color:${!temDadoAcima24h ? cor.muted : (qtdAcima24h > 0 ? cor.bad : cor.good)}">${temDadoAcima24h ? qtdAcima24h.toLocaleString('pt-BR') : '—'}</div>
+      ${temDadoAcima24h ? `<div class="delta" style="color:${cor.muted};">${pctAcima24h.toFixed(1)}% dos incidentes do mês</div>` : ''}
     </div>
     <div class="kpi">
       <div class="label">📅 Dias do Mês (D-1)</div>
@@ -4464,10 +4190,7 @@ function render(){
     return totalArea ? (d.dentro/totalArea*100) : 0;
   });
 
-  // Mês anterior (já fechado) — mesma área, pra comparar com o mês atual
-  // (em andamento) selecionado nos chips. Usa o mesmo cálculo de % por
-  // área, mas com o mesObj do índice anterior. Se não houver mês
-  // anterior na base (primeiro mês), a linha de comparação some.
+  // Mês anterior (já fechado) — mesma área, pra comparar com o mês selecionado.
   const mesAnteriorObj = mesAtualIdx > 0 ? DADOS.meses[mesAtualIdx - 1] : null;
   const pctPorAreaAnterior = mesAnteriorObj
     ? areaNames.map(a=>{
@@ -4541,12 +4264,6 @@ function render(){
   });
 
   // ---- Diário por Área — Fora do Prazo (mês selecionado) ----
-  // Usa mesObj.diarioAreas — vem da própria base "Historico" (não do
-  // FCA), já quebrado por dia x área x dentro/fora, com a data calculada
-  // a partir do CLEAR_DATE (ou RESOLVED_DATE quando o CLEAR_DATE estiver
-  // vazio) — a mesma data de referência (dataRef) usada no resto do
-  // painel. Requer que o Office Script da aba "Historico" exporte esse
-  // campo por mês (ver "diarioAreas" dentro de buildMeses).
   const areaDiarioCanvas = document.getElementById('areaDiarioChart');
   if(areaDiarioCanvas){
     const diarioAreasDoMes = Array.isArray(mesObj.diarioAreas) ? mesObj.diarioAreas : [];
@@ -4666,9 +4383,6 @@ function render(){
   }
 
   // ---- Incidentes por Site (mês selecionado) ----
-  // Usa INCIDENTES_POR_SITE (do dados.json), filtrado pelo mesmo mesOrd
-  // do mês selecionado nos chips e pelas áreas válidas do mês (mesmo
-  // padrão de renderPendenciasFca), ordenado por Site.
   const incidentesPorSiteBody = document.getElementById('incidentesPorSiteBody');
   if(incidentesPorSiteBody){
     const nomeMesSite = mesObj.mes.split('/')[0];
@@ -4687,7 +4401,6 @@ function render(){
       if(incidentesPorSiteFiltroAtual === 'afaz' && !temAfaz) return false;
       if(incidentesPorSiteFiltroAtual === 'preventiva' && !temPreventiva) return false;
       if(incidentesPorSiteFiltroAtual === 'com' && !temAfaz && !temPreventiva) return false;
-      // 'todos' não filtra nada
       return true;
     }).sort((a,b) => (a.site || '').localeCompare(b.site || '', 'pt-BR'));
 
@@ -4709,10 +4422,7 @@ function render(){
     }
   }
 
-  // ---- Página "Infra" (Tipo de Infra / Unidade Responsável 2), separada
-  // em Dentro e Fora do prazo (Eser 4h) — mesma fonte de dados e mesmo
-  // filtro de mês/área de "Incidentes por Site" acima, mas sem o filtro
-  // de Afaz/Preventiva.
+  // ---- Página "Infra" ----
   const infraForaBody = document.getElementById('infraForaBody');
   const infraDentroBody = document.getElementById('infraDentroBody');
   if(infraForaBody || infraDentroBody){
@@ -4731,10 +4441,7 @@ function render(){
     renderInfraTables();
   }
 
-  // ---- Top Sites — quadro da Claro (vermelho, lista fixa) e quadro da Engemon (azul, Top 10 dos demais) ----
-  // Período: os últimos MESES_RANKING_SITES meses, terminando no mês selecionado.
-  // Todos os sites da Claro (SITES_CLARO) aparecem sempre; se algum estiver com 0, o motivo provável
-  // é explicado no Console (F12).
+  // ---- Top Sites — Claro (lista fixa) e Engemon (Top 10 dos demais) ----
   const topSitesClaroCanvas = document.getElementById('topSitesClaroChart');
   const topSitesEngemonCanvas = document.getElementById('topSitesEngemonChart');
   if(topSitesClaroCanvas && topSitesEngemonCanvas){
@@ -4745,12 +4452,10 @@ function render(){
       ? mesesJanela[0].mes + ' – ' + mesesJanela[mesesJanela.length - 1].mes
       : (mesesJanela[0] ? mesesJanela[0].mes : '');
 
-    // Contagem direto da base (aba Historico), quando o dados.json trouxer "sitesBase".
     const janelaBase = mesesComSitesDaBase(mesesJanela, SITES_BASE);
     const todosBase = mesesComSitesDaBase(DADOS.meses, SITES_BASE);
     const rk = rankingSitesClaroEngemon(janelaBase.meses, todosBase.meses, LIMITE_ENGEMON);
 
-    // sites da Claro sem incidentes no período: avisa no quadro e explica no Console
     const zerosClaro = rk.claro.filter(x => x.total === 0).map(x => x.site);
     zerosClaro.forEach(site => {
       const d = rk.diagnostico[site];
@@ -4765,7 +4470,6 @@ function render(){
     });
 
     const tituloClaro = ['Período: ' + periodoTop];
-    // Só avisa quando a contagem direta da base (sitesBase) NÃO está sendo usada.
     if(!(mesesJanela.length && janelaBase.usados === mesesJanela.length)){
       tituloClaro.push('Fonte: totais do painel (com filtros) — rode o Office Script novo para usar a base completa');
     }
@@ -4783,7 +4487,6 @@ function render(){
       ? ['Período: ' + periodoTop]
       : ['Sem incidentes no período ' + periodoTop];
 
-    // os dois quadros têm a mesma altura
     const alturaQuadros = Math.max(300, Math.max(rk.claro.length, rk.engemon.length) * 24 + 110);
     ['topSitesClaroChartWrap', 'topSitesEngemonChartWrap'].forEach(id => {
       const w = document.getElementById(id);
@@ -4793,7 +4496,7 @@ function render(){
     const rotuloClaro = {
       color: '#000000', anchor:'end', align:'right',
       font:{size:10, family:'JetBrains Mono', weight:'700'},
-      display: (ctx) => ctx.dataset.data[ctx.dataIndex] !== null   // mostra também o 0
+      display: (ctx) => ctx.dataset.data[ctx.dataIndex] !== null
     };
     const rotuloEngemon = {
       color: '#000000', anchor:'end', align:'right',
@@ -4830,18 +4533,11 @@ function render(){
     topSitesEngemonChart = criarQuadroRanking(topSitesEngemonCanvas, topSitesEngemonChart, 'Engemon', rk.engemon, '#1f77b4', rotuloEngemon, tituloEngemon);
   }
 
-  // =====================================================================
-  // SITES QUE MAIS REPETIRAM — BLOCO CORRIGIDO
-  // Mostra todos os sites com incidente em 2 ou 3 dos últimos 3 meses,
-  // sem limite de 10 e sem lista fixa de exclusão.
-  // =====================================================================
+  // ---- Sites que Mais Repetiram (sites com incidente em 2 ou 3 dos últimos 3 meses) ----
   const sitesRecorrentesCanvas = document.getElementById('sitesRecorrentesChart');
   if(sitesRecorrentesCanvas){
-    // Últimos 3 meses disponíveis (ex.: Jul/Ago/Set).
     const ultimosTresMesesSites = DADOS.meses.slice(-3);
 
-    // Usa "todosSites" (sem corte em 15). Se o dados.json ainda não trouxer
-    // esse campo, cai para "topSites" (só Top 15 por mês) e avisa no console.
     function sitesDoMes(m){
       if(Array.isArray(m.todosSites)) return m.todosSites;
       if(Array.isArray(m.topSites)){
@@ -4852,10 +4548,8 @@ function render(){
     }
 
     // Sites que você quer esconder deste gráfico. Vazio = mostra todos.
-    // Ex.: new Set(['SMPIR62','SMSMT03'])
     const SITES_EXCLUIDOS_RECORRENTES = new Set([]);
 
-    // Soma de incidentes e quais meses cada site teve incidente.
     const somaPorSite = {};
     const mesesComIncidentePorSite = {};
     ultimosTresMesesSites.forEach(m => {
@@ -4870,9 +4564,6 @@ function render(){
       });
     });
 
-    // Sites com incidente em 2 ou 3 dos 3 meses, sem limite de 10.
-    // Ordem: primeiro os de 3 meses, depois os de 2; dentro de cada grupo,
-    // quem tem mais incidentes.
     // Quantos sites aparecem no gráfico (os que mais repetiram, já ordenados).
     const LIMITE_SITES_RECORRENTES = 15;
 
@@ -4884,7 +4575,6 @@ function render(){
       )
       .slice(0, LIMITE_SITES_RECORRENTES);
 
-    // Altura do card acompanha a quantidade de sites.
     const alturaPorBarra = 24;
     const alturaMinima = 260;
     const wrapRecorrentes = document.getElementById('sitesRecorrentesChartWrap');
@@ -4892,7 +4582,6 @@ function render(){
       wrapRecorrentes.style.height = Math.max(alturaMinima, sitesOrdenados.length * alturaPorBarra + 60) + 'px';
     }
 
-    // Uma série por mês (empilhadas).
     const mesesComSites = ultimosTresMesesSites.filter(m => sitesDoMes(m).length > 0);
     const paletaMeses = [cor.accent, '#5e34b5', cor.warn, cor.good, '#2563eb'];
     const datasetsPorMes = mesesComSites.map((m, i) => {
@@ -4946,7 +4635,7 @@ function render(){
             labels: {
               color: cor.muted,
               font: { family: 'Inter', size: 10 },
-              filter: (item) => item.text !== 'Total'   // esconde "Total" da legenda
+              filter: (item) => item.text !== 'Total'
             }
           },
           datalabels: { display: true }
@@ -5019,8 +4708,8 @@ function render(){
       }
     }
 
-    // NOVO: diferença do volume projetado da área vs o total FECHADO da
-    // mesma área no mês anterior (se existir na base).
+    // Diferença do volume projetado da área vs o total FECHADO da mesma
+    // área no mês anterior (se existir na base).
     let diffMesAnteriorTxt = '—';
     if(mesAnteriorObj){
       const dAnterior = areasValidas(mesAnteriorObj.areas)[a];
@@ -5107,10 +4796,7 @@ function renderPendenciasFca(){
   });
   const justificadosDoMes = itensFiltrados.filter(p => !p.pendente);
 
-  // NOVO (item 23): agrupa os incidentes preenchidos do mês por
-  // Causa + Ação Interna, e sugere um plano de ação com base na ação
-  // (coluna "Ação tomada") mais repetida dentro de cada grupo. É uma
-  // contagem de repetição de texto, não uma análise semântica.
+  // Causa × Ação Interna — sugestão de plano de ação por repetição de texto.
   const causaAcaoInternaBody = document.getElementById('causaAcaoInternaBody');
   if(causaAcaoInternaBody){
     const gruposCausaAcaoInterna = {};
@@ -5122,10 +4808,6 @@ function renderPendenciasFca(){
         gruposCausaAcaoInterna[chaveGrupo] = { causa: causaVal, acaoInterna: acaoInternaVal, qtd: 0, acoesTomadas: {} };
       }
       gruposCausaAcaoInterna[chaveGrupo].qtd++;
-      // ALTERADO (item 24): a sugestão usa o texto longo de "Ação tomada"
-      // (campo acaoTomada), não mais o valor categórico da Ação Interna.
-      // Enquanto o Power Automate não enviar esse campo, fica vazio e é
-      // ignorado na contagem (tratado à parte, ver "semDescricao" abaixo).
       const acaoTomadaVal = norm(p.acaoTomada);
       if(acaoTomadaVal !== ''){
         gruposCausaAcaoInterna[chaveGrupo].acoesTomadas[acaoTomadaVal] = (gruposCausaAcaoInterna[chaveGrupo].acoesTomadas[acaoTomadaVal] || 0) + 1;
@@ -5138,12 +4820,6 @@ function renderPendenciasFca(){
         return 'Sem descrição de "Ação tomada" disponível — atualize o fluxo do Power Automate pra enviar esse campo (acaoTomada) no FCA.';
       }
 
-      // ALTERADO: em vez de citar o texto INTEIRO de "Ação tomada" (o que
-      // deixava a coluna enorme e ilegível quando os textos eram longos e
-      // variados), agora: (1) extrai as palavras mais citadas no grupo
-      // (ignorando palavras de ligação) como um resumo dos temas mais
-      // comuns, e (2) mostra só um TRECHO CURTO (truncado) da ação mais
-      // recorrente como exemplo — não a frase completa.
       const STOPWORDS_PT = new Set([
         'a','o','as','os','de','da','do','das','dos','em','no','na','nos','nas','um','uma','uns','umas',
         'e','ou','que','se','foi','foram','ser','sera','sido','esta','estava','nao','ao','aos',
@@ -5359,15 +5035,9 @@ if(kpiRow){
     <div class="kpi" style="${qtdAtrasados > 0 ? `border-color:${cor.bad}; box-shadow:0 0 0 2px ${cor.bad} inset;` : ''}"><div class="label">⚠️ Atrasados (&gt;5 dias)</div><div class="value" style="color:${qtdAtrasados > 0 ? cor.bad : cor.good}">${qtdAtrasados.toLocaleString('pt-BR')}</div></div>
   `;
 }
-  // ALTERADO: "Causa" volta a considerar só o MÊS selecionado acima
-  // (mesOrdAtual), mas agora como gráfico empilhado por causa: quantos
-  // incidentes com aquela causa "Ficaram" (continuam no Detalhamento —
-  // Fora do Prazo) vs quantos "Saíram de Indisponibilidade" (foram
-  // reclassificados depois de já terem Causa/Ação preenchida no FCA).
-  // Ex.: Vandalismo com 10 no total, 9 saíram, 1 ficou.
-  // CORRIGIDO: agora dedupe por número de incidente em cada grupo — se o
-  // mesmo incidente aparecer mais de uma vez na base (linha duplicada na
-  // aba "Historico"), só conta uma vez, evitando inflar a soma.
+  // "Causa" — mês selecionado, empilhado: "Não reclassificação" (continua no
+  // Detalhamento) vs "Reclassificação" (saiu de Indisponibilidade depois de
+  // preenchido). Dedupe por número de incidente.
   const causaFicouCounts = {};
   const incidentesVistosFicou = {};
   justificadosDoMes.forEach(p => {
@@ -5384,9 +5054,6 @@ if(kpiRow){
     if(p.mesOrd !== mesOrdAtual) return;
     if(supervisorFiltroAtual && norm(p.supervisor) !== supervisorFiltroAtual) return;
     const chave = p.incidente || JSON.stringify(p);
-    // Proteção extra: se por algum motivo esse incidente também aparecer
-    // como "Ficou" (não deveria, mas evita contar em dobro caso a base
-    // tenha alguma inconsistência), não conta de novo aqui.
     if(incidentesVistosFicou[chave]) return;
     if(incidentesVistosSaiu[chave]) return;
     incidentesVistosSaiu[chave] = true;
@@ -5403,9 +5070,6 @@ if(kpiRow){
   const causaWrap = document.getElementById('causaChartWrap');
   if(causaWrap) causaWrap.style.height = Math.max(180, causaLabelsOrdenados.length * 30) + 'px';
 
-  // Total analisado e preenchido = soma de "Não reclassificação" +
-  // "Reclassificação" (todo mundo que já teve Causa/Ação preenchida no
-  // FCA nesse mês, dedupe por incidente já aplicado acima).
   const causaTotalLabelEl = document.getElementById('causaTotalLabel');
   if(causaTotalLabelEl){
     const totalNaoReclassificado = Object.values(causaFicouCounts).reduce((a,b) => a+b, 0);
@@ -5543,8 +5207,7 @@ if(kpiRow){
     return;
   }
 
-  // Ordena por Área (SPC1, SPC2, SPC3, SPC4) — áreas fora dessa lista vão
-  // pro final, mantendo a ordem original entre itens da mesma área.
+  // Ordena por Área (SPC1, SPC2, SPC3, SPC4).
   const itensOrdenados = [...itensFiltrados].sort((a, b) => {
     const idxA = AREAS_VALIDAS.indexOf(a.area);
     const idxB = AREAS_VALIDAS.indexOf(b.area);
@@ -5625,10 +5288,7 @@ render();
 
 carregarDados();
 
-// Recarrega o dados.json periodicamente (o arquivo é atualizado ~1x/dia pelo
-// Power Automate), assim o painel — incluindo o card "Meta do mês — quanto
-// falta" — atualiza sozinho conforme os números da base mudam, sem precisar
-// dar F5.
+// Recarrega o dados.json a cada 5 minutos, assim o painel atualiza sozinho.
 setInterval(carregarDados, 5 * 60 * 1000);
 
 </script>
