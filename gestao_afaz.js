@@ -22,12 +22,74 @@
   const COR = { good: '#059669', warn: '#d97706', bad: '#dc2626', accent: '#0e7c86', muted: '#6b7590' };
   const COR_CI = { 'Backlog': '#60a5fa', 'Entrante': '#1d4ed8', 'Prioritário': '#7c3aed' };
 
+  // =======================================================================
+  // CALENDÁRIO DO PLANO — "Acompanhamento Semanal - Plan"
+  // Semanas ISO (segunda a domingo) de SEMANA_INICIO até SEMANA_FIM do
+  // ANO_PLANO. 2026 tem 53 semanas ISO, por isso termina em W53.
+  // =======================================================================
+  const ANO_PLANO = 2026;
+  const SEMANA_INICIO = 26;
+  const SEMANA_FIM = 53;
+
+  // Backlog Planejado Restante — meta de cada semana (a linha azul-clara
+  // do Power BI). Valores lidos do gráfico do Power BI: CONFIRA, principalmente
+  // W27 a W30, onde os números ficavam sobrepostos na imagem.
+  const PLANO_BACKLOG = {
+    26: 2076, 27: 2007, 28: 1883, 29: 1818, 30: 1716, 31: 1619, 32: 1528,
+    33: 1437, 34: 1345, 35: 1254, 36: 1167, 37: 1081, 38: 998, 39: 910,
+    40: 826, 41: 744, 42: 662, 43: 580, 44: 498, 45: 436, 46: 374,
+    47: 313, 48: 251, 49: 192, 50: 135, 51: 77, 52: 20, 53: 0
+  };
+
+  // Backlog Real Restante — fechamento de cada semana JÁ PASSADA (linha
+  // azul-escura do Power BI). O dados_afaz.json é só a foto de hoje, então
+  // o histórico fica aqui. A semana atual é calculada sozinha a partir da
+  // foto (itens Backlog ainda pendentes). Quando a semana fechar, acrescente
+  // o número dela aqui. CONFIRA W27 a W30 (números sobrepostos na imagem).
+  const HISTORICO_BACKLOG_REAL = {
+    27: 2019, 28: 1977, 29: 1918, 30: 1855, 31: 1812, 32: 1774, 33: 1715,
+    34: 1618, 35: 1616, 36: 1546, 37: 1518, 38: 1477, 39: 1468, 40: 1450
+  };
+
+  // Quais carteiras contam como "Backlog Real Restante" no cálculo da semana atual.
+  const CARTEIRAS_BACKLOG_REAL = new Set(['Backlog']);
+
+  const COR_PLANO = { planejado: '#38a5f5', real: '#2a2a8f', entrantes: '#7b1fa2' };
+
   let dados = null, raiz = null, busca = '';
   const sel = { st: '', oc: '', eq: '', sp: '' };
-  let gStatus = null, gEquipe = null, gPrioridade = null, gAging = null, gSemanal = null, gEntrantesAcum = null;
+  let gStatus = null, gEquipe = null, gPrioridade = null, gAging = null, gSemanal = null, gPlano = null;
 
   const fmt = n => n.toLocaleString('pt-BR');
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pad2 = n => (n < 10 ? '0' : '') + n;
+
+  // Segunda-feira da semana ISO "semana" do "ano".
+  function segundaDaSemanaIso(ano, semana) {
+    const jan4 = new Date(ano, 0, 4);
+    const diaSemana = (jan4.getDay() + 6) % 7; // segunda = 0
+    const segunda = new Date(ano, 0, 4 - diaSemana);
+    segunda.setDate(segunda.getDate() + (semana - 1) * 7);
+    return segunda;
+  }
+
+  // Lista de semanas do plano: [{ num: 26, label: 'W26', periodo: '22/06 – 28/06' }, ...]
+  function calendarioPlano() {
+    const semanas = [];
+    for (let w = SEMANA_INICIO; w <= SEMANA_FIM; w++) {
+      const ini = segundaDaSemanaIso(ANO_PLANO, w);
+      const fim = new Date(ini); fim.setDate(fim.getDate() + 6);
+      semanas.push({
+        num: w,
+        label: 'W' + pad2(w),
+        periodo: pad2(ini.getDate()) + '/' + pad2(ini.getMonth() + 1) + ' – ' + pad2(fim.getDate()) + '/' + pad2(fim.getMonth() + 1)
+      });
+    }
+    return semanas;
+  }
+
+  // "W07" -> 7
+  const numSemana = s => { const m = String(s || '').match(/(\d+)/); return m ? Number(m[1]) : null; };
 
   function estilos() {
     if (document.getElementById('afz-estilos')) return;
@@ -38,6 +100,7 @@
     .afz-filtros select{font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--line,#e1e5f0);background:var(--panel,#fff);color:var(--text,#1b2440);min-width:150px}
     #afz-kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
     .afz-cv{position:relative;height:320px}
+    .afz-cv-plano{position:relative;height:380px}
     .afz-rolagem{max-height:420px;overflow:auto;border-radius:8px}
     .afz-tab-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
     .afz-tab-topo .search input{min-width:240px}`;
@@ -77,15 +140,14 @@
         </div>
       </div>
 
-      <div class="grid">
-        <div class="panel">
-          <h2>Prioritários em Esteira (por semana)</h2>
-          <div class="afz-cv"><canvas id="afz-semanal"></canvas></div>
-        </div>
-        <div class="panel">
-          <h2>Acompanhamento Semanal — Entrantes Acumulados</h2>
-          <div class="afz-cv"><canvas id="afz-entrantes-acum"></canvas></div>
-        </div>
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Acompanhamento Semanal — Plan</h2>
+        <div class="afz-cv-plano"><canvas id="afz-plano"></canvas></div>
+      </div>
+
+      <div class="panel" style="margin-bottom:16px;">
+        <h2>Prioritários em Esteira (por semana)</h2>
+        <div class="afz-cv"><canvas id="afz-semanal"></canvas></div>
       </div>
 
       <div class="panel">
@@ -141,39 +203,84 @@
     graficoEmpilhado('afz-equipe', gEquipe, v => (gEquipe = v), pendentes, 'eq');
     graficoEmpilhado('afz-prioridade', gPrioridade, v => (gPrioridade = v), pendentes, 'pr', ['P0', 'P1', 'P2', 'P3']);
     graficoAging(pendentes);
+    graficoPlano();
     graficoSemanal();
-    graficoEntrantesAcumulados();
     tabela(pendentes);
   }
 
-  // Entrantes em Esteira Acumulados: entre os itens Entrante (não
-  // prioritário, não tratado) AINDA PENDENTES HOJE, acumula pela semana
-  // de Abertura — não depende de histórico diário, calculado direto da
-  // foto atual, e já vem pronto do dados_afaz.json.
-  function graficoEntrantesAcumulados() {
-    const serie = Array.isArray(dados.entrantesAcumulados) ? dados.entrantesAcumulados : [];
+  // "Acompanhamento Semanal - Plan": as três linhas do Power BI no calendário
+  // W26–W53. É série histórica, então NÃO respeita os filtros da página.
+  function graficoPlano() {
+    const semanas = calendarioPlano();
+
+    // Entrantes acumulados vêm do dados_afaz.json. A série começa no ano
+    // anterior (W35 de 2025...), por isso os rótulos se repetem: como ela está
+    // em ordem cronológica, a última ocorrência de cada "Wnn" é a de 2026.
+    const serieEntr = Array.isArray(dados.entrantesAcumulados) ? dados.entrantesAcumulados : [];
+    const entrPorSemana = {};
+    serieEntr.forEach(s => { const n = numSemana(s.semana); if (n !== null) entrPorSemana[n] = s.entrantesAcumulados; });
+    const semanaAtual = serieEntr.length ? numSemana(serieEntr[serieEntr.length - 1].semana) : null;
+
+    // Backlog real: histórico fixo + semana atual calculada da foto de hoje.
+    const realPorSemana = Object.assign({}, HISTORICO_BACKLOG_REAL);
+    if (semanaAtual !== null && realPorSemana[semanaAtual] === undefined) {
+      realPorSemana[semanaAtual] = dados.registros.filter(r => !TRATADOS.has(r.st) && CARTEIRAS_BACKLOG_REAL.has(r.ci)).length;
+    }
+
+    // Depois da semana atual não há dado real: fica em branco (só o plano segue até W53).
+    const valorAte = (mapa, w) => (semanaAtual !== null && w > semanaAtual) ? null : (mapa[w] ?? null);
+
+    const labels = semanas.map(s => s.label);
+    const planejado = semanas.map(s => PLANO_BACKLOG[s.num] ?? null);
+    const real = semanas.map(s => valorAte(realPorSemana, s.num));
+    const entrantes = semanas.map(s => valorAte(entrPorSemana, s.num));
+
     const temLabels = typeof ChartDataLabels !== 'undefined';
-    if (gEntrantesAcum) gEntrantesAcum.destroy();
-    gEntrantesAcum = new Chart(raiz.querySelector('#afz-entrantes-acum'), {
+    const rotulo = (cor, align) => temLabels
+      ? { display: ctx => ctx.dataset.data[ctx.dataIndex] !== null, align: align, anchor: 'center', offset: 4,
+          color: cor, font: { size: 9, weight: '700' }, formatter: v => fmt(v) }
+      : undefined;
+
+    if (gPlano) gPlano.destroy();
+    gPlano = new Chart(raiz.querySelector('#afz-plano'), {
       type: 'line',
       data: {
-        labels: serie.map(s => s.semana),
-        datasets: [{ label: 'Entrantes em Esteira Acumulados', data: serie.map(s => s.entrantesAcumulados),
-          borderColor: COR_CI['Entrante'], backgroundColor: COR_CI['Entrante'], tension: 0.2, pointRadius: 3, fill: false }]
+        labels: labels,
+        datasets: [
+          { label: 'Backlog Planejado Restante', data: planejado, borderColor: COR_PLANO.planejado, backgroundColor: COR_PLANO.planejado,
+            borderWidth: 3, tension: 0.15, pointRadius: 2, datalabels: rotulo('#1b2440', 'bottom') },
+          { label: 'Backlog Real Restante', data: real, borderColor: COR_PLANO.real, backgroundColor: COR_PLANO.real,
+            borderWidth: 3, tension: 0.15, pointRadius: 2, spanGaps: false, datalabels: rotulo('#1b2440', 'top') },
+          { label: 'Entrantes em Esteira Acumulados', data: entrantes, borderColor: COR_PLANO.entrantes, backgroundColor: COR_PLANO.entrantes,
+            borderWidth: 3, tension: 0.15, pointRadius: 2, spanGaps: false, datalabels: rotulo('#1b2440', 'bottom') }
+        ]
       },
       plugins: temLabels ? [ChartDataLabels] : [],
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false },
-          datalabels: temLabels ? { align: 'top', color: COR_CI['Entrante'], font: { size: 9, weight: '700' } } : undefined },
-        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: '#e1e5f0' } } }
+        layout: { padding: { top: 18 } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', align: 'start', labels: { boxWidth: 10, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              title: items => {
+                const s = semanas[items[0].dataIndex];
+                return s.label + ' · ' + s.periodo + (s.num === semanaAtual ? ' (semana atual)' : '');
+              }
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 10 }, autoSkip: false, maxRotation: 0 } },
+          y: { display: false, beginAtZero: true }
+        }
       }
     });
   }
 
-  // Prioritários em Esteira por semana — não respeita os filtros da página,
-  // pois é uma série histórica (já vem pronta do dados_afaz.json), e não
-  // existe filtro histórico por Status/Equipe/Carteira em cada semana passada.
+  // Prioritários em Esteira por semana — série histórica pronta do
+  // dados_afaz.json; não respeita os filtros da página.
   function graficoSemanal() {
     const serie = Array.isArray(dados.semanal) ? dados.semanal : [];
     const temLabels = typeof ChartDataLabels !== 'undefined';
@@ -195,9 +302,7 @@
     });
   }
 
-  // Gráfico de barras horizontais empilhadas por Carteira Indicador
-  // (Backlog / Entrante / Prioritário — sites prioritários já saem das
-  // outras duas categorias, igual à medida "Carteira Indicador" do Power BI)
+  // Barras horizontais empilhadas por Carteira Indicador (Backlog / Entrante / Prioritário).
   function graficoEmpilhado(canvasId, atual, setAtual, regs, campo, ordemFixa) {
     const CIS = ['Backlog', 'Entrante', 'Prioritário'];
     const porCat = {};
@@ -282,7 +387,7 @@
   }
 
   function redesenhar() {
-    [gStatus, gEquipe, gPrioridade, gAging, gSemanal, gEntrantesAcum].forEach(g => { if (g) g.resize(); });
+    [gStatus, gEquipe, gPrioridade, gAging, gSemanal, gPlano].forEach(g => { if (g) g.resize(); });
   }
 
   window.PainelAFAZ = { montar, redesenhar };
