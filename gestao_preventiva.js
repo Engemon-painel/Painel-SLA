@@ -64,6 +64,9 @@
   // tipo: 'Dupla' ou 'Solo'. A média de preventivas por dia de cada equipe
   // vem de MEDIA_POR_DIA (pode ser diferente para dupla e solo).
   const MEDIA_POR_DIA = { Dupla: 4, Solo: 4 };
+  // Folga para ausência: quantas equipes ficam de fora por dia (falta, folga, atestado).
+  // A capacidade do dia desconta essas equipes, usando a média por equipe.
+  const FALTAS_POR_DIA = 1;
   const EQUIPES_MOP_MOVEL = [
     { t1: 'ADRIANO PEREIRA DA SILVA',             t2: 'MARCOS TEIXEIRA CARVALHO',       tipo: 'Dupla' },
     { t1: 'ALEXIS VERIS',                         t2: 'PAULO HENRIQUE CARDOSO',         tipo: 'Dupla' },
@@ -857,14 +860,18 @@
     const equipes = EQUIPES_MOP_MOVEL.map(e => ({ ...e, media: MEDIA_POR_DIA[e.tipo] || 0 }));
     const nDuplas = equipes.filter(e => e.tipo === 'Dupla').length;
     const nSolos = equipes.filter(e => e.tipo === 'Solo').length;
-    const capDia = equipes.reduce((s, e) => s + e.media, 0);
-    const capRest = capDia * nRest;
+    const capCheia = equipes.reduce((s, e) => s + e.media, 0);           // todas as equipes trabalhando
+    const mediaEquipe = equipes.length ? capCheia / equipes.length : 0;
+    const equipesAtivas = Math.max(0, equipes.length - FALTAS_POR_DIA);  // descontando a falta do dia
+    const fatorPresenca = equipes.length ? equipesAtivas / equipes.length : 0;
+    const capDia = Math.round(capCheia * fatorPresenca * 10) / 10;       // ex.: 14 equipes, 1 falta -> 13 × 4 = 52
+    const capRest = Math.round(capDia * nRest);
     const necessarioDia = nRest > 0 ? pendentes / nRest : 0;
-    const necessarioEquipe = equipes.length && nRest > 0 ? pendentes / nRest / equipes.length : 0;
+    const necessarioEquipe = equipesAtivas && nRest > 0 ? pendentes / nRest / equipesAtivas : 0;
     const planoMesDia = total / duMes;                                  // ritmo do mês inteiro, do zero
     const saldo = capRest - pendentes;                                  // + folga / − déficit
     const diasParaZerar = capDia > 0 ? Math.ceil(pendentes / capDia) : 0;
-    const equipesNecessarias = nRest > 0 ? Math.ceil(pendentes / nRest / (capDia / (equipes.length || 1))) : 0;
+    const equipesNecessarias = nRest > 0 && mediaEquipe > 0 ? Math.ceil(necessarioDia / mediaEquipe) + FALTAS_POR_DIA : 0;
     const corSaldo = saldo >= 0 ? COR.good : COR.bad;
 
     raiz.querySelector('#pv-cap-kpis').innerHTML = `
@@ -880,22 +887,22 @@
         <div class="delta" style="color:${COR.muted}">contando a partir de hoje</div></div>
       <div class="kpi"><div class="label">🎯 Necessário por Dia</div>
         <div class="value"><span style="color:${necessarioDia > capDia ? COR.bad : COR.good}">${nRest ? dec(necessarioDia) : '—'}</span></div>
-        <div class="delta" style="color:${COR.muted}">${nRest ? dec(necessarioEquipe) + ' por equipe/dia (média ' + dec(capDia / (equipes.length || 1)) + ')' : 'mês encerrado'}</div></div>`;
+        <div class="delta" style="color:${COR.muted}">${nRest ? dec(necessarioEquipe) + ' por equipe ativa/dia (média ' + dec(mediaEquipe) + ')' : 'mês encerrado'}</div></div>`;
 
     raiz.querySelector('#pv-cap-kpis2').innerHTML = `
       <div class="kpi"><div class="label">👥 Equipes</div>
         <div class="value">${equipes.length}</div>
-        <div class="delta" style="color:${COR.muted}">${nDuplas} duplas · ${nSolos} solo</div></div>
+        <div class="delta" style="color:${COR.muted}">${nDuplas} duplas · ${nSolos} solo · ${equipesAtivas} ativas/dia (${FALTAS_POR_DIA} falta)</div></div>
       <div class="kpi"><div class="label">⚙️ Capacidade por Dia</div>
         <div class="value">${fmt(capDia)}</div>
-        <div class="delta" style="color:${COR.muted}">Dupla ${MEDIA_POR_DIA.Dupla}/dia · Solo ${MEDIA_POR_DIA.Solo}/dia</div></div>
+        <div class="delta" style="color:${COR.muted}">${equipesAtivas} equipes × ${dec(mediaEquipe)} (sem a falta: ${fmt(capCheia)})</div></div>
       <div class="kpi"><div class="label">📦 Capacidade até o fim do mês</div>
         <div class="value">${fmt(capRest)}</div>
         <div class="delta" style="color:${corSaldo};font-weight:600;">${saldo >= 0 ? 'folga de ' + fmt(saldo) : 'faltam ' + fmt(-saldo)} preventivas</div></div>
       <div class="kpi"><div class="label">⏱️ Dias para zerar | Equipes necessárias</div>
         <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
           <span>${fmt(diasParaZerar)}</span><span class="pv-sep">|</span><span style="color:${equipesNecessarias > equipes.length ? COR.bad : COR.good}">${nRest ? fmt(equipesNecessarias) : '—'}</span></div>
-        <div class="delta" style="color:${COR.muted}">no ritmo de ${fmt(capDia)}/dia · equipes para fechar no prazo</div></div>`;
+        <div class="delta" style="color:${COR.muted}">no ritmo de ${fmt(capDia)}/dia · equipes para fechar no prazo (já com ${FALTAS_POR_DIA} falta)</div></div>`;
 
     // gráfico: realizado por dia (até ontem) + plano dos dias restantes e capacidade
     const porDia = {};
@@ -905,7 +912,7 @@
     const plano = dias.map(d => d.util && d.data >= hoje ? Math.ceil(necessarioDia) : null);
     const capacidade = dias.map(d => d.util ? capDia : null);
     raiz.querySelector('#pv-cap-hint').textContent = nRest
-      ? `Para fechar ${fmt(pendentes)} pendentes em ${nRest} dias úteis: ${Math.ceil(necessarioDia)} por dia (capacidade ${fmt(capDia)}/dia).`
+      ? `Para fechar ${fmt(pendentes)} pendentes em ${nRest} dias úteis: ${Math.ceil(necessarioDia)} por dia (capacidade ${fmt(capDia)}/dia, considerando ${FALTAS_POR_DIA} equipe em falta por dia).`
       : 'Mês encerrado — sem dias úteis restantes.';
 
     const temLabels = typeof ChartDataLabels !== 'undefined';
@@ -947,7 +954,7 @@
       i > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
     raiz.querySelector('#pv-cap-qtd').textContent = fmt(equipes.length);
     raiz.querySelector('#pv-cap-tbody').innerHTML = equipes.map((e, i) => {
-      const capEq = e.media * nRest;
+      const capEq = Math.round(e.media * fatorPresenca * nRest);   // cada equipe fica de fora em parte dos dias
       const cota = capRest > 0 ? Math.round(pendentes * capEq / capRest) : 0;
       const cotaDia = nRest > 0 ? cota / nRest : 0;
       const corCota = cotaDia > e.media ? COR.bad : COR.good;
@@ -964,7 +971,7 @@
       </tr>`;
     }).join('') + `<tr style="font-weight:700;border-top:2px solid #e1e5f0;">
         <td></td><td>Total</td><td></td><td></td>
-        <td class="num mono">${fmt(capDia)}</td>
+        <td class="num mono">${fmt(capCheia)}</td>
         <td class="num mono">${fmt(realizadasEquipe.reduce((a, b) => a + b, 0))}</td>
         <td class="num mono">${fmt(capRest)}</td>
         <td class="num mono">${nRest ? fmt(pendentes) : '—'}</td>
