@@ -5,6 +5,13 @@
    Uso:    <div id="sec-preventiva"></div>
            <script src="gestao_preventiva.js"> (depois do Chart.js)
            (monta sozinho; ou chame PainelPreventiva.montar('id-do-container'))
+
+   NOVO — FILTRO DE MÊS:
+   O dados_preventiva.json passou a trazer "meses" (lista de todos os meses
+   guardados pelo Office Script, cada um com seus registros). No topo da aba
+   aparece o filtro "Mês": o mês da base atual vem selecionado; os meses
+   anteriores ficam travados como estavam quando a base foi trocada.
+   Se o JSON ainda não trouxer "meses", o filtro mostra só o mês atual.
    ========================================================================= */
 (function () {
   const ARQUIVO_JSON = 'dados_preventiva.json';
@@ -35,7 +42,8 @@
   const executorDoTipo = t => EXECUTOR_POR_TIPO[semAcento(t).replace(/^preventiva infra - /, '')] || 'Outros';
 
   // ---- HISTÓRICO MENSAL (meses fechados) — edite/acrescente aqui ----
-  // O mês atual entra sozinho, calculado da base (dados_preventiva.json).
+  // Meses que existem no dados_preventiva.json (mês atual e meses travados)
+  // são calculados da própria base e substituem o valor daqui.
   const HISTORICO_MENSAL = [
     { mes: '2026-01', programadas: 920,  executadas: 482 },
     { mes: '2026-02', programadas: 961,  executadas: 896 },
@@ -55,14 +63,21 @@
   const sel = { st: '', ex: '', t: '', x: '' };
   let busca = '';
 
+  // NOVO: todos os meses disponíveis, o mês da base atual e o mês escolhido no filtro
+  let todosMeses = {};      // { '2026-09': { mes, gerado_em, registros }, ... }
+  let mesBase = '';         // mês da base atual (o mais recente)
+  let abaAtiva = 'geral';
+
   const fmt = n => n.toLocaleString('pt-BR');
   const pct = n => (isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const nomeMes = mes => { const [a, m] = mes.split('-').map(Number); return MESES[m - 1] + '/' + a; };
 
   // "Executada" só conta se a Data Fim - Consolidado (r.d) estiver preenchida
-  // e dentro do mês corrente (dados.mes) — vazia ou de outro mês não conta.
-  const executadaNoMes = r => r.st === 'Executada' && !!r.d && r.d.slice(0, 7) === dados.mes;
+  // e dentro do mês informado — vazia ou de outro mês não conta.
+  const executadaEm = mes => r => r.st === 'Executada' && !!r.d && r.d.slice(0, 7) === mes;
+  const executadaNoMes = r => executadaEm(dados.mes)(r);
 
   function diasDoMes(mes) {
     const [a, m] = mes.split('-').map(Number);
@@ -92,6 +107,12 @@
     .pv-filtros label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#6b7590);text-transform:uppercase;letter-spacing:.05em}
     .pv-filtros label:not(:first-child){margin-left:8px}
     .pv-filtros select{font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--line,#e1e5f0);background:var(--panel,#fff);color:var(--text,#1b2440);min-width:150px}
+    .pv-mesbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;border:1px solid var(--line,#e1e5f0);border-radius:12px;background:var(--panel,#fff);box-shadow:0 2px 8px rgba(27,36,64,.06)}
+    .pv-mesbar label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#6b7590);text-transform:uppercase;letter-spacing:.05em}
+    .pv-mesbar select{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid var(--accent,#0e7c86);background:var(--panel,#fff);color:var(--text,#1b2440);min-width:200px}
+    .pv-mesbar .pv-trava{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px}
+    .pv-mesbar .pv-trava.fechado{background:rgba(94,52,181,.12);color:#5e34b5}
+    .pv-mesbar .pv-trava.aberto{background:rgba(5,150,105,.12);color:#059669}
     .pv-sub{font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:var(--muted,#6b7590);text-transform:uppercase;margin-left:4px}
     .pv-sep{color:var(--line,#e1e5f0)}
     #pv-kpis{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
@@ -123,7 +144,10 @@
 
   function esqueleto() {
     opMontada = false;
+    tecMontada = false;
     const [a, m] = dados.mes.split('-').map(Number);
+    const mesesOrdenados = Object.keys(todosMeses).sort().reverse(); // mais recente primeiro
+    const fechado = dados.mes !== mesBase;
     raiz.innerHTML = `
     <div class="pv">
       <div class="pv-layout">
@@ -131,18 +155,27 @@
         <div class="nav-group">
           <div class="nav-group-label"><span>Preventiva</span></div>
           <div class="nav-group-items">
-            <div class="nav-item pv-aba active" data-aba="geral"><span class="nav-icon">📊</span> Visão Geral</div>
-            <div class="nav-item pv-aba" data-aba="op"><span class="nav-icon">🛠️</span> Operação</div>
-            <div class="nav-item pv-aba" data-aba="tec"><span class="nav-icon">👷</span> Produtividade</div>
+            <div class="nav-item pv-aba${abaAtiva === 'geral' ? ' active' : ''}" data-aba="geral"><span class="nav-icon">📊</span> Visão Geral</div>
+            <div class="nav-item pv-aba${abaAtiva === 'op' ? ' active' : ''}" data-aba="op"><span class="nav-icon">🛠️</span> Operação</div>
+            <div class="nav-item pv-aba${abaAtiva === 'tec' ? ' active' : ''}" data-aba="tec"><span class="nav-icon">👷</span> Produtividade</div>
           </div>
         </div>
       </nav>
       <div class="pv-conteudo">
-      <div id="pv-aba-geral">
+      <div class="pv-mesbar">
+        <label for="pv-mes">Mês</label>
+        <select id="pv-mes">
+          ${mesesOrdenados.map(k => `<option value="${k}"${k === dados.mes ? ' selected' : ''}>${nomeMes(k)}${k === mesBase ? ' (atual)' : ''}</option>`).join('')}
+        </select>
+        <span class="pv-trava ${fechado ? 'fechado' : 'aberto'}">${fechado ? '🔒 Mês fechado — dados travados' : '● Mês atual — atualizando'}</span>
+        <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);margin-left:auto;">
+          ${fechado ? 'última atualização' : 'atualizado em'} ${esc(dados.gerado_em || '')}</span>
+      </div>
+      <div id="pv-aba-geral"${abaAtiva === 'geral' ? '' : ' style="display:none;"'}>
       <div class="pv-filtros">
         ${FILTROS.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
         <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);margin-left:auto;">
-          ${MESES[m - 1]}/${a} · atualizado em ${esc(dados.gerado_em || '')}</span>
+          ${MESES[m - 1]}/${a}</span>
       </div>
 
       <div class="signal-strip" id="pv-signal" title="Aderência em D-1"></div>
@@ -179,8 +212,9 @@
     </div>`;
 
     raiz.querySelectorAll('.pv-aba').forEach(bt => bt.addEventListener('click', () => trocarAba(bt.dataset.aba)));
+    raiz.querySelector('#pv-mes').addEventListener('change', e => selecionarMes(e.target.value));
 
-    raiz.querySelectorAll('.pv-filtros select').forEach(s =>
+    raiz.querySelectorAll('#pv-aba-geral .pv-filtros select').forEach(s =>
       s.addEventListener('change', () => { sel[s.dataset.k] = s.value; atualizar(); }));
     raiz.querySelector('#pv-busca').addEventListener('input', e => { busca = e.target.value.toLowerCase(); tabela(filtrar()); });
   }
@@ -191,7 +225,7 @@
 
   // Opções de cada filtro respeitam os demais filtros (como slicers do Power BI)
   function opcoes() {
-    raiz.querySelectorAll('.pv-filtros select').forEach(s => {
+    raiz.querySelectorAll('#pv-aba-geral .pv-filtros select').forEach(s => {
       const k = s.dataset.k;
       const vals = [...new Set(filtrar(k).map(r => r[k]))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
       if (sel[k] && !vals.includes(sel[k])) vals.push(sel[k]);
@@ -220,6 +254,7 @@
     const aberto = regs.filter(r => r.st === 'Aberta').length;
     // Aderência comparada com a meta proporcional ATÉ HOJE (não até amanhã):
     // conta o que já foi executado hoje, sem exigir ainda o que só vence nos próximos dias.
+    // Para um mês já fechado, "hoje" é depois do fim do mês, então vale o mês inteiro.
     const hoje = iso(new Date());
     const duHoje = dias.filter(d => d.util && d.data <= hoje).length;
     const planHoje = Math.round(planejado * duHoje / duMes);
@@ -262,7 +297,7 @@
   function grafico_(regs, dias, ref, duMes, planejado) {
     const porDia = {};
     // Só conta quem tem Data Fim - Consolidado preenchida e dentro do mês
-    // corrente — vazia ou de outro mês não entra na contagem.
+    // selecionado — vazia ou de outro mês não entra na contagem.
     regs.forEach(r => { if (executadaNoMes(r)) porDia[r.d] = (porDia[r.d] || 0) + 1; });
     let du = 0, acum = 0;
     const rot = [], plan = [], real = [];
@@ -312,13 +347,20 @@
   let graficoMensal = null;
   function graficoMensal_() {
     const ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const serie = HISTORICO_MENSAL.filter(h => h.mes !== dados.mes).map(h => ({ ...h }));
-    serie.push({ mes: dados.mes, programadas: dados.registros.length,
-      executadas: dados.registros.filter(executadaNoMes).length, atual: true });
+    // Meses que existem no JSON (atual + travados) são calculados da base;
+    // os demais vêm do HISTORICO_MENSAL.
+    const serie = HISTORICO_MENSAL.filter(h => !todosMeses[h.mes]).map(h => ({ ...h }));
+    Object.keys(todosMeses).forEach(k => {
+      const regsMes = todosMeses[k].registros;
+      serie.push({ mes: k, programadas: regsMes.length,
+        executadas: regsMes.filter(executadaEm(k)).length, atual: k === mesBase });
+    });
     serie.sort((a, b) => a.mes.localeCompare(b.mes));
     const rot = serie.map(h => ABREV[+h.mes.slice(5) - 1] + '/' + h.mes.slice(2, 4) + (h.atual ? '*' : ''));
     const pcts = serie.map(h => h.programadas ? h.executadas / h.programadas * 100 : 0);
     const corPct = p => p >= 100 ? '#059669' : p >= 95 ? '#d97706' : '#dc2626';
+    // destaca a barra do mês escolhido no filtro
+    const destaque = (cor, corSel) => serie.map(h => h.mes === dados.mes ? corSel : cor);
     const temLabels = typeof ChartDataLabels !== 'undefined';
 
     if (graficoMensal) graficoMensal.destroy();
@@ -327,10 +369,10 @@
         labels: rot,
         datasets: [
           { type: 'bar', label: 'Programadas', data: serie.map(h => h.programadas),
-            backgroundColor: 'rgba(107,117,144,.6)', borderRadius: 5, order: 2,
+            backgroundColor: destaque('rgba(107,117,144,.6)', 'rgba(107,117,144,.9)'), borderRadius: 5, order: 2,
             datalabels: { color: '#000', anchor: 'end', align: 'top', font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
           { type: 'bar', label: 'Executadas', data: serie.map(h => h.executadas),
-            backgroundColor: 'rgba(14,124,134,.8)', borderRadius: 5, order: 2,
+            backgroundColor: destaque('rgba(14,124,134,.8)', 'rgba(10,95,102,1)'), borderRadius: 5, order: 2,
             datalabels: { color: '#000', anchor: 'end', align: 'top', font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
           { type: 'line', label: '% Execução', data: pcts, yAxisID: 'y1', order: 1,
             borderColor: '#d97706', backgroundColor: '#d97706', tension: .3, pointRadius: 4,
@@ -387,7 +429,7 @@
     { k: 't', rotulo: 'Tipo de Preventiva' },
     { k: 'x', rotulo: 'Equipe' }
   ];
-  const selTec = { tipo: '', x: '' };
+  const selTec = { t: '', x: '' };
   let buscaTec = '', tecMontada = false;
 
   const temRelatorio = r => String(r.er || '').trim() !== '';
@@ -616,7 +658,7 @@
   function montarTec() {
     const alvo = raiz.querySelector('#pv-aba-tec');
     alvo.innerHTML = `
-      <div class="pv-filtros">
+      <div class="pv-filtros pv-tec-filtros">
         ${FILTROS_TEC.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
       </div>
       <div class="kpi-row" id="pv-tec-kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:14px;"></div>
@@ -635,7 +677,7 @@
           </table>
         </div>
       </div>`;
-    alvo.querySelectorAll('.pv-filtros select').forEach(s =>
+    alvo.querySelectorAll('.pv-tec-filtros select').forEach(s =>
       s.addEventListener('change', () => { selTec[s.dataset.k] = s.value; renderTec(); }));
     alvo.querySelector('#pv-tec-busca').addEventListener('input', e => { buscaTec = e.target.value.toLowerCase(); renderTec(); });
     tecMontada = true;
@@ -653,7 +695,7 @@
   }
 
   function opcoesTec() {
-    raiz.querySelectorAll('.pv-filtros select').forEach(s => {
+    raiz.querySelectorAll('.pv-tec-filtros select').forEach(s => {
       const k = s.dataset.k;
       const vals = [...new Set(filtrarTec(k).map(r => r[k]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
       if (selTec[k] && !vals.includes(selTec[k])) vals.push(selTec[k]);
@@ -725,6 +767,7 @@
   }
 
   function trocarAba(aba) {
+    abaAtiva = aba;
     raiz.querySelectorAll('.pv-aba').forEach(b => b.classList.toggle('active', b.dataset.aba === aba));
     raiz.querySelector('#pv-aba-geral').style.display = aba === 'geral' ? '' : 'none';
     raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
@@ -734,22 +777,53 @@
     else { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); }
   }
 
+  // ======================= FILTRO DE MÊS =======================
+  // Monta a lista de meses a partir do JSON: usa "meses" (novo Office Script)
+  // e garante que o mês da base atual (mes/registros do topo) também esteja nela.
+  function carregarMeses(json) {
+    todosMeses = {};
+    if (Array.isArray(json.meses)) {
+      json.meses.forEach(m => {
+        if (m && m.mes && Array.isArray(m.registros)) todosMeses[m.mes] = { mes: m.mes, gerado_em: m.gerado_em || '', registros: m.registros };
+      });
+    }
+    if (json.mes && Array.isArray(json.registros)) {
+      todosMeses[json.mes] = { mes: json.mes, gerado_em: json.gerado_em || '', registros: json.registros };
+    }
+    mesBase = json.mes || Object.keys(todosMeses).sort().pop() || '';
+    // campos calculados (Executor e Expurgo) em todos os meses
+    Object.values(todosMeses).forEach(d => d.registros.forEach(r => { r.ex = executorDoTipo(r.t); r.xpF = r.xp || 'Sem expurgo'; }));
+  }
+
+  function selecionarMes(mes) {
+    if (!todosMeses[mes]) return;
+    dados = todosMeses[mes];
+    // ao trocar de mês, zera os filtros e buscas (as opções mudam de um mês pro outro)
+    Object.keys(sel).forEach(k => { sel[k] = ''; });
+    Object.keys(selOp).forEach(k => { selOp[k] = ''; });
+    Object.keys(selTec).forEach(k => { selTec[k] = ''; });
+    busca = ''; buscaOp = ''; buscaTec = '';
+    esqueleto();
+    atualizar();
+    if (abaAtiva !== 'geral') trocarAba(abaAtiva);
+  }
+
   async function montar(idContainer) {
     raiz = document.getElementById(idContainer || CONTAINER_PADRAO);
     if (!raiz) return;
     estilos();
     try {
-      dados = window.DADOS_PREVENTIVA ||
+      const json = window.DADOS_PREVENTIVA ||
         await fetch(ARQUIVO_JSON + '?v=' + Date.now(), { cache: 'no-store' }).then(r => { if (!r.ok) throw r.status; return r.json(); });
-      dados.registros.forEach(r => { r.ex = executorDoTipo(r.t); r.xpF = r.xp || 'Sem expurgo'; });
-      esqueleto();
-      atualizar();
+      carregarMeses(json);
+      if (!mesBase || !todosMeses[mesBase]) throw 'nenhum mês encontrado no arquivo';
+      selecionarMes(mesBase);
     } catch (e) {
       raiz.innerHTML = `<div style="padding:20px;color:#b00020">Não foi possível carregar ${ARQUIVO_JSON} (${esc(e)}).</div>`;
     }
   }
 
-  window.PainelPreventiva = { montar, redesenhar: () => { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); } };
+  window.PainelPreventiva = { montar, redesenhar: () => { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); if (graficoDiario) graficoDiario.resize(); } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => montar());
   else montar();
 })();
