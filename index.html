@@ -321,13 +321,15 @@
       </div>
 
       <div class="panel" style="margin-bottom:16px;">
-        <h2>Detalhe por Cidade</h2>
-        <table>
-          <thead>
-            <tr><th>Cidade</th><th class="num">Qtd</th><th class="num">Sites</th><th class="num">MTTR(h)</th><th class="num">ESER 4h%</th></tr>
-          </thead>
-          <tbody id="tableCidadeBody"></tbody>
-        </table>
+        <h2>Sites com MTTR acima de 24h (<span id="sitesMttr24hQtd">0</span>)</h2>
+        <div style="max-height:420px; overflow:auto; border-radius:8px;">
+          <table>
+            <thead>
+              <tr><th>Site</th><th>Área</th><th class="num">Qtd</th><th class="num">MTTR(h)</th><th class="num">ESER 4h%</th></tr>
+            </thead>
+            <tbody id="sitesMttr24hBody"></tbody>
+          </table>
+        </div>
       </div>
 
       <div class="grid" style="grid-template-columns: 1fr 1fr; margin-bottom:16px;">
@@ -4358,25 +4360,58 @@ function render(){
     totalSitesValueEl.textContent = totalSitesUnicos.toLocaleString('pt-BR');
   }
 
-  const tableCidadeBody = document.getElementById('tableCidadeBody');
-  if(tableCidadeBody){
-    const porCidade = Array.isArray(mesObj.porCidade)
-      ? [...mesObj.porCidade].sort((a,b) => b.qtd - a.qtd)
-      : [];
+  // ---- Sites com MTTR médio acima de 24h (mês selecionado) ----
+  // MTTR vem da coluna "MTTR" da aba Historico (campo mttrHoras do dados.json).
+  const sitesMttr24hBody = document.getElementById('sitesMttr24hBody');
+  if(sitesMttr24hBody){
+    const LIMITE_MTTR_H = 24;
+    const partesMesSm = mesObj.mes.split('/');
+    const mesOrdSm = '20' + partesMesSm[1] + '-' + NOME_MES[partesMesSm[0]];
+    const escSm = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-    if(porCidade.length === 0){
-      tableCidadeBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Sem dados de cidade para este mês</td></tr>`;
+    const doMes = (INCIDENTES_POR_SITE || []).filter(it =>
+      it && it.mesOrd === mesOrdSm && areaNames.indexOf(it.area) !== -1);
+    const temCampoMttr = doMes.some(it => typeof it.mttrHoras === 'number');
+
+    // Agrupa por site: qtd de incidentes, MTTR médio (h), % dentro do prazo e a área.
+    const porSite = {};
+    doMes.forEach(it => {
+      const site = it.site || 'Sem site';
+      if(!porSite[site]) porSite[site] = { site, qtd: 0, dentro: 0, somaMttr: 0, qtdMttr: 0, areas: {} };
+      const g = porSite[site];
+      g.qtd++;
+      if(it.eser4h === 'Dentro') g.dentro++;
+      if(typeof it.mttrHoras === 'number'){ g.somaMttr += it.mttrHoras; g.qtdMttr++; }
+      g.areas[it.area] = (g.areas[it.area] || 0) + 1;
+    });
+
+    const sitesAcima = Object.values(porSite)
+      .map(g => ({
+        site: g.site,
+        area: Object.keys(g.areas).sort((a, b) => g.areas[b] - g.areas[a]).join(' / '),
+        qtd: g.qtd,
+        mttr: g.qtdMttr > 0 ? g.somaMttr / g.qtdMttr : null,
+        eser: g.qtd > 0 ? g.dentro / g.qtd : 0
+      }))
+      .filter(x => x.mttr !== null && x.mttr > LIMITE_MTTR_H)
+      .sort((a, b) => b.mttr - a.mttr);
+
+    const qtdEl = document.getElementById('sitesMttr24hQtd');
+    if(qtdEl) qtdEl.textContent = sitesAcima.length.toLocaleString('pt-BR');
+
+    if(!temCampoMttr && doMes.length){
+      sitesMttr24hBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">O dados.json ainda não traz o MTTR — rode o Office Script atualizado.</td></tr>`;
+    } else if(sitesAcima.length === 0){
+      sitesMttr24hBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum site com MTTR acima de 24h neste mês</td></tr>`;
     } else {
-      tableCidadeBody.innerHTML = porCidade.map(c => {
-        const eserPct = ((c.eser4h || 0) * 100).toFixed(1);
-        const cls = c.eser4h >= DADOS.meta ? 'good' : (c.eser4h >= DADOS.meta - 0.05 ? 'warn' : 'bad');
-        const mttrTxt = (c.mttr !== null && c.mttr !== undefined) ? c.mttr.toFixed(1) : '—';
+      sitesMttr24hBody.innerHTML = sitesAcima.map(x => {
+        const cls = x.eser >= DADOS.meta ? 'good' : (x.eser >= DADOS.meta - 0.05 ? 'warn' : 'bad');
         return `<tr>
-          <td>${c.cidade}</td>
-          <td class="num">${c.qtd}</td>
-          <td class="num">${c.sites}</td>
-          <td class="num">${mttrTxt}</td>
-          <td class="num"><span class="pill ${cls}">${eserPct}%</span></td>
+          <td>${escSm(x.site)}</td>
+          <td>${escSm(x.area)}</td>
+          <td class="num">${x.qtd}</td>
+          <td class="num">${x.mttr.toFixed(1)}</td>
+          <td class="num"><span class="pill ${cls}">${(x.eser * 100).toFixed(1)}%</span></td>
         </tr>`;
       }).join('');
     }
