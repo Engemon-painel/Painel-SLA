@@ -15,6 +15,10 @@
    ========================================================================= */
 (function () {
   const ARQUIVO_JSON = 'dados_preventiva.json';
+  // Meses fechados e travados (ex.: setembro), publicados uma vez no GitHub ao
+  // lado do dados_preventiva.json. O fluxo não mexe nesse arquivo. Opcional:
+  // se não existir, o painel segue só com o dados_preventiva.json.
+  const ARQUIVO_HISTORICO = 'preventiva_historico.json';
   const CONTAINER_PADRAO = 'sec-preventiva';
 
   // Feriados que não contam como dia útil (edite conforme o calendário da operação)
@@ -780,17 +784,33 @@
   // ======================= FILTRO DE MÊS =======================
   // Monta a lista de meses a partir do JSON: usa "meses" (novo Office Script)
   // e garante que o mês da base atual (mes/registros do topo) também esteja nela.
-  function carregarMeses(json) {
+  function carregarMeses(json, historico) {
     todosMeses = {};
     if (Array.isArray(json.meses)) {
       json.meses.forEach(m => {
         if (m && m.mes && Array.isArray(m.registros)) todosMeses[m.mes] = { mes: m.mes, gerado_em: m.gerado_em || '', registros: m.registros };
       });
     }
-    if (json.mes && Array.isArray(json.registros)) {
-      todosMeses[json.mes] = { mes: json.mes, gerado_em: json.gerado_em || '', registros: json.registros };
+    // Mês da base atual. O Office Script novo já manda o mês certo (o mês em
+    // que rodou). O script antigo podia mandar um mês errado (ex.: Agosto),
+    // então, quando o JSON ainda não traz "meses", vale o mês de "gerado_em".
+    let mesAtualJson = json.mes;
+    if (!Array.isArray(json.meses) && /^\d{4}-\d{2}/.test(json.gerado_em || '')) {
+      mesAtualJson = json.gerado_em.slice(0, 7);
     }
-    mesBase = json.mes || Object.keys(todosMeses).sort().pop() || '';
+    if (mesAtualJson && Array.isArray(json.registros)) {
+      todosMeses[mesAtualJson] = { mes: mesAtualJson, gerado_em: json.gerado_em || '', registros: json.registros };
+    }
+    mesBase = mesAtualJson || Object.keys(todosMeses).sort().pop() || '';
+    // meses travados do preventiva_historico.json têm prioridade (são o fechamento oficial),
+    // exceto o mês da base atual, que continua vindo do dados_preventiva.json
+    if (historico && Array.isArray(historico.meses)) {
+      historico.meses.forEach(m => {
+        if (m && m.mes && m.mes !== mesBase && Array.isArray(m.registros)) {
+          todosMeses[m.mes] = { mes: m.mes, gerado_em: m.gerado_em || '', registros: m.registros };
+        }
+      });
+    }
     // campos calculados (Executor e Expurgo) em todos os meses
     Object.values(todosMeses).forEach(d => d.registros.forEach(r => { r.ex = executorDoTipo(r.t); r.xpF = r.xp || 'Sem expurgo'; }));
   }
@@ -815,7 +835,10 @@
     try {
       const json = window.DADOS_PREVENTIVA ||
         await fetch(ARQUIVO_JSON + '?v=' + Date.now(), { cache: 'no-store' }).then(r => { if (!r.ok) throw r.status; return r.json(); });
-      carregarMeses(json);
+      const historico = window.DADOS_PREVENTIVA_HISTORICO ||
+        await fetch(ARQUIVO_HISTORICO + '?v=' + Date.now(), { cache: 'no-store' })
+          .then(r => r.ok ? r.json() : null).catch(() => null);
+      carregarMeses(json, historico);
       if (!mesBase || !todosMeses[mesBase]) throw 'nenhum mês encontrado no arquivo';
       selecionarMes(mesBase);
     } catch (e) {
