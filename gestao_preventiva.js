@@ -36,7 +36,7 @@
     { k: 'x',  rotulo: 'Equipe Responsável' }
   ];
 
-    // Executor definido pelo Tipo de Preventiva
+  // Executor definido pelo Tipo de Preventiva
   const EXECUTOR_POR_TIPO = {
     'energia': 'MOP', 'climatizacao': 'MOP',
     'zeladoria': 'EPS', 'sdai': 'EPS', 'gerador': 'EPS',
@@ -97,6 +97,7 @@
   let todosMeses = {};      // { '2026-09': { mes, gerado_em, registros }, ... }
   let mesBase = '';         // mês da base atual (o mais recente)
   let abaAtiva = 'geral';
+  // Aba Produtividade oculta por enquanto: o código continua no arquivo, só o item do menu foi retirado.
 
   const fmt = n => n.toLocaleString('pt-BR');
   const pct = n => (isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
@@ -188,7 +189,6 @@
           <div class="nav-group-items">
             <div class="nav-item pv-aba${abaAtiva === 'geral' ? ' active' : ''}" data-aba="geral"><span class="nav-icon">📊</span> Visão Geral</div>
             <div class="nav-item pv-aba${abaAtiva === 'op' ? ' active' : ''}" data-aba="op"><span class="nav-icon">🛠️</span> Operação</div>
-            <div class="nav-item pv-aba${abaAtiva === 'tec' ? ' active' : ''}" data-aba="tec"><span class="nav-icon">👷</span> Produtividade</div>
             <div class="nav-item pv-aba${abaAtiva === 'cap' ? ' active' : ''}" data-aba="cap"><span class="nav-icon">📐</span> Capacidade MOP Móvel</div>
           </div>
         </div>
