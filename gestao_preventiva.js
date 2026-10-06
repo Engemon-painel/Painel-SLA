@@ -36,11 +36,11 @@
     { k: 'x',  rotulo: 'Equipe Responsável' }
   ];
 
-  // Executor definido pelo Tipo de Preventiva
+    // Executor definido pelo Tipo de Preventiva
   const EXECUTOR_POR_TIPO = {
     'energia': 'MOP', 'climatizacao': 'MOP',
     'zeladoria': 'EPS', 'sdai': 'EPS', 'gerador': 'EPS',
-    'inspecao termografica': 'EPS', 'spda': 'EPS'
+    'inspecao termografica': 'EPS', 'termografia': 'EPS', 'spda': 'EPS'
   };
   const semAcento = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const executorDoTipo = t => EXECUTOR_POR_TIPO[semAcento(t).replace(/^preventiva infra - /, '')] || 'Outros';
