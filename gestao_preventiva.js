@@ -311,10 +311,14 @@
         <div class="value">${fmt(planejado)}</div>
         <div class="delta" style="color:${COR.muted}">${duMes} dias úteis no mês</div></div>
       <div class="kpi"><div class="label">✅ Realizado / Meta D-1</div>
-        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
-          <span style="color:${COR.good}">${fmt(realizado)}</span><span class="pv-sep">|</span><span>${fmt(planD1)}</span></div>
-        <div class="delta" style="color:${COR.muted}">Planejado D-1 <b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b>
-          <span class="pv-sep">|</span> Entrega D-1 <b style="color:${corAder(ader)}">${pct(entrega)}</b></div></div>
+        <div style="display:grid;grid-template-columns:auto auto auto;justify-content:start;column-gap:14px;align-items:baseline;">
+          <div class="value"><span style="color:${COR.good}">${fmt(realizado)}</span></div>
+          <div class="value"><span class="pv-sep">|</span></div>
+          <div class="value">${fmt(planD1)}</div>
+          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b></div>
+          <div></div>
+          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Planejado D-1<br><b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b></div>
+        </div></div>
       <div class="kpi"><div class="label">📅 Dias Úteis (D-1)</div>
         <div class="value" style="white-space:nowrap;">${duRef}<span class="pv-sub">decorridos</span>
           <span style="color:${COR.muted}"> / </span>${duMes - duRef}<span class="pv-sub">${duMes - duRef === 1 ? 'restante' : 'restantes'}</span></div>
