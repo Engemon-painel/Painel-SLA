@@ -293,14 +293,11 @@
     const realizado = regs.filter(r => r.st === 'Executada').length;   // cards contam tudo; só os gráficos filtram por data
     const pendentes = planejado - realizado;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
-    // Aderência comparada com a meta proporcional ATÉ HOJE (não até amanhã):
-    // conta o que já foi executado hoje, sem exigir ainda o que só vence nos próximos dias.
-    // Para um mês já fechado, "hoje" é depois do fim do mês, então vale o mês inteiro.
-    const hoje = iso(new Date());
-    const duHoje = dias.filter(d => d.util && d.data <= hoje).length;
-    const planHoje = Math.round(planejado * duHoje / duMes);
-    const saldo = realizado - planHoje;
-    const ader = planHoje ? realizado / planHoje * 100 : 0;
+    // ALTERADO (07/10/2026): Aderência em D-1 — compara o realizado com a mesma
+    // meta do card "Realizado / Meta D-1" (dias úteis até ontem).
+    // Para um mês já fechado, D-1 é o último dia do mês, então vale o mês inteiro.
+    const saldo = realizado - planD1;
+    const ader = planD1 ? realizado / planD1 * 100 : 0;
     const entrega = planejado ? realizado / planejado * 100 : 0;
 
     // faixa de sinal (30 blocos) = aderência em D-1
@@ -316,7 +313,8 @@
       <div class="kpi"><div class="label">✅ Realizado / Meta D-1</div>
         <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
           <span style="color:${COR.good}">${fmt(realizado)}</span><span class="pv-sep">|</span><span>${fmt(planD1)}</span></div>
-        <div class="delta" style="color:${COR.muted}">${pct(entrega)} de entrega no mês</div></div>
+        <div class="delta" style="color:${COR.muted}">${pct(entrega)} de entrega no mês</div>
+        <div class="delta" style="color:${COR.muted}">era para estar em <b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b> (Meta D-1 ÷ Planejado)</div></div>
       <div class="kpi"><div class="label">📅 Dias Úteis (D-1)</div>
         <div class="value" style="white-space:nowrap;">${duRef}<span class="pv-sub">decorridos</span>
           <span style="color:${COR.muted}"> / </span>${duMes - duRef}<span class="pv-sub">${duMes - duRef === 1 ? 'restante' : 'restantes'}</span></div>
