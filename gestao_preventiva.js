@@ -956,10 +956,18 @@
       const i = equipeDoTec[chave(r.tec)];
       if (i !== undefined) realizadasEquipe[i]++;
     });
-    const capMesEquipe = equipes.map(e => Math.round(e.media * fatorPresenca * duMes));
+    // ALTERADO: a Capacidade no mês de cada equipe é a sua parte do total de
+    // preventivas MOP · MÓVEL do mês (ex.: 1.031), dividido pelo peso da equipe
+    // (média/dia). Arredonda pelo maior resto para a soma bater com o total.
+    const brutoEquipe = equipes.map(e => capCheia > 0 ? total * e.media / capCheia : 0);
+    const capMesEquipe = brutoEquipe.map(Math.floor);
+    let sobra = total - capMesEquipe.reduce((a, b) => a + b, 0);
+    brutoEquipe.map((v, i) => ({ i, resto: v - Math.floor(v) }))
+      .sort((a, b) => b.resto - a.resto)
+      .forEach(x => { if (sobra > 0) { capMesEquipe[x.i]++; sobra--; } });
 
     raiz.querySelector('#pv-cap-legenda').textContent =
-      `capacidade no mês = média/dia × ${duMes} dias úteis (com ${FALTAS_POR_DIA} equipe em falta por dia)`;
+      `capacidade no mês = ${fmt(total)} preventivas MOP · Móvel divididas entre as ${equipes.length} equipes`;
 
     const nomeBonito = n => n ? n.toLowerCase().split(/\s+/).map((w, i) =>
       i > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
