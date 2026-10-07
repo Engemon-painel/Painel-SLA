@@ -4411,6 +4411,57 @@ function render(){
           <td>${escSm(x.area)}</td>
           <td class="num">${x.qtd}</td>
           <td class="num">${x.mttr.toFixed(1)}</td>
+              // Total de incidentes de cada site no mês (para mostrar "3 de 4").
+    const totalPorSite = {};
+    doMes.forEach(it => {
+      const site = it.site || 'Sem site';
+      totalPorSite[site] = (totalPorSite[site] || 0) + 1;
+    });
+
+    // ALTERADO: filtra CADA incidente com MTTR > 24h e só depois agrupa por site.
+    // Qtd = incidentes acima de 24h; MTTR = média só desses incidentes.
+    const porSite = {};
+    doMes.forEach(it => {
+      if(typeof it.mttrHoras !== 'number' || it.mttrHoras <= LIMITE_MTTR_H) return;
+      const site = it.site || 'Sem site';
+      if(!porSite[site]) porSite[site] = { site, qtd: 0, dentro: 0, somaMttr: 0, maxMttr: 0, areas: {} };
+      const g = porSite[site];
+      g.qtd++;
+      if(it.eser4h === 'Dentro') g.dentro++;
+      g.somaMttr += it.mttrHoras;
+      if(it.mttrHoras > g.maxMttr) g.maxMttr = it.mttrHoras;
+      g.areas[it.area] = (g.areas[it.area] || 0) + 1;
+    });
+
+    const sitesAcima = Object.values(porSite)
+      .map(g => ({
+        site: g.site,
+        area: Object.keys(g.areas).sort((a, b) => g.areas[b] - g.areas[a]).join(' / '),
+        qtd: g.qtd,
+        totalSite: totalPorSite[g.site] || g.qtd,
+        mttr: g.somaMttr / g.qtd,
+        maxMttr: g.maxMttr,
+        eser: g.qtd > 0 ? g.dentro / g.qtd : 0
+      }))
+      .sort((a, b) => b.qtd - a.qtd || b.mttr - a.mttr);
+
+    const qtdIncidentesAcima = sitesAcima.reduce((s, x) => s + x.qtd, 0);
+    const qtdEl = document.getElementById('sitesMttr24hQtd');
+    if(qtdEl) qtdEl.textContent = sitesAcima.length.toLocaleString('pt-BR') + ' sites · ' +
+      qtdIncidentesAcima.toLocaleString('pt-BR') + ' incidentes';
+
+    if(!temCampoMttr && doMes.length){
+      sitesMttr24hBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">O dados.json ainda não traz o MTTR — rode o Office Script atualizado.</td></tr>`;
+    } else if(sitesAcima.length === 0){
+      sitesMttr24hBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:${cor.muted};">Nenhum incidente com MTTR acima de 24h neste mês</td></tr>`;
+    } else {
+      sitesMttr24hBody.innerHTML = sitesAcima.map(x => {
+        const cls = x.eser >= DADOS.meta ? 'good' : (x.eser >= DADOS.meta - 0.05 ? 'warn' : 'bad');
+        return `<tr>
+          <td>${escSm(x.site)}</td>
+          <td>${escSm(x.area)}</td>
+          <td class="num">${x.qtd}<span style="color:${cor.muted}; font-weight:500;"> de ${x.totalSite}</span></td>
+          <td class="num" title="Maior MTTR: ${x.maxMttr.toFixed(1)}h">${x.mttr.toFixed(1)}</td>
           <td class="num"><span class="pill ${cls}">${(x.eser * 100).toFixed(1)}%</span></td>
         </tr>`;
       }).join('');
