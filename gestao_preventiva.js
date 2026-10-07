@@ -12,6 +12,10 @@
    aparece o filtro "Mês": o mês da base atual vem selecionado; os meses
    anteriores ficam travados como estavam quando a base foi trocada.
    Se o JSON ainda não trouxer "meses", o filtro mostra só o mês atual.
+
+   ALTERADO (07/10/2026): na aba "Capacidade MOP Móvel", a tabela
+   "Distribuição por Equipe" não mostra mais Cota sugerida / Cota por dia.
+   Agora mostra a Capacidade no mês de cada equipe e o que ela já fez.
    ========================================================================= */
 (function () {
   const ARQUIVO_JSON = 'dados_preventiva.json';
@@ -830,12 +834,12 @@
       <div class="panel">
         <div class="pv-tab-topo">
           <h2>Distribuição por Equipe (<span id="pv-cap-qtd">0</span>)</h2>
-          <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);">cota = pendentes divididos pela capacidade de cada equipe</span>
+          <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);" id="pv-cap-legenda"></span>
         </div>
         <div class="pv-rolagem" style="max-height:560px;">
           <table class="pv-tec-tab">
             <thead><tr><th>#</th><th>Técnico 1</th><th>Técnico 2</th><th>Tipo</th><th class="num">Média/dia</th>
-              <th class="num">Realizadas no mês</th><th class="num">Capacidade restante</th><th class="num">Cota sugerida</th><th class="num">Cota por dia</th></tr></thead>
+              <th class="num">Capacidade no mês</th><th class="num">Realizadas no mês</th></tr></thead>
             <tbody id="pv-cap-tbody"></tbody>
           </table>
         </div>
@@ -939,7 +943,10 @@
       }
     });
 
-    // tabela por equipe: realizadas (pelo técnico da aba Validação) e cota sugerida
+    // ALTERADO (07/10/2026): tabela por equipe mostra só a Capacidade no mês e
+    // o que a equipe já fez (realizadas, pelo técnico da aba Validação).
+    // Capacidade no mês = média/dia × dias úteis do mês × fator de presença
+    // (desconta a falta prevista em FALTAS_POR_DIA, igual ao resto da aba).
     const chave = n => semAcento(n).replace(/\s+/g, ' ');
     const equipeDoTec = {};
     equipes.forEach((e, i) => { [e.t1, e.t2].filter(Boolean).forEach(n => { equipeDoTec[chave(n)] = i; }); });
@@ -949,33 +956,27 @@
       const i = equipeDoTec[chave(r.tec)];
       if (i !== undefined) realizadasEquipe[i]++;
     });
+    const capMesEquipe = equipes.map(e => Math.round(e.media * fatorPresenca * duMes));
+
+    raiz.querySelector('#pv-cap-legenda').textContent =
+      `capacidade no mês = média/dia × ${duMes} dias úteis (com ${FALTAS_POR_DIA} equipe em falta por dia)`;
 
     const nomeBonito = n => n ? n.toLowerCase().split(/\s+/).map((w, i) =>
       i > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
     raiz.querySelector('#pv-cap-qtd').textContent = fmt(equipes.length);
-    raiz.querySelector('#pv-cap-tbody').innerHTML = equipes.map((e, i) => {
-      const capEq = Math.round(e.media * fatorPresenca * nRest);   // cada equipe fica de fora em parte dos dias
-      const cota = capRest > 0 ? Math.round(pendentes * capEq / capRest) : 0;
-      const cotaDia = nRest > 0 ? cota / nRest : 0;
-      const corCota = cotaDia > e.media ? COR.bad : COR.good;
-      return `<tr>
+    raiz.querySelector('#pv-cap-tbody').innerHTML = equipes.map((e, i) => `<tr>
         <td class="mono" style="color:${COR.muted}">${i + 1}</td>
         <td>${esc(nomeBonito(e.t1))}</td>
         <td>${e.t2 ? esc(nomeBonito(e.t2)) : '<span style="color:#6b7590">N/A</span>'}</td>
         <td><span class="pill ${e.tipo === 'Dupla' ? 'good' : 'warn'}">${esc(e.tipo)}</span></td>
         <td class="num mono">${fmt(e.media)}</td>
-        <td class="num mono">${fmt(realizadasEquipe[i])}</td>
-        <td class="num mono">${fmt(capEq)}</td>
-        <td class="num mono">${nRest ? fmt(cota) : '—'}</td>
-        <td class="num mono" style="font-weight:700;color:${corCota}">${nRest ? dec(cotaDia) : '—'}</td>
-      </tr>`;
-    }).join('') + `<tr style="font-weight:700;border-top:2px solid #e1e5f0;">
+        <td class="num mono">${fmt(capMesEquipe[i])}</td>
+        <td class="num mono" style="font-weight:700;">${fmt(realizadasEquipe[i])}</td>
+      </tr>`).join('') + `<tr style="font-weight:700;border-top:2px solid #e1e5f0;">
         <td></td><td>Total</td><td></td><td></td>
         <td class="num mono">${fmt(capCheia)}</td>
-        <td class="num mono">${fmt(realizadasEquipe.reduce((a, b) => a + b, 0))}</td>
-        <td class="num mono">${fmt(capRest)}</td>
-        <td class="num mono">${nRest ? fmt(pendentes) : '—'}</td>
-        <td class="num mono">${nRest ? dec(necessarioDia) : '—'}</td></tr>`;
+        <td class="num mono">${fmt(capMesEquipe.reduce((a, b) => a + b, 0))}</td>
+        <td class="num mono">${fmt(realizadasEquipe.reduce((a, b) => a + b, 0))}</td></tr>`;
   }
 
   // ======================= FILTRO DE MÊS =======================
