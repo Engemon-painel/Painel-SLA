@@ -313,8 +313,8 @@
       <div class="kpi"><div class="label">✅ Realizado / Meta D-1</div>
         <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
           <span style="color:${COR.good}">${fmt(realizado)}</span><span class="pv-sep">|</span><span>${fmt(planD1)}</span></div>
-        <div class="delta" style="color:${COR.muted}">${pct(entrega)} de entrega no mês</div>
-        <div class="delta" style="color:${COR.muted}">era para estar em <b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b> (Meta D-1 ÷ Planejado)</div></div>
+        <div class="delta" style="color:${COR.muted}">Planejado D-1 <b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b>
+          <span class="pv-sep">|</span> Entrega D-1 <b style="color:${corAder(ader)}">${pct(entrega)}</b></div></div>
       <div class="kpi"><div class="label">📅 Dias Úteis (D-1)</div>
         <div class="value" style="white-space:nowrap;">${duRef}<span class="pv-sub">decorridos</span>
           <span style="color:${COR.muted}"> / </span>${duMes - duRef}<span class="pv-sub">${duMes - duRef === 1 ? 'restante' : 'restantes'}</span></div>
