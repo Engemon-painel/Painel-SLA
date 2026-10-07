@@ -16,6 +16,10 @@
    ALTERADO (07/10/2026): na aba "Capacidade MOP Móvel", a tabela
    "Distribuição por Equipe" não mostra mais Cota sugerida / Cota por dia.
    Agora mostra a Capacidade no mês de cada equipe e o que ela já fez.
+
+   ALTERADO (07/10/2026): a aba "Capacidade MOP Móvel" ganhou o filtro
+   Executor (MOP / EPS / Todos), sempre com Equipe Responsável MÓVEL.
+   Saíram o card "Necessário por Dia" e as barras de projeção do gráfico.
    ========================================================================= */
 (function () {
   const ARQUIVO_JSON = 'dados_preventiva.json';
@@ -820,14 +824,26 @@
   // Quantas preventivas MOP · MÓVEL por dia útil são necessárias para fechar o
   // mês, comparando com a capacidade das equipes (duplas e solos × média/dia).
   let capMontada = false, graficoCap = null;
+  // NOVO: filtro de Executor da aba (MOP, EPS ou os dois). Começa em MOP.
+  let capExec = 'MOP';
 
   function montarCap() {
     const alvo = raiz.querySelector('#pv-aba-cap');
     alvo.innerHTML = `
+      <div class="pv-filtros">
+        <label for="pv-cap-exec">Executor</label>
+        <select id="pv-cap-exec">
+          <option value="MOP"${capExec === 'MOP' ? ' selected' : ''}>MOP</option>
+          <option value="EPS"${capExec === 'EPS' ? ' selected' : ''}>EPS</option>
+          <option value=""${capExec === '' ? ' selected' : ''}>Todos (MOP + EPS)</option>
+        </select>
+        <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);">Equipe Responsável: MÓVEL</span>
+      </div>
       <div class="kpi-row" id="pv-cap-kpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px;"></div>
       <div class="kpi-row" id="pv-cap-kpis2" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px;"></div>
+      <div class="kpi-row" id="pv-cap-kpis3" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px;"></div>
       <div class="panel">
-        <h2>Planejamento diário — MOP · MÓVEL</h2>
+        <h2 id="pv-cap-titulo">Realizado por dia</h2>
         <div class="hint" id="pv-cap-hint"></div>
         <div style="position:relative;height:320px;"><canvas id="pv-cap-grafico"></canvas></div>
       </div>
@@ -844,12 +860,14 @@
           </table>
         </div>
       </div>`;
+    alvo.querySelector('#pv-cap-exec').addEventListener('change', e => { capExec = e.target.value; renderCap(); });
     capMontada = true;
   }
 
   function renderCap() {
     const dec = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    const regs = dados.registros.filter(ehMopMovel);
+    const regs = dados.registros.filter(r => semAcento(r.x) === 'movel' && (!capExec || r.ex === capExec));
+    const rotuloExec = (capExec || 'MOP + EPS') + ' · Móvel';
     const dias = diasDoMes(dados.mes);
     const hoje = iso(new Date());
     const duMes = dias.filter(d => d.util).length || 1;
@@ -878,8 +896,20 @@
     const equipesNecessarias = nRest > 0 && mediaEquipe > 0 ? Math.ceil(necessarioDia / mediaEquipe) + FALTAS_POR_DIA : 0;
     const corSaldo = saldo >= 0 ? COR.good : COR.bad;
 
+    // NOVO: projeção pelo RITMO REAL (média do que está sendo realizado por dia útil).
+    // Ex.: se no ritmo atual vou ficar devendo 150 em 17 dias úteis -> 8,8 WO/dia a mais
+    // -> 8,8 ÷ 4 (média por equipe) = 2,2 -> 3 equipes a mais.
+    const duDecorridos = dias.filter(d => d.util && d.data < hoje).length;
+    const realizadasAteOntem = regs.filter(r => r.st === 'Executada' && r.d && r.d.slice(0, 7) === dados.mes && r.d < hoje).length;
+    const mediaReal = duDecorridos > 0 ? realizadasAteOntem / duDecorridos : 0;
+    const projecaoFim = Math.round(executadas + mediaReal * nRest);
+    const devendo = Math.max(0, total - projecaoFim);
+    const faltaPorDia = nRest > 0 ? devendo / nRest : 0;
+    const equipesExtrasBruto = mediaEquipe > 0 ? faltaPorDia / mediaEquipe : 0;
+    const equipesExtras = Math.ceil(equipesExtrasBruto - 1e-9);
+
     raiz.querySelector('#pv-cap-kpis').innerHTML = `
-      <div class="kpi"><div class="label">📋 MOP · Móvel no mês</div>
+      <div class="kpi"><div class="label">📋 ${rotuloExec} no mês</div>
         <div class="value">${fmt(total)}</div>
         <div class="delta" style="color:${COR.muted}">${dec(planoMesDia)} por dia útil (${duMes} dias úteis)</div></div>
       <div class="kpi"><div class="label">✅ Executadas | Pendentes</div>
@@ -888,10 +918,7 @@
         <div class="delta" style="color:${COR.muted}">${pct(total ? executadas / total * 100 : 0)} executado</div></div>
       <div class="kpi"><div class="label">📅 Dias Úteis Restantes</div>
         <div class="value">${nRest}</div>
-        <div class="delta" style="color:${COR.muted}">contando a partir de hoje</div></div>
-      <div class="kpi"><div class="label">🎯 Necessário por Dia</div>
-        <div class="value"><span style="color:${necessarioDia > capDia ? COR.bad : COR.good}">${nRest ? dec(necessarioDia) : '—'}</span></div>
-        <div class="delta" style="color:${COR.muted}">${nRest ? dec(necessarioEquipe) + ' por equipe ativa/dia (média ' + dec(mediaEquipe) + ')' : 'mês encerrado'}</div></div>`;
+        <div class="delta" style="color:${COR.muted}">contando a partir de hoje</div></div>`;
 
     raiz.querySelector('#pv-cap-kpis2').innerHTML = `
       <div class="kpi"><div class="label">👥 Equipes</div>
@@ -903,21 +930,33 @@
       <div class="kpi"><div class="label">📦 Capacidade até o fim do mês</div>
         <div class="value">${fmt(capRest)}</div>
         <div class="delta" style="color:${corSaldo};font-weight:600;">${saldo >= 0 ? 'folga de ' + fmt(saldo) : 'faltam ' + fmt(-saldo)} preventivas</div></div>
-      <div class="kpi"><div class="label">⏱️ Dias para zerar | Equipes necessárias</div>
-        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
-          <span>${fmt(diasParaZerar)}</span><span class="pv-sep">|</span><span style="color:${equipesNecessarias > equipes.length ? COR.bad : COR.good}">${nRest ? fmt(equipesNecessarias) : '—'}</span></div>
-        <div class="delta" style="color:${COR.muted}">no ritmo de ${fmt(capDia)}/dia · equipes para fechar no prazo (já com ${FALTAS_POR_DIA} falta)</div></div>`;
+      <div class="kpi"><div class="label">⏱️ Dias para zerar</div>
+        <div class="value">${fmt(diasParaZerar)}</div>
+        <div class="delta" style="color:${COR.muted}">na capacidade de ${fmt(capDia)}/dia</div></div>`;
 
-    // gráfico: realizado por dia (até ontem) + plano dos dias restantes e capacidade
+    raiz.querySelector('#pv-cap-kpis3').innerHTML = `
+      <div class="kpi"><div class="label">📊 Média realizada por dia</div>
+        <div class="value">${dec(mediaReal)}</div>
+        <div class="delta" style="color:${COR.muted}">${fmt(realizadasAteOntem)} em ${duDecorridos} dias úteis (até ontem)</div></div>
+      <div class="kpi"><div class="label">🔮 Projeção no fim do mês</div>
+        <div class="value">${fmt(projecaoFim)} <span style="font-size:15px;color:${COR.muted};font-weight:600;">de ${fmt(total)}</span></div>
+        <div class="delta" style="color:${COR.muted}">mantendo ${dec(mediaReal)}/dia nos ${nRest} dias úteis restantes</div></div>
+      <div class="kpi"><div class="label">💸 Vou ficar devendo</div>
+        <div class="value"><span style="color:${devendo > 0 ? COR.bad : COR.good}">${fmt(devendo)}</span></div>
+        <div class="delta" style="color:${COR.muted}">${devendo > 0 && nRest ? dec(faltaPorDia) + ' WO por dia a mais (' + fmt(devendo) + ' ÷ ' + nRest + ' dias)' : 'no ritmo atual fecha o mês'}</div></div>
+      <div class="kpi"><div class="label">➕ Equipes a mais</div>
+        <div class="value"><span style="color:${equipesExtras > 0 ? COR.bad : COR.good}">${devendo > 0 && nRest ? fmt(equipesExtras) : '0'}</span></div>
+        <div class="delta" style="color:${COR.muted}">${devendo > 0 && nRest ? dec(faltaPorDia) + ' ÷ ' + dec(mediaEquipe) + ' por equipe = ' + dec(equipesExtrasBruto) : 'nenhuma equipe extra necessária'}</div></div>`;
+
+    // gráfico: realizado por dia (até ontem) e capacidade das equipes
     const porDia = {};
     regs.forEach(r => { if (r.st === 'Executada' && r.d && r.d.slice(0, 7) === dados.mes) porDia[r.d] = (porDia[r.d] || 0) + 1; });
     const rot = dias.map(d => String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5));
     const realizado = dias.map(d => d.data < hoje ? (porDia[d.data] || (d.util ? 0 : null)) : null);
-    const plano = dias.map(d => d.util && d.data >= hoje ? Math.ceil(necessarioDia) : null);
     const capacidade = dias.map(d => d.util ? capDia : null);
-    raiz.querySelector('#pv-cap-hint').textContent = nRest
-      ? `Para fechar ${fmt(pendentes)} pendentes em ${nRest} dias úteis: ${Math.ceil(necessarioDia)} por dia (capacidade ${fmt(capDia)}/dia, considerando ${FALTAS_POR_DIA} equipe em falta por dia).`
-      : 'Mês encerrado — sem dias úteis restantes.';
+    raiz.querySelector('#pv-cap-titulo').textContent = 'Realizado por dia — ' + rotuloExec;
+    raiz.querySelector('#pv-cap-hint').textContent =
+      `Preventivas executadas por dia x capacidade das equipes (${fmt(capDia)}/dia, considerando ${FALTAS_POR_DIA} equipe em falta por dia).`;
 
     const temLabels = typeof ChartDataLabels !== 'undefined';
     if (graficoCap) graficoCap.destroy();
@@ -927,8 +966,6 @@
         datasets: [
           { type: 'bar', label: 'Realizado', data: realizado, backgroundColor: 'rgba(14,124,134,.8)', borderRadius: 3, order: 2,
             datalabels: { display: c => (c.dataset.data[c.dataIndex] || 0) > 0, anchor: 'end', align: 'top', color: '#000', font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
-          { type: 'bar', label: 'Necessário por dia', data: plano, backgroundColor: 'rgba(217,119,6,.75)', borderRadius: 3, order: 2,
-            datalabels: { display: c => c.dataset.data[c.dataIndex] !== null, anchor: 'end', align: 'top', color: COR.warn, font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
           { type: 'line', label: 'Capacidade das equipes', data: capacidade, borderColor: '#5e34b5', borderDash: [6, 4], borderWidth: 2,
             pointRadius: 0, spanGaps: true, order: 1, datalabels: { display: false } }
         ]
@@ -967,7 +1004,7 @@
       .forEach(x => { if (sobra > 0) { capMesEquipe[x.i]++; sobra--; } });
 
     raiz.querySelector('#pv-cap-legenda').textContent =
-      `capacidade no mês = ${fmt(total)} preventivas MOP · Móvel divididas entre as ${equipes.length} equipes`;
+      `capacidade no mês = ${fmt(total)} preventivas ${rotuloExec} divididas entre as ${equipes.length} equipes`;
 
     const nomeBonito = n => n ? n.toLowerCase().split(/\s+/).map((w, i) =>
       i > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
