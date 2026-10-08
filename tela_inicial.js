@@ -6,6 +6,9 @@
 // Os cards são montados a partir do menu lateral: página nova no menu
 // aparece aqui sozinha. No menu lateral ganha o item "🏠 Início".
 // No index.html: <script src="tela_inicial.js"></script> (depois dos outros)
+//
+// ALTERADO (07/10/2026): a Gestão de Vagas também passou a pedir senha,
+// igual à Gestão de Frotas (cada área libera separadamente).
 // ======================================================================
 (function(){
 
@@ -13,10 +16,12 @@
   const NOME_PAINEL = 'Central de Operações';
   const SUBTITULO   = 'Engemon OP Services · Gestão Operacional';
 
-  // ---- TRAVA DA ABA FROTA (trava visual, não é segurança forte) ----
+  // ---- TRAVAS POR SENHA (trava visual, não é segurança forte) ----
   // A senha fica guardada só como "impressão digital" (SHA-256). Para trocar a
   // senha, peça o código novo e substitua o valor abaixo.
   const FROTA_SENHA_SHA256 = '8b94527a1c8f5579868ed765d2a280015bdc1cfaeb5d79c58fb3a8d817aa5631';
+  // Senha da Gestão de Vagas (por enquanto, a mesma da Frota).
+  const VAGAS_SENHA_SHA256 = '8b94527a1c8f5579868ed765d2a280015bdc1cfaeb5d79c58fb3a8d817aa5631';
 
   // Repositório do GitHub de onde o painel é publicado (dono/nome). Vazio =
   // descobre sozinho pelo endereço (ex.: engemon-painel.github.io/Painel-SLA).
@@ -101,16 +106,16 @@
       padding:8px 14px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--text); cursor:pointer; }
     #tiFoco button:hover{ border-color:var(--accent); color:var(--accent); }
     #tiFoco .ti-foco-nome{ font-family:'Space Grotesk', sans-serif; font-size:20px; font-weight:700; color:var(--text); }
-    #travaFrota{ max-width:420px; margin:40px auto; background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    .trava-area{ max-width:420px; margin:40px auto; background:var(--panel); border:1px solid var(--line); border-radius:16px;
       padding:28px 26px; text-align:center; box-shadow:0 6px 20px rgba(27,36,64,.08); }
-    #travaFrota .tf-icone{ font-size:40px; margin-bottom:8px; }
-    #travaFrota h2{ font-family:'Space Grotesk', sans-serif; font-size:18px; margin-bottom:6px; }
-    #travaFrota p{ font-size:13px; color:var(--muted); margin-bottom:16px; }
-    #travaFrota input{ width:100%; font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid var(--line); margin-bottom:10px; }
-    #travaFrota input:focus{ outline:2px solid var(--accent); border-color:transparent; }
-    #travaFrota button{ width:100%; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:13px; padding:10px; border-radius:999px;
+    .trava-area .tf-icone{ font-size:40px; margin-bottom:8px; }
+    .trava-area h2{ font-family:'Space Grotesk', sans-serif; font-size:18px; margin-bottom:6px; }
+    .trava-area p{ font-size:13px; color:var(--muted); margin-bottom:16px; }
+    .trava-area input{ width:100%; font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid var(--line); margin-bottom:10px; }
+    .trava-area input:focus{ outline:2px solid var(--accent); border-color:transparent; }
+    .trava-area button{ width:100%; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:13px; padding:10px; border-radius:999px;
       border:0; background:var(--accent); color:#fff; cursor:pointer; }
-    #travaFrota .tf-erro{ color:var(--bad); font-size:12px; min-height:16px; margin-top:8px; }
+    .trava-area .tf-erro{ color:var(--bad); font-size:12px; min-height:16px; margin-top:8px; }
     @keyframes tiEntra{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:none; } }
     @media (max-width:600px){ #telaInicial .ti-grade{ grid-template-columns:repeat(2, 1fr); gap:14px; } #telaInicial .ti-card{ min-height:150px; } }
   `;
@@ -239,7 +244,7 @@
   function cardHtml(it, i){
     return `<button type="button" class="ti-card" data-nav="${esc(it.id)}" style="animation-delay:${i*45}ms">
       ${it.badge ? `<span class="ti-badge" title="Pendentes">${esc(it.badge)}</span>` : ''}
-      ${it.id === 'nav-frota' && !frotaLiberada() ? '<span class="ti-badge" style="background:#374151;" title="Precisa de senha">🔒</span>' : ''}
+      ${TRAVAS[it.id] && !liberada(TRAVAS[it.id].chave) ? '<span class="ti-badge" style="background:#374151;" title="Precisa de senha">🔒</span>' : ''}
       <span class="ti-icone">${esc(it.icone || '•')}</span>
       <span class="ti-nome">${esc(it.nome)}</span>
       ${it.desc ? `<span class="ti-desc">${esc(it.desc)}</span>` : ''}
@@ -249,43 +254,54 @@
 
   let vista = 'principal';
 
-  // ---------------- trava da Frota ----------------
-  const frotaLiberada = () => { try{ return sessionStorage.getItem('frotaLiberada') === '1'; }catch(e){ return false; } };
+  // ---------------- travas por senha (Frota e Gestão de Vagas) ----------------
+  // Cada área: página, seção que fica escondida, título, chave da sessão,
+  // senha (SHA-256) e função que redesenha a página depois de liberar.
+  const TRAVAS = {
+    'nav-frota': { pagina:'pagina-frota', secao:'frotaSecao', titulo:'Gestão de Frotas',
+      texto:'os dados da frota', chave:'frotaLiberada', hash: FROTA_SENHA_SHA256, render:'renderFrota' },
+    'nav-vagas': { pagina:'pagina-vagas', secao:'vagasSecao', titulo:'Gestão de Vagas',
+      texto:'as requisições e vagas', chave:'vagasLiberada', hash: VAGAS_SENHA_SHA256, render:'renderVagas' }
+  };
+  const liberada = chave => { try{ return sessionStorage.getItem(chave) === '1'; }catch(e){ return false; } };
   async function sha256(txt){
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
-  function aplicarTravaFrota(){
-    const pg = document.getElementById('pagina-frota');
-    const secao = document.getElementById('frotaSecao');
+  function aplicarTrava(navId){
+    const t = TRAVAS[navId]; if(!t) return;
+    const pg = document.getElementById(t.pagina);
+    const secao = document.getElementById(t.secao);
     if(!pg || !secao) return;
-    let trava = document.getElementById('travaFrota');
-    if(frotaLiberada()){ secao.style.display = ''; if(trava) trava.remove(); return; }
+    const idTrava = 'trava-' + t.pagina;
+    let trava = document.getElementById(idTrava);
+    if(liberada(t.chave)){ secao.style.display = ''; if(trava) trava.remove(); return; }
     secao.style.display = 'none';
     if(trava) return;
     trava = document.createElement('div');
-    trava.id = 'travaFrota';
+    trava.id = idTrava;
+    trava.className = 'trava-area';
     trava.innerHTML = `<div class="tf-icone">🔒</div>
-      <h2>Gestão de Frotas</h2>
-      <p>Área restrita. Digite a senha para ver os dados da frota.</p>
-      <input type="password" id="tfSenha" placeholder="Senha" autocomplete="off">
-      <button type="button" id="tfEntrar">Entrar</button>
-      <div class="tf-erro" id="tfErro"></div>`;
+      <h2>${esc(t.titulo)}</h2>
+      <p>Área restrita. Digite a senha para ver ${esc(t.texto)}.</p>
+      <input type="password" class="tf-senha" placeholder="Senha" autocomplete="off">
+      <button type="button" class="tf-entrar">Entrar</button>
+      <div class="tf-erro"></div>`;
     pg.appendChild(trava);
+    const campo = trava.querySelector('.tf-senha');
     const entrar = async () => {
-      const senha = document.getElementById('tfSenha').value;
-      if(senha && await sha256(senha) === FROTA_SENHA_SHA256){
-        try{ sessionStorage.setItem('frotaLiberada', '1'); }catch(e){}
-        aplicarTravaFrota();
-        if(typeof renderFrota === 'function') renderFrota();
+      if(campo.value && await sha256(campo.value) === t.hash){
+        try{ sessionStorage.setItem(t.chave, '1'); }catch(e){}
+        aplicarTrava(navId);
+        if(typeof window[t.render] === 'function') window[t.render]();
       } else {
-        document.getElementById('tfErro').textContent = 'Senha incorreta.';
-        document.getElementById('tfSenha').select();
+        trava.querySelector('.tf-erro').textContent = 'Senha incorreta.';
+        campo.select();
       }
     };
-    document.getElementById('tfEntrar').onclick = entrar;
-    document.getElementById('tfSenha').onkeydown = e => { if(e.key === 'Enter') entrar(); };
-    setTimeout(() => document.getElementById('tfSenha')?.focus(), 50);
+    trava.querySelector('.tf-entrar').onclick = entrar;
+    campo.onkeydown = e => { if(e.key === 'Enter') entrar(); };
+    setTimeout(() => campo.focus(), 50);
   }
 
   function desenhar(){
@@ -407,13 +423,15 @@
     if(badge) new MutationObserver(() => { if(document.body.classList.contains('modo-inicio')) desenhar(); })
       .observe(badge, { childList:true, characterData:true, subtree:true });
 
-    // trava da aba Frota: vale para qualquer caminho (card, menu ou atalho)
+    // travas da Frota e da Gestão de Vagas: valem para qualquer caminho (card, menu ou atalho)
     const mostrarAntes = window.mostrarPagina;
     window.mostrarPagina = function(nome){
       mostrarAntes(nome);
-      if(nome === 'frota') aplicarTravaFrota();
+      if(nome === 'frota') aplicarTrava('nav-frota');
+      if(nome === 'vagas') aplicarTrava('nav-vagas');
     };
-    aplicarTravaFrota();
+    aplicarTrava('nav-frota');
+    aplicarTrava('nav-vagas');
 
     // outras páginas avisam quando terminam de carregar os dados (ex.: escala)
     window.addEventListener('painel-dados', () => { if(document.body.classList.contains('modo-inicio')) desenhar(); });
