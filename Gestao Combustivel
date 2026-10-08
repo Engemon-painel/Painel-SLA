@@ -33,7 +33,7 @@
       const r = await fetch('dados_combustivel.json?_=' + Date.now());
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
-      if (j && j.porMes) COMB = j;
+      if (j && j.porMes) { COMB = j; console.log('[Combustível] dados carregados:', j.meses); }
     } catch (e) {
       console.warn('[Combustível] dados_combustivel.json não carregado:', e.message);
     }
@@ -117,14 +117,17 @@
 
   function garantirPainel() {
     let painel = document.getElementById('frotaCombustivelSecao');
-    if (painel) return painel;
-    const ancora = document.getElementById('frotaKpiRow');
-    if (!ancora) return null;
-    painel = document.createElement('div');
-    painel.id = 'frotaCombustivelSecao';
-    painel.className = 'panel';
-    painel.style.marginBottom = '16px';
-    painel.innerHTML = `
+    if (!painel) {
+      const ancora = document.getElementById('frotaKpiRow');
+      if (!ancora) return null;
+      painel = document.createElement('div');
+      painel.id = 'frotaCombustivelSecao';
+      painel.className = 'panel';
+      painel.style.marginBottom = '16px';
+      ancora.insertAdjacentElement('afterend', painel);
+    }
+    // (re)monta a estrutura se estiver faltando (ex.: depois do aviso de "sem dados")
+    if (!painel.querySelector('#combMesStrip')) painel.innerHTML = `
       <h2>Combustível — Claro Infra SPC</h2>
       <div class="month-strip" id="combMesStrip" style="margin:10px 0 14px;"></div>
       <div class="kpi-row" id="combTipoKpiRow" style="margin-bottom:16px;"></div>
@@ -139,7 +142,6 @@
         </div>
       </div>
       <div id="combAviso" class="mono" style="font-size:11px; color:${cor.muted}; margin-top:10px;"></div>`;
-    ancora.insertAdjacentElement('afterend', painel);
     return painel;
   }
 
@@ -151,7 +153,7 @@
     if (!COMB) {
       painel.style.display = '';
       painel.innerHTML = `<h2>Combustível — Claro Infra SPC</h2>
-        <p style="font-size:13px; color:${cor.muted}; margin-top:8px;">O arquivo dados_combustivel.json ainda não está no repositório. Publique a saída do script de combustível com esse nome para ver os gráficos.</p>`;
+        <p style="font-size:13px; color:${cor.muted}; margin-top:8px;">Carregando dados_combustivel.json… Se esta mensagem não sumir, o arquivo não foi encontrado no repositório.</p>`;
       return;
     }
     if (!contratoTemCombustivel(c)) { painel.style.display = 'none'; return; }
@@ -281,6 +283,7 @@
   }
 
   instalar();
+  console.log('[Combustível] módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._comb));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
