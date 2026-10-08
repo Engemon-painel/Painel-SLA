@@ -1,1097 +1,377 @@
-/* =========================================================================
-   Painel do ESER — Seção "Preventiva" (Atualização_Preventiva)
-   Fonte: dados_preventiva.json (gerado da aba Atualização_Preventiva)
-   Requer: Chart.js (datalabels é opcional — usado se já estiver carregado)
-   Uso:    <div id="sec-preventiva"></div>
-           <script src="gestao_preventiva.js"> (depois do Chart.js)
-           (monta sozinho; ou chame PainelPreventiva.montar('id-do-container'))
-
-   NOVO — FILTRO DE MÊS:
-   O dados_preventiva.json passou a trazer "meses" (lista de todos os meses
-   guardados pelo Office Script, cada um com seus registros). No topo da aba
-   aparece o filtro "Mês": o mês da base atual vem selecionado; os meses
-   anteriores ficam travados como estavam quando a base foi trocada.
-   Se o JSON ainda não trouxer "meses", o filtro mostra só o mês atual.
-
-   ALTERADO (07/10/2026): na aba "Capacidade MOP Móvel", a tabela
-   "Distribuição por Equipe" não mostra mais Cota sugerida / Cota por dia.
-   Agora mostra a Capacidade no mês de cada equipe e o que ela já fez.
-
-   ALTERADO (07/10/2026): a aba "Capacidade MOP Móvel" ganhou o filtro
-   Executor (MOP / EPS / Todos), sempre com Equipe Responsável MÓVEL.
-   Saíram o card "Necessário por Dia" e as barras de projeção do gráfico.
-   ========================================================================= */
+/* ======================================================================
+   gestao_combustivel.js — Gestão de Frotas
+   Divide a página em duas abas:
+   • Veículos: só quantidade de carros por área (contrato) e por tipo
+   • Combustível: custos do contrato, combustível mês a mês (VALOR EMISSAO,
+     por TIPO FROTA), Top 10 técnicos (só FROTA), gasto por contrato e ranking
+   Lê dados_combustivel.json (gerado pelo script_combustivel.ts).
+   Não altera nada do index.html: só envolve a função renderFrota().
+   ====================================================================== */
 (function () {
-  const ARQUIVO_JSON = 'dados_preventiva.json';
-  // Meses fechados e travados (ex.: setembro), publicados uma vez no GitHub ao
-  // lado do dados_preventiva.json. O fluxo não mexe nesse arquivo. Opcional:
-  // se não existir, o painel segue só com o dados_preventiva.json.
-  const ARQUIVO_HISTORICO = 'preventiva_historico.json';
-  const CONTAINER_PADRAO = 'sec-preventiva';
+  // Contratos do cadastro de frota (coluna Operação da aba Placa) que a
+  // planilha de combustível cobre. Se o nome mudar, ajuste aqui.
+  const CONTRATOS_COM_COMBUSTIVEL = ['CLARO INFRA SP'];
 
-  // Feriados que não contam como dia útil (edite conforme o calendário da operação)
-  const FERIADOS = [
-    '2026-01-01','2026-02-16','2026-02-17','2026-04-03','2026-04-21','2026-05-01',
-    '2026-06-04','2026-09-07','2026-10-12','2026-11-02','2026-11-15','2026-11-20','2026-12-25',
-    '2027-01-01','2027-02-08','2027-02-09','2027-03-26','2027-04-21','2027-05-01',
-    '2027-05-27','2027-09-07','2027-10-12','2027-11-02','2027-11-15','2027-11-20','2027-12-25'
-  ];
+  const CORES_TIPO = { FROTA: '#0e7c86', GMG: '#d97706', RAC: '#5e34b5', BENEFICIO: '#2563eb' };
+  const MES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-  const FILTROS = [
-    { k: 'st', rotulo: 'Status' },
-    { k: 'ex', rotulo: 'Executor' },
-    { k: 't',  rotulo: 'Tipo Preventiva' },
-    { k: 'x',  rotulo: 'Equipe Responsável' }
-  ];
+  let COMB = null;          // conteúdo do dados_combustivel.json
+  let mesComb = '';         // '' = todos os meses; senão 'AAAA-MM'
+  let mesCombIniciado = false;
+  let chartMeses = null, chartTop = null;
+  let abaFrota = 'veiculos';   // 'veiculos' | 'combustivel'
 
-  // Executor definido pelo Tipo de Preventiva
-  const EXECUTOR_POR_TIPO = {
-    'energia': 'MOP', 'climatizacao': 'MOP',
-    'zeladoria': 'EPS', 'sdai': 'EPS', 'gerador': 'EPS',
-    'inspecao termografica': 'EPS', 'termografia': 'EPS', 'spda': 'EPS'
+  const brl = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const brlCurto = v => {
+    const n = Number(v) || 0;
+    return n >= 1000 ? 'R$ ' + (n / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mil' : brl(n);
   };
-  const semAcento = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const executorDoTipo = t => EXECUTOR_POR_TIPO[semAcento(t).replace(/^preventiva infra - /, '')] || 'Outros';
+  const rotuloMes = ord => { const p = String(ord).split('-'); return MES_PT[Number(p[1]) - 1] + '/' + p[0].slice(2); };
+  const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const chavePlaca = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  // ---- HISTÓRICO MENSAL (meses fechados) — edite/acrescente aqui ----
-  // Meses que existem no dados_preventiva.json (mês atual e meses travados)
-  // são calculados da própria base e substituem o valor daqui.
-  const HISTORICO_MENSAL = [
-    { mes: '2026-01', programadas: 920,  executadas: 482 },
-    { mes: '2026-02', programadas: 961,  executadas: 896 },
-    { mes: '2026-03', programadas: 978,  executadas: 848 },
-    { mes: '2026-04', programadas: 1092, executadas: 810 },
-    { mes: '2026-05', programadas: 1407, executadas: 1196 },
-    { mes: '2026-06', programadas: 1446, executadas: 1284 },
-    { mes: '2026-07', programadas: 1327, executadas: 1264 },
-    { mes: '2026-08', programadas: 1267, executadas: 1216 },
-    { mes: '2026-09', programadas: 1484, executadas: 1420 }
-  ];
-
-  // ---- EQUIPES MOP · MÓVEL (aba "Capacidade MOP Móvel") — edite aqui ----
-  // tipo: 'Dupla' ou 'Solo'. A média de preventivas por dia de cada equipe
-  // vem de MEDIA_POR_DIA (pode ser diferente para dupla e solo).
-  const MEDIA_POR_DIA = { Dupla: 4, Solo: 4 };
-  // Folga para ausência: quantas equipes ficam de fora por dia (falta, folga, atestado).
-  // A capacidade do dia desconta essas equipes, usando a média por equipe.
-  const FALTAS_POR_DIA = 1;
-  const EQUIPES_MOP_MOVEL = [
-    { t1: 'ADRIANO PEREIRA DA SILVA',             t2: 'MARCOS TEIXEIRA CARVALHO',       tipo: 'Dupla' },
-    { t1: 'ALEXIS VERIS',                         t2: 'PAULO HENRIQUE CARDOSO',         tipo: 'Dupla' },
-    { t1: 'CELIO ROBERTO DA SILVA',               t2: 'JOAO VITOR SILVA RODRIGUES',     tipo: 'Dupla' },
-    { t1: 'EDUARDO JACO PRATA',                   t2: '',                               tipo: 'Solo'  },
-    { t1: 'EURIPEDES GOMES DE ALENCAR',           t2: '',                               tipo: 'Solo'  },
-    { t1: 'GUSTAVO SALTORE',                      t2: '',                               tipo: 'Solo'  },
-    { t1: 'MANOEL WESLEY DO NASCIMENTO RE',       t2: '',                               tipo: 'Solo'  },
-    { t1: 'MARCELO HENRIQUE AMARAL',              t2: 'GUSTAVO HEMMEL DA SILVA',        tipo: 'Dupla' },
-    { t1: 'MARCIO DE LIMA',                       t2: 'FERNANDO WASHINGTON DE PAULA',   tipo: 'Dupla' },
-    { t1: 'MATHEUS SANTANA FURIATE DE OLIVEIRA',  t2: 'MARCIO DOS SANTOS SOARES',       tipo: 'Dupla' },
-    { t1: 'MOISES CARLOS VENTURA DE FARIA',       t2: 'GABRIEL DUARTE DE LACERDA',      tipo: 'Dupla' },
-    { t1: 'SIDNEI FELIPE DE SOUZA',               t2: 'WILMAR CAMPOS',                  tipo: 'Dupla' },
-    { t1: 'SILVIO CEZAR RIBEIRO DA ROCHA',        t2: 'FELIPPE DE OLIVEIRA SOUSA',      tipo: 'Dupla' },
-    { t1: 'PAULO HENRIQUE FLORENCIO DE SOUZA',    t2: '',                               tipo: 'Solo'  }
-  ];
-  // Quais registros entram na conta: Executor MOP (Energia/Climatização) e Equipe Responsável MÓVEL
-  const ehMopMovel = r => r.ex === 'MOP' && semAcento(r.x) === 'movel';
-
-  const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
-                 'Agosto','Setembro','Outubro','Novembro','Dezembro'];
-
-  let dados = null, grafico = null, raiz = null;
-  const sel = { st: '', ex: '', t: '', x: '' };
-  let busca = '';
-
-  // NOVO: todos os meses disponíveis, o mês da base atual e o mês escolhido no filtro
-  let todosMeses = {};      // { '2026-09': { mes, gerado_em, registros }, ... }
-  let mesBase = '';         // mês da base atual (o mais recente)
-  let abaAtiva = 'geral';
-  // Aba Produtividade oculta por enquanto: o código continua no arquivo, só o item do menu foi retirado.
-
-  const fmt = n => n.toLocaleString('pt-BR');
-  const pct = n => (isFinite(n) ? n : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const nomeMes = mes => { const [a, m] = mes.split('-').map(Number); return MESES[m - 1] + '/' + a; };
-
-  // "Executada" só conta se a Data Fim - Consolidado (r.d) estiver preenchida
-  // e dentro do mês informado — vazia ou de outro mês não conta.
-  const executadaEm = mes => r => r.st === 'Executada' && !!r.d && r.d.slice(0, 7) === mes;
-  const executadaNoMes = r => executadaEm(dados.mes)(r);
-
-  function diasDoMes(mes) {
-    const [a, m] = mes.split('-').map(Number);
-    const out = [];
-    for (let d = new Date(a, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) {
-      const dia = new Date(d), s = iso(dia), sem = dia.getDay();
-      out.push({ data: s, dia: dia.getDate(), util: sem !== 0 && sem !== 6 && !FERIADOS.includes(s) });
+  async function carregarCombustivel() {
+    try {
+      const r = await fetch('dados_combustivel.json?_=' + Date.now());
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j && j.porMes) { COMB = j; console.log('[Combustível] dados carregados:', j.meses); }
+    } catch (e) {
+      console.warn('[Combustível] dados_combustivel.json não carregado:', e.message);
     }
-    return out;
+    if (!mesCombIniciado && COMB && COMB.meses && COMB.meses.length) {
+      mesComb = COMB.meses[COMB.meses.length - 1];   // começa no mês mais recente
+      mesCombIniciado = true;
+    }
+    if (paginaFrotaVisivel()) renderFrota();
   }
 
-  // D-1: ontem, se o mês é o atual; último dia, se o mês já passou
-  function dataReferencia(mes) {
-    const ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
-    const refMes = iso(ontem).slice(0, 7);
-    if (refMes > mes) { const [a, m] = mes.split('-').map(Number); return iso(new Date(a, m, 0)); }
-    if (refMes < mes) return mes + '-00';
-    return iso(ontem);
+  function paginaFrotaVisivel() {
+    const p = document.getElementById('pagina-frota');
+    return p && p.style.display !== 'none';
   }
 
-  function estilos() {
-    if (document.getElementById('pv-estilos')) return;
-    // Usa as mesmas classes do painel (.signal-strip, .kpi-row, .kpi, .panel, .pill);
-    // aqui ficam só os ajustes específicos da Preventiva.
-    const css = `
-    .pv-filtros{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px}
-    .pv-filtros label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#6b7590);text-transform:uppercase;letter-spacing:.05em}
-    .pv-filtros label:not(:first-child){margin-left:8px}
-    .pv-filtros select{font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--line,#e1e5f0);background:var(--panel,#fff);color:var(--text,#1b2440);min-width:150px}
-    .pv-mesbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px;padding:10px 14px;border:1px solid var(--line,#e1e5f0);border-radius:12px;background:var(--panel,#fff);box-shadow:0 2px 8px rgba(27,36,64,.06)}
-    .pv-mesbar label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#6b7590);text-transform:uppercase;letter-spacing:.05em}
-    .pv-mesbar select{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid var(--accent,#0e7c86);background:var(--panel,#fff);color:var(--text,#1b2440);min-width:200px}
-    .pv-mesbar .pv-trava{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px}
-    .pv-mesbar .pv-trava.fechado{background:rgba(94,52,181,.12);color:#5e34b5}
-    .pv-mesbar .pv-trava.aberto{background:rgba(5,150,105,.12);color:#059669}
-    .pv-sub{font-family:'Inter',sans-serif;font-size:10px;font-weight:600;color:var(--muted,#6b7590);text-transform:uppercase;margin-left:4px}
-    .pv-sep{color:var(--line,#e1e5f0)}
-    #pv-kpis{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-    .pv-cv{position:relative;height:360px}
-    .pv-rolagem{max-height:420px;overflow:auto;border-radius:8px}
-    .pv-tab-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-    .pv-tab-topo .search input{min-width:240px}
-    .pv-layout{display:flex;gap:20px;align-items:flex-start}
-    .pv-menu{width:200px;flex:0 0 200px;background:var(--panel,#fff);border:1px solid var(--line,#e1e5f0);border-radius:14px;
-      padding:10px;position:sticky;top:20px;box-shadow:0 2px 8px rgba(27,36,64,.06)}
-    .pv-menu .nav-group{margin-bottom:0}
-    .pv-menu .nav-group-label{cursor:default}
-    .pv-menu .nav-group-label:hover{color:var(--muted,#6b7590)}
-    .pv-conteudo{flex:1;min-width:0}
-    @media (max-width:860px){.pv-layout{flex-direction:column}.pv-menu{width:100%;position:static}}
-    .pv-legenda{display:flex;flex-direction:column;gap:9px;font-size:12.5px;color:var(--text,#1b2440)}
-    .pv-legenda i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:-1px}
-    .pv-legenda b.n{font-family:'JetBrains Mono',monospace;margin-left:4px}
-    .pv-op-tab td{white-space:nowrap}
-    .pv-sf{display:inline-block;min-width:92px;text-align:center;padding:3px 8px;border-radius:4px;font-weight:600;font-size:12px}
-    .pv-sf.verde{background:#16a34a;color:#fff}.pv-sf.amarelo{background:#facc15;color:#1b2440}.pv-sf.vermelho{background:#dc2626;color:#fff}
-    .pv-tec-tab tbody tr:nth-child(even){background:rgba(107,117,144,.05)}
-    .pv-tec-tab tbody tr:hover{background:rgba(14,124,134,.08)}
-    .pv-tec-tab th,.pv-tec-tab td{padding:10px 12px}
-    .pv-tec-tab td:first-child{font-weight:600}`;
-    const st = document.createElement('style'); st.id = 'pv-estilos'; st.textContent = css;
-    document.head.appendChild(st);
+  function blocoDoMes() {
+    if (!COMB) return null;
+    return mesComb ? COMB.porMes[mesComb] : COMB.geral;
   }
 
-  function esqueleto() {
-    opMontada = false;
-    tecMontada = false;
-    capMontada = false;
-    const [a, m] = dados.mes.split('-').map(Number);
-    const mesesOrdenados = Object.keys(todosMeses).sort().reverse(); // mais recente primeiro
-    const fechado = dados.mes !== mesBase;
-    raiz.innerHTML = `
-    <div class="pv">
-      <div class="pv-layout">
-      <nav class="pv-menu">
-        <div class="nav-group">
-          <div class="nav-group-label"><span>Preventiva</span></div>
-          <div class="nav-group-items">
-            <div class="nav-item pv-aba${abaAtiva === 'geral' ? ' active' : ''}" data-aba="geral"><span class="nav-icon">📊</span> Visão Geral</div>
-            <div class="nav-item pv-aba${abaAtiva === 'op' ? ' active' : ''}" data-aba="op"><span class="nav-icon">🛠️</span> Operação</div>
-            <div class="nav-item pv-aba${abaAtiva === 'cap' ? ' active' : ''}" data-aba="cap"><span class="nav-icon">📐</span> Capacidade MOP Móvel</div>
-          </div>
-        </div>
-      </nav>
-      <div class="pv-conteudo">
-      <div class="pv-mesbar">
-        <label for="pv-mes">Mês</label>
-        <select id="pv-mes">
-          ${mesesOrdenados.map(k => `<option value="${k}"${k === dados.mes ? ' selected' : ''}>${nomeMes(k)}${k === mesBase ? ' (atual)' : ''}</option>`).join('')}
-        </select>
-        <span class="pv-trava ${fechado ? 'fechado' : 'aberto'}">${fechado ? '🔒 Mês fechado — dados travados' : '● Mês atual — atualizando'}</span>
-        <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);margin-left:auto;">
-          ${fechado ? 'última atualização' : 'atualizado em'} ${esc(dados.gerado_em || '')}</span>
-      </div>
-      <div id="pv-aba-geral"${abaAtiva === 'geral' ? '' : ' style="display:none;"'}>
-      <div class="pv-filtros">
-        ${FILTROS.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
-        <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);margin-left:auto;">
-          ${MESES[m - 1]}/${a}</span>
-      </div>
+  function contratoAtual() { return typeof frotaOperacaoFiltroAtual === 'string' ? frotaOperacaoFiltroAtual : ''; }
+  function contratoTemCombustivel(c) { return !c || CONTRATOS_COM_COMBUSTIVEL.indexOf(c) !== -1; }
 
-      <div class="signal-strip" id="pv-signal" title="Aderência em D-1"></div>
-
-      <div class="kpi-row" id="pv-kpis"></div>
-
-      <div class="panel">
-        <h2>Realizado x Meta — Acumulado</h2>
-        <div class="pv-cv"><canvas id="pv-canvas"></canvas></div>
-      </div>
-      <div class="panel">
-        <h2>Visão mensal</h2>
-        <div class="pv-cv"><canvas id="pv-mensal"></canvas></div>
-      </div>
-
-      <div class="panel">
-        <div class="pv-tab-topo">
-          <h2>Preventivas não executadas (<span id="pv-qtd-tab">0</span>)</h2>
-          <div class="search">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
-            <input id="pv-busca" type="search" placeholder="Buscar site, WO, município...">
-          </div>
-        </div>
-        <div class="pv-rolagem"><table>
-          <thead><tr><th>Status</th><th>Site</th><th>Site Infratel</th><th>Município</th><th>Tipo</th>
-          <th>Tipologia</th><th>Executor</th><th>Equipe</th><th>Supervisão</th><th>WO</th></tr></thead>
-          <tbody id="pv-tbody"></tbody></table></div>
-      </div>
-      </div>
-      <div id="pv-aba-op" style="display:none;"></div>
-      <div id="pv-aba-tec" style="display:none;"></div>
-      <div id="pv-aba-cap" style="display:none;"></div>
-      </div>
-      </div>
-    </div>`;
-
-    raiz.querySelectorAll('.pv-aba').forEach(bt => bt.addEventListener('click', () => trocarAba(bt.dataset.aba)));
-    raiz.querySelector('#pv-mes').addEventListener('change', e => selecionarMes(e.target.value));
-
-    raiz.querySelectorAll('#pv-aba-geral .pv-filtros select').forEach(s =>
-      s.addEventListener('change', () => { sel[s.dataset.k] = s.value; atualizar(); }));
-    raiz.querySelector('#pv-busca').addEventListener('input', e => { busca = e.target.value.toLowerCase(); tabela(filtrar()); });
-  }
-
-  function filtrar(ignorar) {
-    return dados.registros.filter(r => FILTROS.every(f => f.k === ignorar || !sel[f.k] || r[f.k] === sel[f.k]));
-  }
-
-  // Opções de cada filtro respeitam os demais filtros (como slicers do Power BI)
-  function opcoes() {
-    raiz.querySelectorAll('#pv-aba-geral .pv-filtros select').forEach(s => {
-      const k = s.dataset.k;
-      const vals = [...new Set(filtrar(k).map(r => r[k]))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
-      if (sel[k] && !vals.includes(sel[k])) vals.push(sel[k]);
-      s.innerHTML = '<option value="">Todos</option>' +
-        vals.map(v => `<option value="${esc(v)}"${v === sel[k] ? ' selected' : ''}>${esc(v)}</option>`).join('');
+  // Troca o "Valor Combustível" de cada placa pelo valor do mês escolhido
+  function aplicarCombustivelNasPlacas() {
+    if (!Array.isArray(FROTA)) return;
+    const bloco = blocoDoMes();
+    const mapa = {};
+    // porPlacaTodos = todas as placas da planilha, de qualquer contrato
+    if (bloco) (bloco.porPlacaTodos || bloco.porPlaca || []).forEach(p => { mapa[chavePlaca(p.Placa)] = Number(p['Valor Total']) || 0; });
+    FROTA.forEach(v => {
+      if (!('_combOriginal' in v)) v._combOriginal = v.valorCombustivel;
+      v.valorCombustivel = bloco ? (mapa[chavePlaca(v.placa)] || 0) : v._combOriginal;
     });
   }
 
-  const COR = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590' };
-  // Meta 100% (verde) · a partir de 95% é o 2º patamar (laranja) · abaixo de 95% vermelho
-  const META_ADER = 100, PATAMAR2_ADER = 95;
-  const corAder = p => p >= META_ADER ? COR.good : p >= PATAMAR2_ADER ? COR.warn : COR.bad;
-
-  function atualizar() {
-    opcoes();
-    const regs = filtrar();
-    const dias = diasDoMes(dados.mes);
-    const ref = dataReferencia(dados.mes);
-    const duMes = dias.filter(d => d.util).length || 1;
-    const duRef = dias.filter(d => d.util && d.data <= ref).length;
-
-    const planejado = regs.length;
-    const planD1 = Math.round(planejado * duRef / duMes);
-    const realizado = regs.filter(r => r.st === 'Executada').length;   // cards contam tudo; só os gráficos filtram por data
-    const pendentes = planejado - realizado;
-    const aberto = regs.filter(r => r.st === 'Aberta').length;
-    // ALTERADO (07/10/2026): Aderência em D-1 — compara o realizado com a mesma
-    // meta do card "Realizado / Meta D-1" (dias úteis até ontem).
-    // Para um mês já fechado, D-1 é o último dia do mês, então vale o mês inteiro.
-    const saldo = realizado - planD1;
-    const ader = planD1 ? realizado / planD1 * 100 : 0;
-    const entrega = planejado ? realizado / planejado * 100 : 0;
-
-    // faixa de sinal (30 blocos) = aderência em D-1
-    const strip = raiz.querySelector('#pv-signal');
-    const on = Math.round(Math.min(1, ader / META_ADER) * 30);
-    strip.innerHTML = Array.from({ length: 30 }, (_, i) =>
-      `<div style="background:${i < on ? 'rgba(5,150,105,.7)' : 'rgba(220,38,38,.7)'}"></div>`).join('');
-
-    raiz.querySelector('#pv-kpis').innerHTML = `
-      <div class="kpi"><div class="label">📋 Planejado no Mês</div>
-        <div class="value">${fmt(planejado)}</div>
-        <div class="delta" style="color:${COR.muted}">${duMes} dias úteis no mês</div></div>
-      <div class="kpi"><div class="label">✅ Realizado / Meta D-1</div>
-        <div style="display:grid;grid-template-columns:auto auto auto;justify-content:start;column-gap:14px;align-items:baseline;">
-          <div class="value"><span style="color:${COR.good}">${fmt(realizado)}</span></div>
-          <div class="value"><span class="pv-sep">|</span></div>
-          <div class="value">${fmt(planD1)}</div>
-          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b></div>
-          <div></div>
-          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Planejado D-1<br><b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b></div>
-        </div></div>
-      <div class="kpi"><div class="label">📅 Dias Úteis (D-1)</div>
-        <div class="value" style="white-space:nowrap;">${duRef}<span class="pv-sub">decorridos</span>
-          <span style="color:${COR.muted}"> / </span>${duMes - duRef}<span class="pv-sub">${duMes - duRef === 1 ? 'restante' : 'restantes'}</span></div>
-        <div class="delta" style="color:${COR.muted}">${pct(duRef / duMes * 100)} dos dias úteis do mês</div></div>
-      <div class="kpi"><div class="label">📈 Aderência</div>
-        <div class="value"><span style="color:${corAder(ader)}">${pct(ader)}</span></div>
-        <div class="delta" style="color:${corAder(ader)}">${ader >= META_ADER ? '▲ meta batida' : ader >= PATAMAR2_ADER ? '● 2º patamar (≥95%)' : '▼ abaixo de 95%'} · saldo ${(saldo > 0 ? '+' : '') + fmt(saldo)}</div>
-        <div class="delta" style="color:${COR.muted}">Meta 100% · 2º patamar 95%</div></div>
-      <div class="kpi"><div class="label">⚠️ Pendentes</div>
-        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
-          <span style="color:${COR.bad}">${fmt(pendentes)}</span><span class="pv-sep">|</span>
-          <span style="font-size:15px;color:${COR.muted};font-weight:600;">Em aberto <span style="color:#1b2440">${fmt(aberto)}</span></span></div></div>`;
-
-    grafico_(regs, dias, ref, duMes, planejado);
-    graficoMensal_();
-    tabela(regs);
+  // Aba Veículos: com filtro ativo, os cards mostram só o contrato escolhido
+  function ajustarCardsContrato() {
+    const row = document.getElementById('frotaOperacaoKpiRow');
+    if (!row) return;
+    const c = contratoAtual();
+    if (!c) return;   // sem filtro: mantém os cards de todos os contratos
+    const qtd = FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c).length;
+    row.innerHTML = `
+      <div class="kpi" style="cursor:pointer;" onclick="filtrarFrotaPorOperacaoEKpi('')" title="Voltar para todos os contratos">
+        <div class="label">↺ Todos os contratos</div>
+        <div class="value" style="color:${cor.muted}">${FROTA.length.toLocaleString('pt-BR')}</div>
+        <div class="delta" style="color:${cor.muted};">clique para limpar o filtro</div>
+      </div>
+      <div class="kpi" style="border-color:${cor.accent}; box-shadow:0 0 0 2px ${cor.accent} inset;">
+        <div class="label" style="color:${cor.accent};">🏢 ${esc(c)}</div>
+        <div class="value" style="color:${cor.accent};">${qtd}</div>
+        <div class="delta" style="color:${cor.accent};">veículos</div>
+      </div>`;
   }
 
-  function grafico_(regs, dias, ref, duMes, planejado) {
-    const porDia = {};
-    // Só conta quem tem Data Fim - Consolidado preenchida e dentro do mês
-    // selecionado — vazia ou de outro mês não entra na contagem.
-    regs.forEach(r => { if (executadaNoMes(r)) porDia[r.d] = (porDia[r.d] || 0) + 1; });
-    let du = 0, acum = 0;
-    const rot = [], plan = [], real = [];
-    dias.forEach(d => {
-      if (d.util) du++;
-      acum += porDia[d.data] || 0;
-      rot.push(String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5));
-      plan.push(Math.round(planejado * du / duMes));
-      real.push(d.data <= ref || porDia[d.data] ? acum : null);
+  // Aba Veículos: tabela Área (contrato) × Tipo
+  function renderMatrizAreaTipo() {
+    const alvo = document.getElementById('frotaMatrizAreaTipo');
+    if (!alvo) return;
+    const c = contratoAtual();
+    const lista = c ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c) : FROTA;
+    const tipos = Array.from(new Set(lista.map(v => normFrota(v.tipo) || 'Sem tipo'))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const linhas = {};
+    lista.forEach(v => {
+      const a = canonOperacaoFrota(v.operacao) || 'Sem operação';
+      const t = normFrota(v.tipo) || 'Sem tipo';
+      if (!linhas[a]) linhas[a] = { total: 0 };
+      linhas[a][t] = (linhas[a][t] || 0) + 1;
+      linhas[a].total++;
     });
+    const areas = Object.keys(linhas).sort((a, b) => linhas[b].total - linhas[a].total);
+    const totTipo = {}; tipos.forEach(t => totTipo[t] = areas.reduce((s, a) => s + (linhas[a][t] || 0), 0));
+    alvo.innerHTML = `<table>
+      <thead><tr><th>Área / Contrato</th>${tipos.map(t => `<th class="num">${esc(t)}</th>`).join('')}<th class="num">Total</th></tr></thead>
+      <tbody>
+        ${areas.map(a => `<tr><td>${esc(a)}</td>${tipos.map(t => `<td class="num">${linhas[a][t] || '—'}</td>`).join('')}<td class="num" style="font-weight:700;">${linhas[a].total}</td></tr>`).join('')}
+        <tr style="font-weight:700; border-top:2px solid ${cor.line};"><td>Total</td>${tipos.map(t => `<td class="num">${totTipo[t]}</td>`).join('')}<td class="num">${lista.length}</td></tr>
+      </tbody></table>`;
+  }
 
-    const temLabels = typeof ChartDataLabels !== 'undefined';
-    const cfg = {
-      type: 'line',
-      data: { labels: rot, datasets: [
-        { label: 'Planejado Acumulado', data: plan, borderColor: '#6b7590', backgroundColor: '#6b7590',
-          borderDash: [3, 4], borderWidth: 2, pointStyle: 'rect', pointRadius: 4, tension: 0,
-          datalabels: { align: 'top', color: '#6b7590' } },
-        { label: 'Realizado Acumulado', data: real, borderColor: '#0e7c86', backgroundColor: '#0e7c86',
-          borderWidth: 3, pointRadius: 4, tension: 0.25, spanGaps: false,
-          datalabels: { align: 'bottom', color: '#000000' } }
-      ]},
-      options: {
-        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 18, bottom: 6, right: 26 } },
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8 } },
-          tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.parsed.y)}` } },
-          datalabels: temLabels ? {
-            display: c => { const i = c.dataIndex, v = c.dataset.data;
-              if (v[i] == null) return false;
-              let ult = v.length - 1; while (ult > 0 && v[ult] == null) ult--;
-              if (i === ult) return true;                       // sempre mostra o último valor
-              if (i >= ult - 2) return false;                   // evita encavalar com o último
-              return i % 3 === 0 && (i === 0 || v[i] !== v[i - 1]); },
-            font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => fmt(v)
-          } : undefined
-        },
-        scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { callback: v => fmt(v) } }, x: { grid: { display: false } } }
-      },
-      plugins: temLabels ? [ChartDataLabels] : []
+  // Aba Combustível: custos do contrato filtrado (ou de todos)
+  function renderCustosContrato() {
+    const row = document.getElementById('combCustoKpiRow');
+    if (!row) return;
+    const c = contratoAtual();
+    const lista = c ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c) : FROTA;
+    let aluguel = 0, combPlacas = 0;
+    lista.forEach(v => { aluguel += extrairNumeroValorFrota(v.valor); combPlacas += extrairNumeroValorFrota(v.valorCombustivel); });
+    const bloco = blocoDoMes();
+    const usaRelatorio = bloco && c && contratoTemCombustivel(c);
+    const comb = usaRelatorio ? bloco.total : combPlacas;
+    const periodo = COMB ? (mesComb ? rotuloMes(mesComb) : 'todos os meses') : '';
+    row.innerHTML = `
+      <div class="kpi"><div class="label">🏢 ${esc(c || 'Todos os contratos')}</div>
+        <div class="value">${lista.length}</div><div class="delta" style="color:${cor.muted};">veículos</div></div>
+      <div class="kpi"><div class="label">🚗 Aluguel / Compra</div>
+        <div class="value" style="font-size:20px;">${brl(aluguel)}</div></div>
+      <div class="kpi"><div class="label">⛽ Combustível</div>
+        <div class="value" style="font-size:20px; color:${cor.warn};">${brl(comb)}</div>
+        <div class="delta" style="color:${cor.muted};">${usaRelatorio ? periodo + ' · relatório de abastecimento' : periodo + ' · soma das placas'}</div></div>
+      <div class="kpi"><div class="label">Σ Total</div>
+        <div class="value" style="font-size:20px; color:${cor.accent};">${brl(aluguel + comb)}</div></div>`;
+  }
+
+  // Monta as duas abas uma única vez, reaproveitando os blocos que já existem
+  function montarAbas() {
+    const secao = document.getElementById('frotaSecao');
+    if (!secao || document.getElementById('frotaAbas')) return;
+    const painelDe = id => { const el = document.getElementById(id); return el ? el.closest('.panel') : null; };
+
+    const filtroTopo = document.getElementById('frotaContratoTopo').parentElement;
+    const kpiContratos = document.getElementById('frotaOperacaoKpiRow');
+    const kpiStatus = document.getElementById('frotaKpiRow');
+    const pGasto = painelDe('frotaGastoContratoBody');
+    const pRanking = painelDe('frotaRankingBody');
+    const pTipo = painelDe('frotaTipoChart');
+    const gridGraficos = pTipo ? pTipo.parentElement : null;
+    const pVeiculos = painelDe('frotaTable');
+
+    const abas = document.createElement('div');
+    abas.id = 'frotaAbas';
+    abas.className = 'month-strip';
+    abas.style.margin = '4px 0 16px';
+    abas.innerHTML = `<div class="chip active" data-aba="veiculos">🚗 Veículos</div><div class="chip" data-aba="combustivel">⛽ Combustível</div>`;
+    filtroTopo.insertAdjacentElement('afterend', abas);
+
+    const abaV = document.createElement('div'); abaV.id = 'frotaAbaVeiculos';
+    const abaC = document.createElement('div'); abaC.id = 'frotaAbaCombustivel'; abaC.style.display = 'none';
+    const oculto = document.createElement('div'); oculto.id = 'frotaOculto'; oculto.style.display = 'none';
+    abas.insertAdjacentElement('afterend', abaV);
+    abaV.insertAdjacentElement('afterend', abaC);
+    abaC.insertAdjacentElement('afterend', oculto);
+
+    // Veículos: cards por contrato + Área × Tipo + gráfico por tipo
+    abaV.appendChild(kpiContratos);
+    const grade = document.createElement('div');
+    grade.className = 'grid';
+    grade.style.gridTemplateColumns = '1.4fr 1fr';
+    grade.innerHTML = `<div class="panel"><h2>Veículos por Área e Tipo</h2><div id="frotaMatrizAreaTipo" style="overflow:auto;"></div></div>`;
+    abaV.appendChild(grade);
+    if (pTipo) grade.appendChild(pTipo);
+
+    // Combustível: custos + painel de combustível + gasto por contrato + ranking
+    const custos = document.createElement('div');
+    custos.className = 'kpi-row'; custos.id = 'combCustoKpiRow'; custos.style.marginBottom = '16px';
+    abaC.appendChild(custos);
+    const ancoraComb = document.createElement('div'); ancoraComb.id = 'combAncora';
+    abaC.appendChild(ancoraComb);
+    if (pGasto) abaC.appendChild(pGasto);
+    if (pRanking) abaC.appendChild(pRanking);
+
+    // O que não foi pedido fica escondido (o código original continua funcionando)
+    [kpiStatus, gridGraficos, pVeiculos].forEach(el => { if (el) oculto.appendChild(el); });
+
+    abas.querySelectorAll('.chip').forEach(ch => ch.onclick = () => {
+      abaFrota = ch.dataset.aba;
+      abas.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x === ch));
+      abaV.style.display = abaFrota === 'veiculos' ? '' : 'none';
+      abaC.style.display = abaFrota === 'combustivel' ? '' : 'none';
+      renderFrota();   // redesenha os gráficos da aba que ficou visível
+    });
+  }
+
+  function garantirPainel() {
+    let painel = document.getElementById('frotaCombustivelSecao');
+    if (!painel) {
+      const ancora = document.getElementById('combAncora') || document.getElementById('frotaKpiRow');
+      if (!ancora) return null;
+      painel = document.createElement('div');
+      painel.id = 'frotaCombustivelSecao';
+      painel.className = 'panel';
+      painel.style.marginBottom = '16px';
+      ancora.insertAdjacentElement('afterend', painel);
+    }
+    // (re)monta a estrutura se estiver faltando (ex.: depois do aviso de "sem dados")
+    if (!painel.querySelector('#combMesStrip')) painel.innerHTML = `
+      <h2>Combustível — Claro Infra SPC</h2>
+      <div class="month-strip" id="combMesStrip" style="margin:10px 0 14px;"></div>
+      <div class="kpi-row" id="combTipoKpiRow" style="margin-bottom:16px;"></div>
+      <div class="grid" style="grid-template-columns: 1.3fr 1fr; margin-bottom:0;">
+        <div class="panel">
+          <h2>Valor de combustível mês a mês</h2>
+          <div style="position:relative; height:300px;"><canvas id="combMesesChart"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2 id="combTopTitulo">Top 10 técnicos que mais usaram (Frota)</h2>
+          <div style="position:relative; height:300px;"><canvas id="combTopChart"></canvas></div>
+        </div>
+      </div>
+      <div id="combAviso" class="mono" style="font-size:11px; color:${cor.muted}; margin-top:10px;"></div>`;
+    return painel;
+  }
+
+  function renderCombustivel() {
+    const painel = garantirPainel();
+    if (!painel) return;
+    const c = contratoAtual();
+
+    if (!COMB) {
+      painel.style.display = '';
+      painel.innerHTML = `<h2>Combustível — Claro Infra SPC</h2>
+        <p style="font-size:13px; color:${cor.muted}; margin-top:8px;">Carregando dados_combustivel.json… Se esta mensagem não sumir, o arquivo não foi encontrado no repositório.</p>`;
+      return;
+    }
+    if (!contratoTemCombustivel(c)) { painel.style.display = 'none'; return; }
+    painel.style.display = '';
+
+    // chips de mês
+    const strip = document.getElementById('combMesStrip');
+    strip.innerHTML = COMB.meses.map(m =>
+      `<div class="chip${m === mesComb ? ' active' : ''}" data-mes="${m}">${rotuloMes(m)}</div>`).join('') +
+      `<div class="chip${mesComb === '' ? ' active' : ''}" data-mes="">Todos</div>`;
+    strip.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { mesComb = ch.dataset.mes; renderFrota(); });
+
+    const bloco = blocoDoMes();
+    const periodo = mesComb ? rotuloMes(mesComb) : 'todos os meses';
+
+    // cards por TIPO FROTA
+    const kpi = document.getElementById('combTipoKpiRow');
+    kpi.innerHTML = `<div class="kpi">
+        <div class="label">⛽ Total ${periodo}</div>
+        <div class="value" style="color:${cor.accent}; font-size:20px;">${brl(bloco.total)}</div>
+        <div class="delta" style="color:${cor.muted};">${bloco.qtdAbastecimentos.toLocaleString('pt-BR')} abastecimentos</div>
+      </div>` +
+      bloco.porTipoFrota.map(t => {
+        const pct = bloco.total > 0 ? (t.valor / bloco.total * 100).toFixed(1) : '0.0';
+        const corT = CORES_TIPO[t.tipo] || cor.muted;
+        return `<div class="kpi" style="border-color:${corT}55;">
+          <div class="label" style="color:${corT};">${esc(t.tipo)}</div>
+          <div class="value" style="font-size:20px; color:${corT};">${brl(t.valor)}</div>
+          <div class="delta" style="color:${corT};">${pct}% · ${t.qtd} abast.</div>
+        </div>`;
+      }).join('');
+
+    // gráfico mês a mês (empilhado por TIPO FROTA + total)
+    const tipos = [];
+    COMB.meses.forEach(m => COMB.porMes[m].porTipoFrota.forEach(t => { if (tipos.indexOf(t.tipo) === -1) tipos.push(t.tipo); }));
+    const ordemTipos = ['FROTA', 'GMG', 'RAC', 'BENEFICIO'];
+    tipos.sort((a, b) => (ordemTipos.indexOf(a) + 1 || 99) - (ordemTipos.indexOf(b) + 1 || 99));
+    const valorTipo = (m, tipo) => { const t = COMB.porMes[m].porTipoFrota.find(x => x.tipo === tipo); return t ? t.valor : 0; };
+    const totaisMes = COMB.meses.map(m => COMB.porMes[m].total);
+
+    const dsTipos = tipos.map(tipo => ({
+      type: 'bar', label: tipo, stack: 'v',
+      data: COMB.meses.map(m => valorTipo(m, tipo)),
+      backgroundColor: COMB.meses.map(m => (CORES_TIPO[tipo] || cor.muted) + (mesComb && m !== mesComb ? '66' : 'dd')),
+      borderRadius: 3,
+      datalabels: { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 4000, color: '#fff',
+        font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => brlCurto(v) }
+    }));
+    const dsTotal = {
+      type: 'bar', label: 'Total', stack: 'v', data: COMB.meses.map(() => 0), backgroundColor: 'rgba(0,0,0,0)',
+      datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
+        formatter: (v, ctx) => {
+          const i = ctx.dataIndex, atual = totaisMes[i], ant = i > 0 ? totaisMes[i - 1] : null;
+          const varTxt = ant ? ' (' + ((atual - ant) / ant * 100 >= 0 ? '+' : '') + ((atual - ant) / ant * 100).toFixed(1) + '%)' : '';
+          return brlCurto(atual) + varTxt;
+        } }
     };
-    if (grafico) grafico.destroy();
-    grafico = new Chart(raiz.querySelector('#pv-canvas'), cfg);
-  }
 
-  let graficoMensal = null;
-  function graficoMensal_() {
-    const ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    // Meses que existem no JSON (atual + travados) são calculados da base;
-    // os demais vêm do HISTORICO_MENSAL.
-    const serie = HISTORICO_MENSAL.filter(h => !todosMeses[h.mes]).map(h => ({ ...h }));
-    Object.keys(todosMeses).forEach(k => {
-      const regsMes = todosMeses[k].registros;
-      serie.push({ mes: k, programadas: regsMes.length,
-        executadas: regsMes.filter(executadaEm(k)).length, atual: k === mesBase });
-    });
-    serie.sort((a, b) => a.mes.localeCompare(b.mes));
-    const rot = serie.map(h => ABREV[+h.mes.slice(5) - 1] + '/' + h.mes.slice(2, 4) + (h.atual ? '*' : ''));
-    const pcts = serie.map(h => h.programadas ? h.executadas / h.programadas * 100 : 0);
-    const corPct = p => p >= 100 ? '#059669' : p >= 95 ? '#d97706' : '#dc2626';
-    // destaca a barra do mês escolhido no filtro
-    const destaque = (cor, corSel) => serie.map(h => h.mes === dados.mes ? corSel : cor);
-    const temLabels = typeof ChartDataLabels !== 'undefined';
-
-    if (graficoMensal) graficoMensal.destroy();
-    graficoMensal = new Chart(raiz.querySelector('#pv-mensal'), {
-      data: {
-        labels: rot,
-        datasets: [
-          { type: 'bar', label: 'Programadas', data: serie.map(h => h.programadas),
-            backgroundColor: destaque('rgba(107,117,144,.6)', 'rgba(107,117,144,.9)'), borderRadius: 5, order: 2,
-            datalabels: { color: '#000', anchor: 'end', align: 'top', font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
-          { type: 'bar', label: 'Executadas', data: serie.map(h => h.executadas),
-            backgroundColor: destaque('rgba(14,124,134,.8)', 'rgba(10,95,102,1)'), borderRadius: 5, order: 2,
-            datalabels: { color: '#000', anchor: 'end', align: 'top', font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
-          { type: 'line', label: '% Execução', data: pcts, yAxisID: 'y1', order: 1,
-            borderColor: '#d97706', backgroundColor: '#d97706', tension: .3, pointRadius: 4,
-            pointBackgroundColor: pcts.map(corPct), pointBorderColor: pcts.map(corPct),
-            datalabels: { align: 'top', offset: 6, color: c => corPct(pcts[c.dataIndex]),
-              font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => Math.round(v) + '%',
-              backgroundColor: 'rgba(255,255,255,.85)', borderRadius: 4, padding: { top: 1, bottom: 1, left: 4, right: 4 } } },
-          { type: 'line', label: 'Meta 100%', data: serie.map(() => 100), yAxisID: 'y1', order: 1,
-            borderColor: '#000', borderDash: [5, 5], pointRadius: 0, borderWidth: 1, datalabels: { display: false } }
-        ]
-      },
-      plugins: temLabels ? [ChartDataLabels] : [],
+    if (chartMeses) chartMeses.destroy();
+    chartMeses = new Chart(document.getElementById('combMesesChart'), {
+      data: { labels: COMB.meses.map(rotuloMes), datasets: [...dsTipos, dsTotal] },
+      plugins: [ChartDataLabels],
       options: {
-        responsive: true, maintainAspectRatio: false,
-        layout: { padding: { top: 10 } },
+        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
         plugins: {
-          legend: { labels: { color: '#6b7590', font: { family: 'Inter', size: 11 }, boxWidth: 12 } },
-          tooltip: { callbacks: {
-            label: c => c.dataset.yAxisID === 'y1' ? `${c.dataset.label}: ${c.parsed.y.toFixed(1).replace('.', ',')}%` : `${c.dataset.label}: ${fmt(c.parsed.y)}`,
-            footer: it => serie[it[0].dataIndex].atual ? 'Mês atual (parcial)' : '' } }
+          legend: { labels: { color: cor.muted, font: { family: 'Inter', size: 11 }, filter: i => i.text !== 'Total' } },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Total' ? null : ctx.dataset.label + ': ' + brl(ctx.parsed.y) } },
+          datalabels: { display: true }
         },
         scales: {
-          x: { grid: { display: false }, ticks: { color: '#1b2440', font: { weight: 'bold' } } },
-          y: { beginAtZero: true, max: Math.ceil(Math.max(...serie.map(h => h.programadas)) * 1.75 / 200) * 200, grid: { display: false }, ticks: { color: '#1b2440' } },
-          y1: { position: 'right', min: 0, max: 110, grid: { display: false },
-            ticks: { color: '#1b2440', callback: v => v <= 100 ? v + '%' : '' } }
+          x: { stacked: true, ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } }
         }
       }
     });
-  }
 
-  function tabela(regs) {
-    const lista = regs.filter(r => r.st !== 'Executada').filter(r => !busca ||
-      [r.s, r.si, r.w, r.m, r.t, r.e, r.x, r.ex, r.tp].some(v => String(v ?? '').toLowerCase().includes(busca)));
-    raiz.querySelector('#pv-qtd-tab').textContent = fmt(lista.length);
-    raiz.querySelector('#pv-tbody').innerHTML = lista.map(r => `<tr>
-      <td><span class="pill ${r.st === 'Aberta' ? 'warn' : 'bad'}">${esc(r.st)}</span></td><td>${esc(r.s)}</td><td>${esc(r.si)}</td>
-      <td>${esc(r.m)}</td><td>${esc(r.t)}</td><td>${esc(r.tp)}</td><td>${esc(r.ex)}</td><td>${esc(r.x)}</td><td>${esc(r.e)}</td><td>${esc(r.w)}</td>
-    </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;color:#6b7590">Nenhuma preventiva pendente</td></tr>';
-  }
-
-  // ======================= ABA OPERAÇÃO =======================
-  const FILTROS_OP = [
-    { k: 'xpF', rotulo: 'Expurgo' },
-    { k: 'st',  rotulo: 'Status' },
-    { k: 'ex',  rotulo: 'Executor' },
-    { k: 't',   rotulo: 'Tipo Preventiva' },
-    { k: 'io',  rotulo: 'Infratel OK' },
-    { k: 'x',   rotulo: 'Equipe Responsável' }
-  ];
-  const selOp = { xpF: '', st: '', ex: '', t: '', io: '', x: '' };
-  let buscaOp = '', opMontada = false;
-  const FILTROS_TEC = [
-    { k: 't', rotulo: 'Tipo de Preventiva' },
-    { k: 'x', rotulo: 'Equipe' }
-  ];
-  const selTec = { t: '', x: '' };
-  let buscaTec = '', tecMontada = false;
-
-  const temRelatorio = r => String(r.er || '').trim() !== '';
-  const fmtPct = v => v === null || v === undefined ? '' : (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-
-  // Cor do "Status Final" (legenda do Power BI):
-  //  verde    = Executada: Infratel 100% + relatório recebido (MOP não exige relatório)
-  //  amarelo  = Divergência: relatório recebido, porém Infratel 0%
-  //  vermelho = Verificar: Infratel 100%, porém sem relatório entregue (EPS)
-  function corStatusFinal(r) {
-    const rel = temRelatorio(r), infra100 = r.pc === 1, infra0 = r.pc === 0;
-    if (r.ex === 'MOP') return infra100 ? 'verde' : '';
-    if (infra100 && rel) return 'verde';
-    if (rel && infra0) return 'amarelo';
-    if (infra100 && !rel) return 'vermelho';
-    return '';
-  }
-
-  function filtrarOp(ignorar) {
-    return dados.registros.filter(r => FILTROS_OP.every(f => f.k === ignorar || !selOp[f.k] || r[f.k] === selOp[f.k]));
-  }
-
-  function montarOp() {
-    const alvo = raiz.querySelector('#pv-aba-op');
-    alvo.innerHTML = `
-      <div class="pv-filtros pv-op-filtros">
-        ${FILTROS_OP.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
-      </div>
-      <div class="kpi-row" id="pv-op-ritmo" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px;"></div>
-      <div class="kpi-row" id="pv-op-kpis" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));"></div>
-      <div class="grid" style="grid-template-columns:1.4fr 1fr;">
-        <div class="panel">
-          <h2>Realizado x Meta Diária</h2>
-          <div style="position:relative;height:300px;"><canvas id="pv-op-diario"></canvas></div>
-        </div>
-        <div class="panel">
-          <h2>Entrega por Equipe Responsável</h2>
-          <div id="pv-op-equipes" style="display:flex;flex-direction:column;gap:22px;margin-top:18px;"></div>
-        </div>
-      </div>
-      <div class="panel">
-        <div class="pv-tab-topo">
-          <h2>Preventivas (<span id="pv-op-qtd">0</span>)</h2>
-          <div class="search">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
-            <input id="pv-op-busca" type="search" placeholder="Buscar WO, site, chamado...">
-          </div>
-        </div>
-        <div class="pv-rolagem" style="max-height:560px;"><table class="pv-op-tab">
-          <thead><tr><th>WO</th><th>Site</th><th>Tipo de Infra</th><th>Equipe Responsável - Engemon</th>
-          <th class="num">% Inventário</th><th>Nº do chamado / Acesso</th><th>Infratel OK</th><th>Tipo de Preventiva</th>
-          <th class="num">% Cronograma Infratel</th><th>Relatórios Entregues</th><th>Expurgo</th></tr></thead>
-          <tbody id="pv-op-tbody"></tbody></table></div>
-      </div>`;
-    alvo.querySelectorAll('.pv-op-filtros select').forEach(s =>
-      s.addEventListener('change', () => { selOp[s.dataset.k] = s.value; atualizarOp(); }));
-    alvo.querySelector('#pv-op-busca').addEventListener('input', e => { buscaOp = e.target.value.toLowerCase(); tabelaOp(filtrarOp()); });
-    opMontada = true;
-  }
-
-  function opcoesOp() {
-    raiz.querySelectorAll('.pv-op-filtros select').forEach(s => {
-      const k = s.dataset.k;
-      const vals = [...new Set(filtrarOp(k).map(r => r[k]))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
-      if (selOp[k] && !vals.includes(selOp[k])) vals.push(selOp[k]);
-      s.innerHTML = '<option value="">Todos</option>' +
-        vals.map(v => `<option value="${esc(v)}"${v === selOp[k] ? ' selected' : ''}>${esc(v)}</option>`).join('');
-    });
-  }
-
-  function atualizarOp() {
-    opcoesOp();
-    const regs = filtrarOp();
-    const planejado = regs.length;
-    const realizado = regs.filter(r => r.st === 'Executada').length;
-    const entrega = planejado ? realizado / planejado * 100 : 0;
-    const totalRel = regs.filter(r => r.ex === 'EPS').length;
-    const relEntregues = regs.filter(temRelatorio).length;
-    const expurgo = regs.filter(r => r.xp).length;
-    const traco = v => v ? v : '--';
-
-    raiz.querySelector('#pv-op-kpis').innerHTML = `
-      <div class="kpi"><div class="label">📄 Total Relatórios EPS</div>
-        <div class="value">${fmt(totalRel)}</div>
-        <div class="delta" style="color:${COR.muted}">Zeladoria, SDAI, Gerador, Termografia e SPDA</div></div>
-      <div class="kpi"><div class="label">🚫 Qtd Expurgo</div>
-        <div class="value"><span style="color:${COR.warn}">${fmt(expurgo)}</span></div>
-        <div class="delta" style="color:${COR.muted}">% Expurgo <b style="color:#1b2440">${pct(planejado ? expurgo / planejado * 100 : 0)}</b></div></div>`;
-
-    ritmoOp(regs);
-    tabelaOp(regs);
-  }
-
-  let graficoDiario = null;
-  function ritmoOp(regs) {
-    const dias = diasDoMes(dados.mes);
-    const ref = dataReferencia(dados.mes);
-    const duMes = dias.filter(d => d.util).length || 1;
-    const duRef = dias.filter(d => d.util && d.data <= ref).length;
-    const restantes = duMes - duRef;
-
-    const total = regs.length;
-    const exec = regs.filter(r => r.st === 'Executada');
-    const realizadas = exec.length;
-    const realD1 = exec.filter(r => r.d && r.d <= ref).length;
-    const media = duRef ? realD1 / duRef : 0;
-    const necessario = restantes > 0 ? Math.max(0, total - realD1) / restantes : 0;
-    const capacidade = Math.round(realD1 + media * restantes);
-    const projecao = total ? capacidade / total * 100 : 0;
-    const dec = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    raiz.querySelector('#pv-op-ritmo').innerHTML = `
-      <div class="kpi"><div class="label">✅ Realizadas | Total WO</div>
-        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
-          <span style="color:${COR.good}">${fmt(realizadas)}</span><span class="pv-sep">|</span><span>${fmt(total)}</span></div>
-        <div class="delta" style="color:${COR.muted}">% Entrega <b style="color:#1b2440">${pct(total ? realizadas / total * 100 : 0)}</b></div></div>
-      <div class="kpi"><div class="label">📊 Média Realizada Dia</div>
-        <div class="value">${dec(media)}</div>
-        <div class="delta" style="color:${COR.muted}">${fmt(realD1)} em ${duRef} dias úteis</div></div>
-      <div class="kpi"><div class="label">🎯 Necessário por Dia</div>
-        <div class="value"><span style="color:${necessario > media ? COR.bad : COR.good}">${dec(necessario)}</span></div>
-        <div class="delta" style="color:${COR.muted}">para fechar ${fmt(total)} no mês</div></div>
-      <div class="kpi"><div class="label">📅 Dias Úteis Restantes</div>
-        <div class="value">${restantes}</div>
-        <div class="delta" style="color:${COR.muted}">${duRef} / ${duMes} dias úteis</div></div>
-      <div class="kpi"><div class="label">🔮 Capacidade | % Projeção D-1</div>
-        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
-          <span>${fmt(capacidade)}</span><span class="pv-sep">|</span><span style="color:${corAder(projecao)}">${pct(projecao)}</span></div>
-        <div class="delta" style="color:${COR.muted}">no ritmo atual até o fim do mês</div></div>`;
-
-    // gráfico Realizado x Meta Diária
-    // Meta do dia = meta original do dia + o que ficou faltando nos dias anteriores
-    // (meta acumulada até hoje − realizado acumulado até ontem). Se sobrou, abate do dia seguinte.
-    // Dias depois de D-1 usam a meta de recuperação (o que falta ÷ dias úteis restantes).
-    const porDia = {};
-    exec.forEach(r => { if (r.d) porDia[r.d] = (porDia[r.d] || 0) + 1; });
-    const metaOriginal = total / duMes;
-    const realDia = [], metaDia = [], deficitAnt = [], corBarra = [];
-    let du = 0, realAcumAnt = 0;
-    dias.forEach(d => {
-      const feito = porDia[d.data] || 0;
-      if (d.util) du++;
-      let meta = null, deficit = null;
-      if (d.util) {
-        if (d.data <= ref) {
-          const planAcum = metaOriginal * du;
-          meta = Math.max(0, planAcum - realAcumAnt);
-          deficit = meta - metaOriginal;
-        } else {
-          meta = necessario;
-          deficit = necessario - metaOriginal;
-        }
-      }
-      realDia.push(d.data <= ref || feito ? feito : null);
-      metaDia.push(meta === null ? null : Math.round(meta * 100) / 100);
-      deficitAnt.push(deficit);
-      corBarra.push(meta === null ? 'rgba(107,117,144,.55)' : feito >= meta - 0.005 ? 'rgba(5,150,105,.8)' : 'rgba(220,38,38,.75)');
-      realAcumAnt += feito;
-    });
-
-    const cv = raiz.querySelector('#pv-op-diario');
-    if (graficoDiario) graficoDiario.destroy();
-    graficoDiario = new Chart(cv, {
+    // Top 10 técnicos (FROTA)
+    const top = bloco.topMotoristasFrota || [];
+    document.getElementById('combTopTitulo').textContent = 'Top 10 técnicos que mais usaram (Frota) — ' + periodo;
+    if (chartTop) chartTop.destroy();
+    chartTop = new Chart(document.getElementById('combTopChart'), {
+      type: 'bar',
       data: {
-        labels: dias.map(d => String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5)),
-        datasets: [
-          { type: 'bar', label: 'Realizado Dia', data: realDia, backgroundColor: corBarra, borderRadius: 3, order: 3,
-            datalabels: { display: c => c.dataset.data[c.dataIndex] > 0, anchor: 'end', align: 'top', color: '#000',
-              font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
-          { type: 'line', label: 'Meta do Dia (com acúmulo)', data: metaDia, spanGaps: false,
-            borderColor: COR.warn, backgroundColor: COR.warn, borderWidth: 2, stepped: 'middle',
-            pointRadius: 3, pointHoverRadius: 5, order: 1,
-            datalabels: { display: c => c.dataset.data[c.dataIndex] !== null, align: 'top', offset: 4, color: COR.warn,
-              font: { size: 9, family: 'JetBrains Mono', weight: '700' }, formatter: v => Math.round(v) } },
-          { type: 'line', label: 'Meta Original', data: dias.map(d => d.util ? Math.round(metaOriginal * 100) / 100 : null),
-            borderColor: '#6b7590', borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, order: 2, spanGaps: true,
-            datalabels: { display: false } }
-        ]
+        labels: top.map(t => t.motorista),
+        datasets: [{
+          label: 'Valor', data: top.map(t => t.valor),
+          backgroundColor: top.map((_, i) => i === 0 ? cor.bad : 'rgba(14,124,134,.8)'), borderRadius: 4,
+          datalabels: { anchor: 'end', align: 'right', color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+            formatter: v => brl(v) }
+        }]
       },
-      plugins: typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [],
+      plugins: [ChartDataLabels],
       options: {
-        responsive: true, maintainAspectRatio: false,
-        layout: { padding: { top: 14 } },
-        interaction: { mode: 'index', intersect: false },
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 90 } },
         plugins: {
-          legend: { labels: { color: COR.muted, font: { family: 'Inter', size: 11 }, boxWidth: 12 } },
-          tooltip: { callbacks: {
-            label: c => c.parsed.y === null ? null : `${c.dataset.label}: ${dec(c.parsed.y)}`,
-            afterBody: it => {
-              const i = it[0].dataIndex, dAnt = deficitAnt[i];
-              if (dAnt === null) return 'Dia não útil';
-              return dAnt >= 0 ? `Acúmulo dos dias anteriores: +${dec(dAnt)}` : `Sobra dos dias anteriores: ${dec(dAnt)}`;
-            } } }
+          legend: { display: false }, datalabels: { display: true },
+          tooltip: { callbacks: { afterLabel: ctx => {
+            const t = top[ctx.dataIndex];
+            return t.qtd + ' abastecimentos' + (t.placas && t.placas.length ? ' · placa ' + t.placas.join(', ') : '');
+          } } }
         },
-        scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-          y: { beginAtZero: true, grid: { color: '#e1e5f0' } } }
-      }
-    });
-
-    // barras por Equipe Responsável
-    const porEquipe = {};
-    regs.forEach(r => {
-      const k = r.x || 'Sem equipe';
-      porEquipe[k] = porEquipe[k] || { feitas: 0, total: 0 };
-      porEquipe[k].total++;
-      if (r.st === 'Executada') porEquipe[k].feitas++;
-    });
-    raiz.querySelector('#pv-op-equipes').innerHTML = Object.keys(porEquipe).sort().map(k => {
-      const { feitas, total: tot } = porEquipe[k];
-      const p = tot ? feitas / tot * 100 : 0;
-      const cor = p >= 100 ? '#16a34a' : p >= 80 ? '#eab308' : '#dc2626';
-      return `<div style="display:grid;grid-template-columns:110px 1fr auto;gap:12px;align-items:center;">
-        <b style="font-size:13px;text-align:right;">${esc(k)}</b>
-        <div><div style="background:#e5e7eb;border-radius:999px;height:14px;overflow:hidden;">
-          <div style="width:${Math.min(100, p)}%;background:${cor};height:100%;border-radius:999px;"></div></div>
-          <div class="mono" style="font-size:11px;color:${COR.muted};margin-top:4px;">${p.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%</div></div>
-        <b class="mono" style="font-size:13px;">${fmt(feitas)} / ${fmt(tot)}</b></div>`;
-    }).join('') || `<div style="color:${COR.muted}">Sem dados</div>`;
-  }
-
-  // ======================= ABA PRODUTIVIDADE (POR TÉCNICO) =======================
-  // Depende do campo r.tec em cada registro — nome do técnico, obtido via JOIN
-  // entre a aba Atualização_Preventiva (WO) e a aba Validação (coluna Executor),
-  // feito na geração do dados_preventiva.json. Sem esse campo, tudo cai em
-  // "Sem técnico identificado".
-  function montarTec() {
-    const alvo = raiz.querySelector('#pv-aba-tec');
-    alvo.innerHTML = `
-      <div class="pv-filtros pv-tec-filtros">
-        ${FILTROS_TEC.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
-      </div>
-      <div class="kpi-row" id="pv-tec-kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:14px;"></div>
-      <div class="panel">
-        <div class="pv-tab-topo">
-          <h2>Produtividade por Técnico (<span id="pv-tec-qtd">0</span>)</h2>
-          <div class="search">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
-            <input id="pv-tec-busca" type="search" placeholder="Buscar técnico...">
-          </div>
-        </div>
-        <div class="pv-rolagem" style="max-height:560px;">
-          <table class="pv-tec-tab">
-            <thead><tr><th>#</th><th>Técnico</th><th>Equipe</th><th class="num">Qtd WO</th><th class="num">% do Total</th><th class="num">Dias Trabalhados</th><th class="num">Média WO/Dia</th></tr></thead>
-            <tbody id="pv-tec-tbody"></tbody>
-          </table>
-        </div>
-      </div>`;
-    alvo.querySelectorAll('.pv-tec-filtros select').forEach(s =>
-      s.addEventListener('change', () => { selTec[s.dataset.k] = s.value; renderTec(); }));
-    alvo.querySelector('#pv-tec-busca').addEventListener('input', e => { buscaTec = e.target.value.toLowerCase(); renderTec(); });
-    tecMontada = true;
-  }
-
-  function atualizarTec() { renderTec(); }
-
-  // Base: dados.registros (Atualização_Preventiva), uma linha por preventiva
-  // de verdade — só preventivas Executadas e com técnico identificado (via
-  // Validação) entram na produtividade.
-  function filtrarTec(ignorar) {
-    return dados.registros.filter(r =>
-      r.st === 'Executada' && r.tec &&
-      FILTROS_TEC.every(f => f.k === ignorar || !selTec[f.k] || r[f.k] === selTec[f.k]));
-  }
-
-  function opcoesTec() {
-    raiz.querySelectorAll('.pv-tec-filtros select').forEach(s => {
-      const k = s.dataset.k;
-      const vals = [...new Set(filtrarTec(k).map(r => r[k]).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
-      if (selTec[k] && !vals.includes(selTec[k])) vals.push(selTec[k]);
-      s.innerHTML = '<option value="">Todos</option>' +
-        vals.map(v => `<option value="${esc(v)}"${v === selTec[k] ? ' selected' : ''}>${esc(v)}</option>`).join('');
-    });
-  }
-
-  function renderTec() {
-    opcoesTec();
-    const base = filtrarTec();
-    const porTec = {};
-    base.forEach(r => {
-      const nome = r.tec;
-      if (!porTec[nome]) porTec[nome] = { qtd: 0, dias: new Set(), x: r.x || '' };
-      porTec[nome].qtd++;
-      const dataRef = r.ini || r.d;
-      if (dataRef) porTec[nome].dias.add(dataRef);
-      if (!porTec[nome].x && r.x) porTec[nome].x = r.x;
-    });
-
-    const totalWo = base.length; // já é contagem de preventivas reais (1 linha = 1 WO)
-    let linhasTodas = Object.entries(porTec).map(([nome, info]) => {
-      const dias = info.dias.size;
-      return { nome, qtd: info.qtd, dias, media: dias ? info.qtd / dias : 0, x: info.x,
-        pctTotal: totalWo ? info.qtd / totalWo * 100 : 0 };
-    }).sort((a, b) => b.qtd - a.qtd);
-
-    const mediaGeral = linhasTodas.length ? linhasTodas.reduce((s, l) => s + l.media, 0) / linhasTodas.length : 0;
-
-    raiz.querySelector('#pv-tec-kpis').innerHTML = `
-      <div class="kpi"><div class="label">👷 Técnicos</div><div class="value">${fmt(linhasTodas.length)}</div></div>
-      <div class="kpi"><div class="label">🧾 Total WO</div><div class="value">${fmt(totalWo)}</div></div>
-      <div class="kpi"><div class="label">📊 Média Geral WO/Dia</div><div class="value">${mediaGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div></div>`;
-
-    // Tabela (aplica busca)
-    let linhas = linhasTodas;
-    if (buscaTec) linhas = linhas.filter(l => l.nome.toLowerCase().includes(buscaTec));
-
-    raiz.querySelector('#pv-tec-qtd').textContent = fmt(linhas.length);
-    raiz.querySelector('#pv-tec-tbody').innerHTML = linhas.map((l, i) => {
-      const corMedia = l.media >= mediaGeral ? COR.good : COR.bad;
-      return `<tr>
-        <td class="mono" style="color:${COR.muted}">${i + 1}</td>
-        <td>${esc(l.nome)}</td>
-        <td>${l.x ? `<span class="pill">${esc(l.x)}</span>` : '--'}</td>
-        <td class="num mono">${fmt(l.qtd)}</td>
-        <td class="num mono">${pct(l.pctTotal)}</td>
-        <td class="num mono">${fmt(l.dias)}</td>
-        <td class="num mono" style="font-weight:700;color:${corMedia}">${l.media.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="7" style="text-align:center;color:#6b7590">Nenhum técnico encontrado</td></tr>';
-  }
-
-  function tabelaOp(regs) {
-    const lista = regs.filter(r => !buscaOp ||
-      [r.w, r.si, r.s, r.ch, r.t, r.ti, r.x, r.m].some(v => String(v ?? '').toLowerCase().includes(buscaOp)))
-      .sort((a, b) => String(a.w).localeCompare(String(b.w)));
-    raiz.querySelector('#pv-op-qtd').textContent = fmt(lista.length);
-    raiz.querySelector('#pv-op-tbody').innerHTML = lista.map(r => {
-      return `<tr>
-        <td class="mono" style="font-size:12px;">${esc(r.w)}</td><td>${esc(r.si)}</td><td>${esc(r.ti) || '-'}</td><td>${esc(r.x)}</td>
-        <td class="num">${r.pi === null || r.pi === undefined ? '' : fmt(r.pi)}</td><td class="mono" style="font-size:12px;">${esc(r.ch)}</td>
-        <td>${r.io === 'OK' ? '<span class="pill good">OK</span>' : `<span class="pill bad">${esc(r.io) || '—'}</span>`}</td>
-        <td>Preventiva infra - ${esc(r.t)}</td>
-        <td class="num">${fmtPct(r.pc)}</td><td>${esc(r.er)}</td><td>${esc(r.xp)}</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="11" style="text-align:center;color:#6b7590">Nenhuma preventiva encontrada</td></tr>';
-  }
-
-  function trocarAba(aba) {
-    abaAtiva = aba;
-    raiz.querySelectorAll('.pv-aba').forEach(b => b.classList.toggle('active', b.dataset.aba === aba));
-    raiz.querySelector('#pv-aba-geral').style.display = aba === 'geral' ? '' : 'none';
-    raiz.querySelector('#pv-aba-op').style.display = aba === 'op' ? '' : 'none';
-    raiz.querySelector('#pv-aba-tec').style.display = aba === 'tec' ? '' : 'none';
-    raiz.querySelector('#pv-aba-cap').style.display = aba === 'cap' ? '' : 'none';
-    if (aba === 'cap') { if (!capMontada) montarCap(); renderCap(); return; }
-    if (aba === 'op') { if (!opMontada) montarOp(); atualizarOp(); if (graficoDiario) graficoDiario.resize(); }
-    else if (aba === 'tec') { if (!tecMontada) montarTec(); atualizarTec(); }
-    else { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); }
-  }
-
-  // ======================= ABA CAPACIDADE MOP MÓVEL =======================
-  // Quantas preventivas MOP · MÓVEL por dia útil são necessárias para fechar o
-  // mês, comparando com a capacidade das equipes (duplas e solos × média/dia).
-  let capMontada = false, graficoCap = null;
-  // NOVO: filtro de Executor da aba (MOP, EPS ou os dois). Começa em MOP.
-  let capExec = 'MOP';
-
-  function montarCap() {
-    const alvo = raiz.querySelector('#pv-aba-cap');
-    alvo.innerHTML = `
-      <div class="pv-filtros">
-        <label for="pv-cap-exec">Executor</label>
-        <select id="pv-cap-exec">
-          <option value="MOP"${capExec === 'MOP' ? ' selected' : ''}>MOP</option>
-          <option value="EPS"${capExec === 'EPS' ? ' selected' : ''}>EPS</option>
-          <option value=""${capExec === '' ? ' selected' : ''}>Todos (MOP + EPS)</option>
-        </select>
-        <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);">Equipe Responsável: MÓVEL</span>
-      </div>
-      <div class="kpi-row" id="pv-cap-kpis" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px;"></div>
-      <div class="kpi-row" id="pv-cap-kpis2" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px;"></div>
-      <div class="kpi-row" id="pv-cap-kpis3" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:14px;"></div>
-      <div class="panel">
-        <h2 id="pv-cap-titulo">Realizado por dia</h2>
-        <div class="hint" id="pv-cap-hint"></div>
-        <div style="position:relative;height:320px;"><canvas id="pv-cap-grafico"></canvas></div>
-      </div>
-      <div class="panel">
-        <div class="pv-tab-topo">
-          <h2>Distribuição por Equipe (<span id="pv-cap-qtd">0</span>)</h2>
-          <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);" id="pv-cap-legenda"></span>
-        </div>
-        <div class="pv-rolagem" style="max-height:560px;">
-          <table class="pv-tec-tab">
-            <thead><tr><th>#</th><th>Técnico 1</th><th>Técnico 2</th><th>Tipo</th><th class="num">Média/dia</th>
-              <th class="num">Capacidade no mês</th><th class="num">Realizadas no mês</th></tr></thead>
-            <tbody id="pv-cap-tbody"></tbody>
-          </table>
-        </div>
-      </div>`;
-    alvo.querySelector('#pv-cap-exec').addEventListener('change', e => { capExec = e.target.value; renderCap(); });
-    capMontada = true;
-  }
-
-  function renderCap() {
-    const dec = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    const regs = dados.registros.filter(r => semAcento(r.x) === 'movel' && (!capExec || r.ex === capExec));
-    const rotuloExec = (capExec || 'MOP + EPS') + ' · Móvel';
-    const dias = diasDoMes(dados.mes);
-    const hoje = iso(new Date());
-    const duMes = dias.filter(d => d.util).length || 1;
-    // dias úteis que ainda dá para trabalhar: de hoje (inclusive) até o fim do mês
-    const diasRest = dias.filter(d => d.util && d.data >= hoje);
-    const nRest = diasRest.length;
-
-    const total = regs.length;
-    const executadas = regs.filter(r => r.st === 'Executada').length;
-    const pendentes = total - executadas;
-
-    const equipes = EQUIPES_MOP_MOVEL.map(e => ({ ...e, media: MEDIA_POR_DIA[e.tipo] || 0 }));
-    const nDuplas = equipes.filter(e => e.tipo === 'Dupla').length;
-    const nSolos = equipes.filter(e => e.tipo === 'Solo').length;
-    const capCheia = equipes.reduce((s, e) => s + e.media, 0);           // todas as equipes trabalhando
-    const mediaEquipe = equipes.length ? capCheia / equipes.length : 0;
-    const equipesAtivas = Math.max(0, equipes.length - FALTAS_POR_DIA);  // descontando a falta do dia
-    const fatorPresenca = equipes.length ? equipesAtivas / equipes.length : 0;
-    const capDia = Math.round(capCheia * fatorPresenca * 10) / 10;       // ex.: 14 equipes, 1 falta -> 13 × 4 = 52
-    const capRest = Math.round(capDia * nRest);
-    const necessarioDia = nRest > 0 ? pendentes / nRest : 0;
-    const necessarioEquipe = equipesAtivas && nRest > 0 ? pendentes / nRest / equipesAtivas : 0;
-    const planoMesDia = total / duMes;                                  // ritmo do mês inteiro, do zero
-    const saldo = capRest - pendentes;                                  // + folga / − déficit
-    const diasParaZerar = capDia > 0 ? Math.ceil(pendentes / capDia) : 0;
-    const equipesNecessarias = nRest > 0 && mediaEquipe > 0 ? Math.ceil(necessarioDia / mediaEquipe) + FALTAS_POR_DIA : 0;
-    const corSaldo = saldo >= 0 ? COR.good : COR.bad;
-
-    // NOVO: projeção pelo RITMO REAL (média do que está sendo realizado por dia útil).
-    // Ex.: se no ritmo atual vou ficar devendo 150 em 17 dias úteis -> 8,8 WO/dia a mais
-    // -> 8,8 ÷ 4 (média por equipe) = 2,2 -> 3 equipes a mais.
-    const duDecorridos = dias.filter(d => d.util && d.data < hoje).length;
-    const realizadasAteOntem = regs.filter(r => r.st === 'Executada' && r.d && r.d.slice(0, 7) === dados.mes && r.d < hoje).length;
-    const mediaReal = duDecorridos > 0 ? realizadasAteOntem / duDecorridos : 0;
-    const projecaoFim = Math.round(executadas + mediaReal * nRest);
-    const devendo = Math.max(0, total - projecaoFim);
-    const faltaPorDia = nRest > 0 ? devendo / nRest : 0;
-    const equipesExtrasBruto = mediaEquipe > 0 ? faltaPorDia / mediaEquipe : 0;
-    const equipesExtras = Math.ceil(equipesExtrasBruto - 1e-9);
-
-    raiz.querySelector('#pv-cap-kpis').innerHTML = `
-      <div class="kpi"><div class="label">📋 ${rotuloExec} no mês</div>
-        <div class="value">${fmt(total)}</div>
-        <div class="delta" style="color:${COR.muted}">${dec(planoMesDia)} por dia útil (${duMes} dias úteis)</div></div>
-      <div class="kpi"><div class="label">✅ Executadas | Pendentes</div>
-        <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
-          <span style="color:${COR.good}">${fmt(executadas)}</span><span class="pv-sep">|</span><span style="color:${COR.bad}">${fmt(pendentes)}</span></div>
-        <div class="delta" style="color:${COR.muted}">${pct(total ? executadas / total * 100 : 0)} executado</div></div>
-      <div class="kpi"><div class="label">📅 Dias Úteis Restantes</div>
-        <div class="value">${nRest}</div>
-        <div class="delta" style="color:${COR.muted}">contando a partir de hoje</div></div>`;
-
-    raiz.querySelector('#pv-cap-kpis2').innerHTML = `
-      <div class="kpi"><div class="label">👥 Equipes</div>
-        <div class="value">${equipes.length}</div>
-        <div class="delta" style="color:${COR.muted}">${nDuplas} duplas · ${nSolos} solo · ${equipesAtivas} ativas/dia (${FALTAS_POR_DIA} falta)</div></div>
-      <div class="kpi"><div class="label">⚙️ Capacidade por Dia</div>
-        <div class="value">${fmt(capDia)}</div>
-        <div class="delta" style="color:${COR.muted}">${equipesAtivas} equipes × ${dec(mediaEquipe)} (sem a falta: ${fmt(capCheia)})</div></div>
-      <div class="kpi"><div class="label">📦 Capacidade até o fim do mês</div>
-        <div class="value">${fmt(capRest)}</div>
-        <div class="delta" style="color:${corSaldo};font-weight:600;">${saldo >= 0 ? 'folga de ' + fmt(saldo) : 'faltam ' + fmt(-saldo)} preventivas</div></div>
-      <div class="kpi"><div class="label">⏱️ Dias para zerar</div>
-        <div class="value">${fmt(diasParaZerar)}</div>
-        <div class="delta" style="color:${COR.muted}">na capacidade de ${fmt(capDia)}/dia</div></div>`;
-
-    raiz.querySelector('#pv-cap-kpis3').innerHTML = `
-      <div class="kpi"><div class="label">📊 Média realizada por dia</div>
-        <div class="value">${dec(mediaReal)}</div>
-        <div class="delta" style="color:${COR.muted}">${fmt(realizadasAteOntem)} em ${duDecorridos} dias úteis (até ontem)</div></div>
-      <div class="kpi"><div class="label">🔮 Projeção no fim do mês</div>
-        <div class="value">${fmt(projecaoFim)} <span style="font-size:15px;color:${COR.muted};font-weight:600;">de ${fmt(total)}</span></div>
-        <div class="delta" style="color:${COR.muted}">mantendo ${dec(mediaReal)}/dia nos ${nRest} dias úteis restantes</div></div>
-      <div class="kpi"><div class="label">💸 Vou ficar devendo</div>
-        <div class="value"><span style="color:${devendo > 0 ? COR.bad : COR.good}">${fmt(devendo)}</span></div>
-        <div class="delta" style="color:${COR.muted}">${devendo > 0 && nRest ? dec(faltaPorDia) + ' WO por dia a mais (' + fmt(devendo) + ' ÷ ' + nRest + ' dias)' : 'no ritmo atual fecha o mês'}</div></div>
-      <div class="kpi"><div class="label">➕ Equipes a mais</div>
-        <div class="value"><span style="color:${equipesExtras > 0 ? COR.bad : COR.good}">${devendo > 0 && nRest ? fmt(equipesExtras) : '0'}</span></div>
-        <div class="delta" style="color:${COR.muted}">${devendo > 0 && nRest ? dec(faltaPorDia) + ' ÷ ' + dec(mediaEquipe) + ' por equipe = ' + dec(equipesExtrasBruto) : 'nenhuma equipe extra necessária'}</div></div>`;
-
-    // gráfico: realizado por dia (até ontem) e capacidade das equipes
-    const porDia = {};
-    regs.forEach(r => { if (r.st === 'Executada' && r.d && r.d.slice(0, 7) === dados.mes) porDia[r.d] = (porDia[r.d] || 0) + 1; });
-    const rot = dias.map(d => String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5));
-    const realizado = dias.map(d => d.data < hoje ? (porDia[d.data] || (d.util ? 0 : null)) : null);
-    const capacidade = dias.map(d => d.util ? capDia : null);
-    raiz.querySelector('#pv-cap-titulo').textContent = 'Realizado por dia — ' + rotuloExec;
-    raiz.querySelector('#pv-cap-hint').textContent =
-      `Preventivas executadas por dia x capacidade das equipes (${fmt(capDia)}/dia, considerando ${FALTAS_POR_DIA} equipe em falta por dia).`;
-
-    const temLabels = typeof ChartDataLabels !== 'undefined';
-    if (graficoCap) graficoCap.destroy();
-    graficoCap = new Chart(raiz.querySelector('#pv-cap-grafico'), {
-      data: {
-        labels: rot,
-        datasets: [
-          { type: 'bar', label: 'Realizado', data: realizado, backgroundColor: 'rgba(14,124,134,.8)', borderRadius: 3, order: 2,
-            datalabels: { display: c => (c.dataset.data[c.dataIndex] || 0) > 0, anchor: 'end', align: 'top', color: '#000', font: { size: 9, family: 'JetBrains Mono', weight: '700' } } },
-          { type: 'line', label: 'Capacidade das equipes', data: capacidade, borderColor: '#5e34b5', borderDash: [6, 4], borderWidth: 2,
-            pointRadius: 0, spanGaps: true, order: 1, datalabels: { display: false } }
-        ]
-      },
-      plugins: temLabels ? [ChartDataLabels] : [],
-      options: {
-        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14 } },
-        interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { labels: { color: COR.muted, font: { family: 'Inter', size: 11 }, boxWidth: 12 } } },
-        scales: { x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-          y: { beginAtZero: true, grid: { color: '#e1e5f0' } } }
-      }
-    });
-
-    // ALTERADO (07/10/2026): tabela por equipe mostra só a Capacidade no mês e
-    // o que a equipe já fez (realizadas, pelo técnico da aba Validação).
-    // Capacidade no mês = média/dia × dias úteis do mês × fator de presença
-    // (desconta a falta prevista em FALTAS_POR_DIA, igual ao resto da aba).
-    const chave = n => semAcento(n).replace(/\s+/g, ' ');
-    const equipeDoTec = {};
-    equipes.forEach((e, i) => { [e.t1, e.t2].filter(Boolean).forEach(n => { equipeDoTec[chave(n)] = i; }); });
-    const realizadasEquipe = equipes.map(() => 0);
-    regs.forEach(r => {
-      if (r.st !== 'Executada' || !r.tec) return;
-      const i = equipeDoTec[chave(r.tec)];
-      if (i !== undefined) realizadasEquipe[i]++;
-    });
-    // ALTERADO: a Capacidade no mês de cada equipe é a sua parte do total de
-    // preventivas MOP · MÓVEL do mês (ex.: 1.031), dividido pelo peso da equipe
-    // (média/dia). Arredonda pelo maior resto para a soma bater com o total.
-    const brutoEquipe = equipes.map(e => capCheia > 0 ? total * e.media / capCheia : 0);
-    const capMesEquipe = brutoEquipe.map(Math.floor);
-    let sobra = total - capMesEquipe.reduce((a, b) => a + b, 0);
-    brutoEquipe.map((v, i) => ({ i, resto: v - Math.floor(v) }))
-      .sort((a, b) => b.resto - a.resto)
-      .forEach(x => { if (sobra > 0) { capMesEquipe[x.i]++; sobra--; } });
-
-    raiz.querySelector('#pv-cap-legenda').textContent =
-      `capacidade no mês = ${fmt(total)} preventivas ${rotuloExec} divididas entre as ${equipes.length} equipes`;
-
-    const nomeBonito = n => n ? n.toLowerCase().split(/\s+/).map((w, i) =>
-      i > 0 && ['de', 'da', 'do', 'das', 'dos', 'e'].includes(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '';
-    raiz.querySelector('#pv-cap-qtd').textContent = fmt(equipes.length);
-    raiz.querySelector('#pv-cap-tbody').innerHTML = equipes.map((e, i) => `<tr>
-        <td class="mono" style="color:${COR.muted}">${i + 1}</td>
-        <td>${esc(nomeBonito(e.t1))}</td>
-        <td>${e.t2 ? esc(nomeBonito(e.t2)) : '<span style="color:#6b7590">N/A</span>'}</td>
-        <td><span class="pill ${e.tipo === 'Dupla' ? 'good' : 'warn'}">${esc(e.tipo)}</span></td>
-        <td class="num mono">${fmt(e.media)}</td>
-        <td class="num mono">${fmt(capMesEquipe[i])}</td>
-        <td class="num mono" style="font-weight:700;">${fmt(realizadasEquipe[i])}</td>
-      </tr>`).join('') + `<tr style="font-weight:700;border-top:2px solid #e1e5f0;">
-        <td></td><td>Total</td><td></td><td></td>
-        <td class="num mono">${fmt(capCheia)}</td>
-        <td class="num mono">${fmt(capMesEquipe.reduce((a, b) => a + b, 0))}</td>
-        <td class="num mono">${fmt(realizadasEquipe.reduce((a, b) => a + b, 0))}</td></tr>`;
-  }
-
-  // ======================= FILTRO DE MÊS =======================
-  // Monta a lista de meses a partir do JSON: usa "meses" (novo Office Script)
-  // e garante que o mês da base atual (mes/registros do topo) também esteja nela.
-  function carregarMeses(json, historico) {
-    todosMeses = {};
-    if (Array.isArray(json.meses)) {
-      json.meses.forEach(m => {
-        if (m && m.mes && Array.isArray(m.registros)) todosMeses[m.mes] = { mes: m.mes, gerado_em: m.gerado_em || '', registros: m.registros };
-      });
-    }
-    // Mês da base atual. O Office Script novo já manda o mês certo (o mês em
-    // que rodou). O script antigo podia mandar um mês errado (ex.: Agosto),
-    // então, quando o JSON ainda não traz "meses", vale o mês de "gerado_em".
-    let mesAtualJson = json.mes;
-    if (!Array.isArray(json.meses) && /^\d{4}-\d{2}/.test(json.gerado_em || '')) {
-      mesAtualJson = json.gerado_em.slice(0, 7);
-    }
-    if (mesAtualJson && Array.isArray(json.registros)) {
-      todosMeses[mesAtualJson] = { mes: mesAtualJson, gerado_em: json.gerado_em || '', registros: json.registros };
-    }
-    mesBase = mesAtualJson || Object.keys(todosMeses).sort().pop() || '';
-    // meses travados do preventiva_historico.json têm prioridade (são o fechamento oficial),
-    // exceto o mês da base atual, que continua vindo do dados_preventiva.json
-    if (historico && Array.isArray(historico.meses)) {
-      historico.meses.forEach(m => {
-        if (m && m.mes && m.mes !== mesBase && Array.isArray(m.registros)) {
-          todosMeses[m.mes] = { mes: m.mes, gerado_em: m.gerado_em || '', registros: m.registros };
+        scales: {
+          x: { beginAtZero: true, ticks: { display: false }, grid: { display: false } },
+          y: { ticks: { color: cor.text, font: { size: 10, weight: 'bold' } }, grid: { display: false } }
         }
-      });
-    }
-    // campos calculados (Executor e Expurgo) em todos os meses
-    Object.values(todosMeses).forEach(d => d.registros.forEach(r => { r.ex = executorDoTipo(r.t); r.xpF = r.xp || 'Sem expurgo'; }));
+      }
+    });
+
+    const aviso = document.getElementById('combAviso');
+    aviso.textContent = COMB.atualizadoEm
+      ? 'Relatório de abastecimento atualizado em ' + new Date(COMB.atualizadoEm).toLocaleString('pt-BR') + '. O mês selecionado aqui também define o "Valor Combustível" de todas as placas na tabela e no ranking abaixo.'
+      : '';
   }
 
-  function selecionarMes(mes) {
-    if (!todosMeses[mes]) return;
-    dados = todosMeses[mes];
-    // ao trocar de mês, zera os filtros e buscas (as opções mudam de um mês pro outro)
-    Object.keys(sel).forEach(k => { sel[k] = ''; });
-    Object.keys(selOp).forEach(k => { selOp[k] = ''; });
-    Object.keys(selTec).forEach(k => { selTec[k] = ''; });
-    busca = ''; buscaOp = ''; buscaTec = '';
-    esqueleto();
-    atualizar();
-    if (abaAtiva !== 'geral') trocarAba(abaAtiva);
+  // Envolve a renderFrota original do index.html
+  function instalar() {
+    if (typeof renderFrota !== 'function' || renderFrota._comb) return;
+    const original = renderFrota;
+    const nova = function () {
+      montarAbas();
+      aplicarCombustivelNasPlacas();
+      original.apply(this, arguments);
+      ajustarCardsContrato();
+      renderMatrizAreaTipo();
+      renderCustosContrato();
+      if (abaFrota === 'combustivel') renderCombustivel();
+    };
+    nova._comb = true;
+    renderFrota = nova;   // mostrarPagina() e os filtros chamam pelo nome
   }
 
-  async function montar(idContainer) {
-    raiz = document.getElementById(idContainer || CONTAINER_PADRAO);
-    if (!raiz) return;
-    estilos();
-    try {
-      const json = window.DADOS_PREVENTIVA ||
-        await fetch(ARQUIVO_JSON + '?v=' + Date.now(), { cache: 'no-store' }).then(r => { if (!r.ok) throw r.status; return r.json(); });
-      const historico = window.DADOS_PREVENTIVA_HISTORICO ||
-        await fetch(ARQUIVO_HISTORICO + '?v=' + Date.now(), { cache: 'no-store' })
-          .then(r => r.ok ? r.json() : null).catch(() => null);
-      carregarMeses(json, historico);
-      if (!mesBase || !todosMeses[mesBase]) throw 'nenhum mês encontrado no arquivo';
-      selecionarMes(mesBase);
-    } catch (e) {
-      raiz.innerHTML = `<div style="padding:20px;color:#b00020">Não foi possível carregar ${ARQUIVO_JSON} (${esc(e)}).</div>`;
-    }
-  }
-
-  window.PainelPreventiva = { montar, redesenhar: () => { if (grafico) grafico.resize(); if (graficoMensal) graficoMensal.resize(); if (graficoDiario) graficoDiario.resize(); if (graficoCap) graficoCap.resize(); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => montar());
-  else montar();
+  instalar();
+  console.log('[Combustível] módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._comb));
+  carregarCombustivel();
+  setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
