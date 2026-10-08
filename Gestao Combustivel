@@ -1,8 +1,9 @@
 /* ======================================================================
    gestao_combustivel.js — Gestão de Frotas
-   1) Filtro de contrato: os cards mostram só o contrato escolhido + valores
-   2) Combustível mês a mês (VALOR EMISSAO, separado por TIPO FROTA)
-   3) Top 10 técnicos que mais usaram (só TIPO FROTA = FROTA)
+   Divide a página em duas abas:
+   • Veículos: só quantidade de carros por área (contrato) e por tipo
+   • Combustível: custos do contrato, combustível mês a mês (VALOR EMISSAO,
+     por TIPO FROTA), Top 10 técnicos (só FROTA), gasto por contrato e ranking
    Lê dados_combustivel.json (gerado pelo script_combustivel.ts).
    Não altera nada do index.html: só envolve a função renderFrota().
    ====================================================================== */
@@ -17,7 +18,8 @@
   let COMB = null;          // conteúdo do dados_combustivel.json
   let mesComb = '';         // '' = todos os meses; senão 'AAAA-MM'
   let mesCombIniciado = false;
-  let chartMeses = null, chartTop = null, chartTipo = null;
+  let chartMeses = null, chartTop = null;
+  let abaFrota = 'veiculos';   // 'veiculos' | 'combustivel'
 
   const brl = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const brlCurto = v => {
@@ -70,55 +72,158 @@
     });
   }
 
-  // Cards de contrato: com filtro ativo mostra só o contrato escolhido + valores
+  // Aba Veículos: com filtro ativo, os cards mostram só o contrato escolhido
   function ajustarCardsContrato() {
     const row = document.getElementById('frotaOperacaoKpiRow');
     if (!row) return;
     const c = contratoAtual();
-    const lista = c ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c) : FROTA;
+    if (!c) return;   // sem filtro: mantém os cards de todos os contratos
+    const qtd = FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c).length;
+    row.innerHTML = `
+      <div class="kpi" style="cursor:pointer;" onclick="filtrarFrotaPorOperacaoEKpi('')" title="Voltar para todos os contratos">
+        <div class="label">↺ Todos os contratos</div>
+        <div class="value" style="color:${cor.muted}">${FROTA.length.toLocaleString('pt-BR')}</div>
+        <div class="delta" style="color:${cor.muted};">clique para limpar o filtro</div>
+      </div>
+      <div class="kpi" style="border-color:${cor.accent}; box-shadow:0 0 0 2px ${cor.accent} inset;">
+        <div class="label" style="color:${cor.accent};">🏢 ${esc(c)}</div>
+        <div class="value" style="color:${cor.accent};">${qtd}</div>
+        <div class="delta" style="color:${cor.accent};">veículos</div>
+      </div>`;
+  }
 
+  // Aba Veículos: tabela Área (contrato) × Tipo
+  function renderMatrizAreaTipo() {
+    const alvo = document.getElementById('frotaMatrizAreaTipo');
+    if (!alvo) return;
+    const c = contratoAtual();
+    const lista = c ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c) : FROTA;
+    const tipos = Array.from(new Set(lista.map(v => normFrota(v.tipo) || 'Sem tipo'))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const linhas = {};
+    lista.forEach(v => {
+      const a = canonOperacaoFrota(v.operacao) || 'Sem operação';
+      const t = normFrota(v.tipo) || 'Sem tipo';
+      if (!linhas[a]) linhas[a] = { total: 0 };
+      linhas[a][t] = (linhas[a][t] || 0) + 1;
+      linhas[a].total++;
+    });
+    const areas = Object.keys(linhas).sort((a, b) => linhas[b].total - linhas[a].total);
+    const totTipo = {}; tipos.forEach(t => totTipo[t] = areas.reduce((s, a) => s + (linhas[a][t] || 0), 0));
+    alvo.innerHTML = `<table>
+      <thead><tr><th>Área / Contrato</th>${tipos.map(t => `<th class="num">${esc(t)}</th>`).join('')}<th class="num">Total</th></tr></thead>
+      <tbody>
+        ${areas.map(a => `<tr><td>${esc(a)}</td>${tipos.map(t => `<td class="num">${linhas[a][t] || '—'}</td>`).join('')}<td class="num" style="font-weight:700;">${linhas[a].total}</td></tr>`).join('')}
+        <tr style="font-weight:700; border-top:2px solid ${cor.line};"><td>Total</td>${tipos.map(t => `<td class="num">${totTipo[t]}</td>`).join('')}<td class="num">${lista.length}</td></tr>
+      </tbody></table>`;
+  }
+
+  // Aba Combustível: custos do contrato filtrado (ou de todos)
+  function renderCustosContrato() {
+    const row = document.getElementById('combCustoKpiRow');
+    if (!row) return;
+    const c = contratoAtual();
+    const lista = c ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c) : FROTA;
     let aluguel = 0, combPlacas = 0;
     lista.forEach(v => { aluguel += extrairNumeroValorFrota(v.valor); combPlacas += extrairNumeroValorFrota(v.valorCombustivel); });
-
-    // Combustível do card: total do relatório quando o contrato é coberto por ele
     const bloco = blocoDoMes();
     const usaRelatorio = bloco && c && contratoTemCombustivel(c);
     const comb = usaRelatorio ? bloco.total : combPlacas;
     const periodo = COMB ? (mesComb ? rotuloMes(mesComb) : 'todos os meses') : '';
-
-    if (c) {
-      row.innerHTML = `
-        <div class="kpi" style="cursor:pointer;" onclick="filtrarFrotaPorOperacaoEKpi('')" title="Voltar para todos os contratos">
-          <div class="label">↺ Todos os contratos</div>
-          <div class="value" style="color:${cor.muted}">${FROTA.length.toLocaleString('pt-BR')}</div>
-          <div class="delta" style="color:${cor.muted};">clique para limpar o filtro</div>
-        </div>
-        <div class="kpi" style="border-color:${cor.accent}; box-shadow:0 0 0 2px ${cor.accent} inset;">
-          <div class="label" style="color:${cor.accent};">🏢 ${esc(c)}</div>
-          <div class="value" style="color:${cor.accent};">${lista.length}</div>
-          <div class="delta" style="color:${cor.accent};">veículos</div>
-        </div>`;
-    }
-    row.innerHTML += `
-      <div class="kpi">
-        <div class="label">🚗 Aluguel / Compra</div>
-        <div class="value" style="font-size:20px;">${brl(aluguel)}</div>
-      </div>
-      <div class="kpi">
-        <div class="label">⛽ Combustível</div>
+    row.innerHTML = `
+      <div class="kpi"><div class="label">🏢 ${esc(c || 'Todos os contratos')}</div>
+        <div class="value">${lista.length}</div><div class="delta" style="color:${cor.muted};">veículos</div></div>
+      <div class="kpi"><div class="label">🚗 Aluguel / Compra</div>
+        <div class="value" style="font-size:20px;">${brl(aluguel)}</div></div>
+      <div class="kpi"><div class="label">⛽ Combustível</div>
         <div class="value" style="font-size:20px; color:${cor.warn};">${brl(comb)}</div>
-        <div class="delta" style="color:${cor.muted};">${usaRelatorio || !c ? periodo : periodo + ' · soma das placas'}</div>
-      </div>
-      <div class="kpi">
-        <div class="label">Σ Total</div>
-        <div class="value" style="font-size:20px; color:${cor.accent};">${brl(aluguel + comb)}</div>
-      </div>`;
+        <div class="delta" style="color:${cor.muted};">${usaRelatorio ? periodo + ' · relatório de abastecimento' : periodo + ' · soma das placas'}</div></div>
+      <div class="kpi"><div class="label">Σ Total</div>
+        <div class="value" style="font-size:20px; color:${cor.accent};">${brl(aluguel + comb)}</div></div>`;
+  }
+
+  // Chips de mês (linha do filtro de contrato) — só na aba Combustível
+  function renderChipsMes() {
+    const strip = document.getElementById('combMesStrip');
+    if (!strip) return;
+    if (abaFrota !== 'combustivel' || !COMB) { strip.style.display = 'none'; return; }
+    strip.style.display = '';
+    strip.innerHTML = `<span class="mono" style="font-size:11px; color:${cor.muted}; text-transform:uppercase; letter-spacing:.05em; align-self:center; margin-right:2px;">Mês</span>` +
+      COMB.meses.map(m => `<div class="chip${m === mesComb ? ' active' : ''}" data-mes="${m}">${rotuloMes(m)}</div>`).join('') +
+      `<div class="chip${mesComb === '' ? ' active' : ''}" data-mes="">Todos</div>`;
+    strip.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { mesComb = ch.dataset.mes; renderFrota(); });
+  }
+
+  // Monta as duas abas uma única vez, reaproveitando os blocos que já existem
+  function montarAbas() {
+    const secao = document.getElementById('frotaSecao');
+    if (!secao || document.getElementById('frotaAbas')) return;
+    const painelDe = id => { const el = document.getElementById(id); return el ? el.closest('.panel') : null; };
+
+    const filtroTopo = document.getElementById('frotaContratoTopo').parentElement;
+    const kpiContratos = document.getElementById('frotaOperacaoKpiRow');
+    const kpiStatus = document.getElementById('frotaKpiRow');
+    const pGasto = painelDe('frotaGastoContratoBody');
+    const pRanking = painelDe('frotaRankingBody');
+    const pTipo = painelDe('frotaTipoChart');
+    const gridGraficos = pTipo ? pTipo.parentElement : null;
+    const pVeiculos = painelDe('frotaTable');
+
+    const selectContrato = document.getElementById('frotaContratoTopo');
+    const abas = document.createElement('div');
+    abas.id = 'frotaAbas';
+    abas.className = 'month-strip';
+    abas.style.marginLeft = '12px';
+    abas.innerHTML = `<div class="chip active" data-aba="veiculos">🚗 Veículos</div><div class="chip" data-aba="combustivel">⛽ Combustível</div>`;
+    selectContrato.insertAdjacentElement('afterend', abas);
+
+    const chipsMes = document.createElement('div');
+    chipsMes.id = 'combMesStrip';
+    chipsMes.className = 'month-strip';
+    chipsMes.style.cssText = 'margin-left:auto; display:none;';
+    filtroTopo.appendChild(chipsMes);
+    filtroTopo.style.marginBottom = '16px';
+
+    const abaV = document.createElement('div'); abaV.id = 'frotaAbaVeiculos';
+    const abaC = document.createElement('div'); abaC.id = 'frotaAbaCombustivel'; abaC.style.display = 'none';
+    const oculto = document.createElement('div'); oculto.id = 'frotaOculto'; oculto.style.display = 'none';
+    filtroTopo.insertAdjacentElement('afterend', abaV);
+    abaV.insertAdjacentElement('afterend', abaC);
+    abaC.insertAdjacentElement('afterend', oculto);
+
+    // Veículos: cards por contrato + Área × Tipo + gráfico por tipo
+    abaV.appendChild(kpiContratos);
+    const grade = document.createElement('div');
+    grade.className = 'grid';
+    grade.style.gridTemplateColumns = '1.4fr 1fr';
+    grade.innerHTML = `<div class="panel"><h2>Veículos por Área e Tipo</h2><div id="frotaMatrizAreaTipo" style="overflow:auto;"></div></div>`;
+    abaV.appendChild(grade);
+    if (pTipo) grade.appendChild(pTipo);
+
+    // Combustível: custos + painel de combustível + gasto por contrato + ranking
+    const custos = document.createElement('div');
+    custos.className = 'kpi-row'; custos.id = 'combCustoKpiRow'; custos.style.marginBottom = '16px';
+    abaC.appendChild(custos);
+    const ancoraComb = document.createElement('div'); ancoraComb.id = 'combAncora';
+    abaC.appendChild(ancoraComb);
+    if (pGasto) abaC.appendChild(pGasto);
+    if (pRanking) abaC.appendChild(pRanking);
+
+    // O que não foi pedido fica escondido (o código original continua funcionando)
+    [kpiStatus, gridGraficos, pVeiculos].forEach(el => { if (el) oculto.appendChild(el); });
+
+    abas.querySelectorAll('.chip').forEach(ch => ch.onclick = () => {
+      abaFrota = ch.dataset.aba;
+      abas.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x === ch));
+      abaV.style.display = abaFrota === 'veiculos' ? '' : 'none';
+      abaC.style.display = abaFrota === 'combustivel' ? '' : 'none';
+      renderFrota();   // redesenha os gráficos da aba que ficou visível
+    });
   }
 
   function garantirPainel() {
     let painel = document.getElementById('frotaCombustivelSecao');
     if (!painel) {
-      const ancora = document.getElementById('frotaKpiRow');
+      const ancora = document.getElementById('combAncora') || document.getElementById('frotaKpiRow');
       if (!ancora) return null;
       painel = document.createElement('div');
       painel.id = 'frotaCombustivelSecao';
@@ -129,8 +234,7 @@
     // (re)monta a estrutura se estiver faltando (ex.: depois do aviso de "sem dados")
     if (!painel.querySelector('#combMesStrip')) painel.innerHTML = `
       <h2>Combustível — Claro Infra SPC</h2>
-      <div class="month-strip" id="combMesStrip" style="margin:10px 0 14px;"></div>
-      <div class="kpi-row" id="combTipoKpiRow" style="margin-bottom:16px;"></div>
+      <div class="kpi-row" id="combTipoKpiRow" style="margin:10px 0 16px;"></div>
       <div class="grid" style="grid-template-columns: 1.3fr 1fr; margin-bottom:0;">
         <div class="panel">
           <h2>Valor de combustível mês a mês</h2>
@@ -158,13 +262,6 @@
     }
     if (!contratoTemCombustivel(c)) { painel.style.display = 'none'; return; }
     painel.style.display = '';
-
-    // chips de mês
-    const strip = document.getElementById('combMesStrip');
-    strip.innerHTML = COMB.meses.map(m =>
-      `<div class="chip${m === mesComb ? ' active' : ''}" data-mes="${m}">${rotuloMes(m)}</div>`).join('') +
-      `<div class="chip${mesComb === '' ? ' active' : ''}" data-mes="">Todos</div>`;
-    strip.querySelectorAll('.chip').forEach(ch => ch.onclick = () => { mesComb = ch.dataset.mes; renderFrota(); });
 
     const bloco = blocoDoMes();
     const periodo = mesComb ? rotuloMes(mesComb) : 'todos os meses';
@@ -273,10 +370,14 @@
     if (typeof renderFrota !== 'function' || renderFrota._comb) return;
     const original = renderFrota;
     const nova = function () {
+      montarAbas();
       aplicarCombustivelNasPlacas();
       original.apply(this, arguments);
       ajustarCardsContrato();
-      renderCombustivel();
+      renderMatrizAreaTipo();
+      renderCustosContrato();
+      renderChipsMes();
+      if (abaFrota === 'combustivel') renderCombustivel();
     };
     nova._comb = true;
     renderFrota = nova;   // mostrarPagina() e os filtros chamam pelo nome
