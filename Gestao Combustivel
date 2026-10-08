@@ -62,16 +62,11 @@
     if (!Array.isArray(FROTA)) return;
     const bloco = blocoDoMes();
     const mapa = {};
-    if (bloco) (bloco.porPlaca || []).forEach(p => { mapa[chavePlaca(p.Placa)] = Number(p['Valor Total']) || 0; });
+    // porPlacaTodos = todas as placas da planilha, de qualquer contrato
+    if (bloco) (bloco.porPlacaTodos || bloco.porPlaca || []).forEach(p => { mapa[chavePlaca(p.Placa)] = Number(p['Valor Total']) || 0; });
     FROTA.forEach(v => {
       if (!('_combOriginal' in v)) v._combOriginal = v.valorCombustivel;
-      if (!bloco) { v.valorCombustivel = v._combOriginal; return; }
-      const op = canonOperacaoFrota(v.operacao);
-      if (CONTRATOS_COM_COMBUSTIVEL.indexOf(op) !== -1) {
-        v.valorCombustivel = mapa[chavePlaca(v.placa)] || 0;
-      } else {
-        v.valorCombustivel = v._combOriginal;
-      }
+      v.valorCombustivel = bloco ? (mapa[chavePlaca(v.placa)] || 0) : v._combOriginal;
     });
   }
 
@@ -112,7 +107,7 @@
       <div class="kpi">
         <div class="label">⛽ Combustível</div>
         <div class="value" style="font-size:20px; color:${cor.warn};">${brl(comb)}</div>
-        <div class="delta" style="color:${cor.muted};">${usaRelatorio || !c ? periodo : 'soma das placas'}</div>
+        <div class="delta" style="color:${cor.muted};">${usaRelatorio || !c ? periodo : periodo + ' · soma das placas'}</div>
       </div>
       <div class="kpi">
         <div class="label">Σ Total</div>
@@ -267,7 +262,7 @@
 
     const aviso = document.getElementById('combAviso');
     aviso.textContent = COMB.atualizadoEm
-      ? 'Relatório de abastecimento atualizado em ' + new Date(COMB.atualizadoEm).toLocaleString('pt-BR') + '. O mês selecionado aqui também define o "Valor Combustível" das placas da Claro na tabela e no ranking abaixo.'
+      ? 'Relatório de abastecimento atualizado em ' + new Date(COMB.atualizadoEm).toLocaleString('pt-BR') + '. O mês selecionado aqui também define o "Valor Combustível" de todas as placas na tabela e no ranking abaixo.'
       : '';
   }
 
