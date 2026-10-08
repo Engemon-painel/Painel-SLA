@@ -327,34 +327,50 @@
       }
     });
 
-    // Top 10 técnicos (FROTA)
+    // Top 10 técnicos (FROTA) — em "Todos", barra empilhada mês a mês
     const top = bloco.topMotoristasFrota || [];
-    document.getElementById('combTopTitulo').textContent = 'Top 10 técnicos que mais usaram (Frota) — ' + periodo;
-    if (chartTop) chartTop.destroy();
-    chartTop = new Chart(document.getElementById('combTopChart'), {
-      type: 'bar',
-      data: {
-        labels: top.map(t => t.motorista),
-        datasets: [{
+    const mesAMes = !mesComb && top.length && top[0].porMes;
+    document.getElementById('combTopTitulo').textContent = 'Top 10 técnicos que mais usaram (Frota) — ' +
+      (mesAMes ? 'mês a mês' : periodo);
+    const PALETA_MESES = ['#0e7c86', '#5e34b5', '#d97706', '#059669', '#2563eb', '#dc2626'];
+    const rotuloBarra = { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 0, color: '#fff', anchor: 'center', align: 'center',
+      font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => brlCurto(v) };
+    const datasetsTop = mesAMes
+      ? [
+          ...COMB.meses.map((m, i) => ({
+            label: rotuloMes(m), data: top.map(t => t.porMes[m] || 0),
+            backgroundColor: PALETA_MESES[i % PALETA_MESES.length], borderRadius: 3, datalabels: rotuloBarra
+          })),
+          { label: 'Total', data: top.map(() => 0), backgroundColor: 'rgba(0,0,0,0)',
+            datalabels: { anchor: 'end', align: 'right', offset: 4, color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+              formatter: (v, ctx) => brl(top[ctx.dataIndex].valor) } }
+        ]
+      : [{
           label: 'Valor', data: top.map(t => t.valor),
           backgroundColor: top.map((_, i) => i === 0 ? cor.bad : 'rgba(14,124,134,.8)'), borderRadius: 4,
           datalabels: { anchor: 'end', align: 'right', color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
             formatter: v => brl(v) }
-        }]
-      },
+        }];
+    if (chartTop) chartTop.destroy();
+    chartTop = new Chart(document.getElementById('combTopChart'), {
+      type: 'bar',
+      data: { labels: top.map(t => t.motorista), datasets: datasetsTop },
       plugins: [ChartDataLabels],
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 90 } },
         plugins: {
-          legend: { display: false }, datalabels: { display: true },
-          tooltip: { callbacks: { afterLabel: ctx => {
-            const t = top[ctx.dataIndex];
-            return t.qtd + ' abastecimentos' + (t.placas && t.placas.length ? ' · placa ' + t.placas.join(', ') : '');
-          } } }
+          legend: { display: !!mesAMes, labels: { color: cor.muted, font: { family: 'Inter', size: 11 }, filter: i => i.text !== 'Total' } },
+          datalabels: { display: true },
+          tooltip: { filter: i => i.dataset.label !== 'Total', callbacks: {
+            label: ctx => (mesAMes ? ctx.dataset.label + ': ' : '') + brl(ctx.parsed.x),
+            afterBody: items => {
+              const t = top[items[0].dataIndex];
+              return t.qtd + ' abastecimentos' + (t.placas && t.placas.length ? ' · placa ' + t.placas.join(', ') : '');
+            } } }
         },
         scales: {
-          x: { beginAtZero: true, ticks: { display: false }, grid: { display: false } },
-          y: { ticks: { color: cor.text, font: { size: 10, weight: 'bold' } }, grid: { display: false } }
+          x: { stacked: !!mesAMes, beginAtZero: true, ticks: { display: false }, grid: { display: false } },
+          y: { stacked: !!mesAMes, ticks: { color: cor.text, font: { size: 10, weight: 'bold' } }, grid: { display: false } }
         }
       }
     });
