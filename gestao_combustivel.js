@@ -249,6 +249,14 @@
 
     // Veículos: cards por contrato + Área × Tipo + gráfico por tipo
     abaV.appendChild(kpiContratos);
+    // status dos veículos (Ativo, Disponível, Manutenção, Funilaria…) — segue o filtro de contrato
+    if (kpiStatus) {
+      const tituloStatus = document.createElement('h2');
+      tituloStatus.textContent = 'Status dos veículos';
+      tituloStatus.style.cssText = 'font-family:"Space Grotesk",sans-serif; font-size:15px; font-weight:600; margin:4px 0 10px;';
+      abaV.appendChild(tituloStatus);
+      abaV.appendChild(kpiStatus);
+    }
     const grade = document.createElement('div');
     grade.className = 'grid';
     grade.style.gridTemplateColumns = '1.4fr 1fr';
@@ -266,7 +274,7 @@
     if (pRanking) abaC.appendChild(pRanking);
 
     // O que não foi pedido fica escondido (o código original continua funcionando)
-    [kpiStatus, gridGraficos, pVeiculos].forEach(el => { if (el) oculto.appendChild(el); });
+    [gridGraficos, pVeiculos].forEach(el => { if (el) oculto.appendChild(el); });
 
     abas.querySelectorAll('.chip').forEach(ch => ch.onclick = () => {
       abaFrota = ch.dataset.aba;
@@ -501,7 +509,7 @@
   }
 
   instalar();
-  console.log('[Combustível] v8 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
+  console.log('[Combustível] v9 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
