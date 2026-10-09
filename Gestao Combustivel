@@ -278,12 +278,12 @@
   }
 
   function garantirPainel() {
-    let painel = document.getElementById('frotaCombustivelSecao');
+    let painel = document.getElementById('frotaCombustivelSecaoV8');
     if (!painel) {
       const ancora = document.getElementById('combAncora') || document.getElementById('frotaKpiRow');
       if (!ancora) return null;
       painel = document.createElement('div');
-      painel.id = 'frotaCombustivelSecao';
+      painel.id = 'frotaCombustivelSecaoV8';
       painel.className = 'panel';
       painel.style.marginBottom = '16px';
       ancora.insertAdjacentElement('afterend', painel);
@@ -481,7 +481,8 @@
 
   // Envolve a renderFrota original do index.html
   function instalar() {
-    if (typeof renderFrota !== 'function' || renderFrota._comb) return;
+    if (typeof renderFrota !== 'function' || renderFrota._combV8) return;
+    if (renderFrota._comb) console.warn('[Combustível] Existe uma cópia ANTIGA deste código em outro arquivo (provavelmente gestao_preventiva.js). Restaure esse arquivo.');
     const original = renderFrota;
     const nova = function () {
       montarAbas();
@@ -495,11 +496,12 @@
       if (abaFrota === 'combustivel') renderCombustivel();
     };
     nova._comb = true;
+    nova._combV8 = true;
     renderFrota = nova;   // mostrarPagina() e os filtros chamam pelo nome
   }
 
   instalar();
-  console.log('[Combustível] v8 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._comb));
+  console.log('[Combustível] v8 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
