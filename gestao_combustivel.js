@@ -304,6 +304,7 @@
         <div class="panel">
           <h2>🚗 Frota — valor e litros mês a mês</h2>
           <div style="position:relative; height:300px;"><canvas id="combMesesChart"></canvas></div>
+          <div id="combMesesInfo" style="margin-top:12px;"></div>
         </div>
         <div class="panel">
           <h2 id="combTopTitulo">Top 10 técnicos que mais usaram (Frota)</h2>
@@ -314,6 +315,7 @@
         <div class="panel">
           <h2>⚡ Gerador (GMG) — valor e litros mês a mês</h2>
           <div style="position:relative; height:300px;"><canvas id="combGmgMesesChart"></canvas></div>
+          <div id="combGmgInfo" style="margin-top:12px;"></div>
         </div>
         <div class="panel">
           <h2 id="combTopGmgTitulo">Top 10 técnicos que mais abasteceram gerador (GMG)</h2>
@@ -370,46 +372,75 @@
     };
     const corMes = (base, m) => base + (mesComb && m !== mesComb ? '66' : 'dd');
 
-    // Gráfico mês a mês: valor + variação em cima da barra, litros dentro da barra
-    function graficoMesAMes(canvasId, tipo, corBase, chartAtual) {
+    // Gráfico mês a mês: barra = valor (R$), linha = litros
+    const fmtPct = p => (p >= 0 ? '+' : '') + p.toFixed(1).replace('.', ',') + '%';
+    function graficoMesAMes(canvasId, infoId, tipo, corBase, chartAtual) {
       const valores = COMB.meses.map(m => tipoDoMes(m, tipo).valor);
       const litros = COMB.meses.map(m => tipoDoMes(m, tipo).litros);
-      const varLitros = i => {
-        const ant = i > 0 ? litros[i - 1] : 0;
-        if (!ant) return '';
-        const p = (litros[i] - ant) / ant * 100;
-        return ' (' + (p >= 0 ? '+' : '') + p.toFixed(1) + '%)';
-      };
+      const maxL = Math.max(...litros, 1);
       if (chartAtual) chartAtual.destroy();
-      return new Chart(document.getElementById(canvasId), {
-        type: 'bar',
-        data: { labels: COMB.meses.map(rotuloMes), datasets: [{
-          label: tipo, data: valores, borderRadius: 4,
-          backgroundColor: COMB.meses.map(m => corMes(corBase, m)),
-          datalabels: { labels: {
-            valor: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
-              formatter: (v, ctx) => brlCurto(v) + variacao(valores, ctx.dataIndex) },
-            litros: { anchor: 'center', align: 'center', color: '#fff', textAlign: 'center',
-              font: { size: 12, family: 'JetBrains Mono', weight: '700' },
-              display: ctx => litros[ctx.dataIndex] > 0,
-              formatter: (v, ctx) => ['⛽ ' + litros[ctx.dataIndex].toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' L', varLitros(ctx.dataIndex).trim()] }
-          } }
-        }] },
+      const ch = new Chart(document.getElementById(canvasId), {
+        data: { labels: COMB.meses.map(rotuloMes), datasets: [
+          { type: 'bar', label: 'Valor (R$)', data: valores, borderRadius: 4, yAxisID: 'y', order: 2,
+            backgroundColor: COMB.meses.map(m => corMes(corBase, m)),
+            datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
+              formatter: (v, ctx) => brlCurto(v) + variacao(valores, ctx.dataIndex) } },
+          { type: 'line', label: 'Litros', data: litros, yAxisID: 'y1', order: 1,
+            borderColor: '#5e34b5', backgroundColor: '#5e34b5', pointRadius: 5, pointBackgroundColor: '#5e34b5', tension: .3, borderWidth: 3,
+            datalabels: { align: 'bottom', offset: 6, color: '#5e34b5', backgroundColor: 'rgba(255,255,255,.92)', borderRadius: 4, padding: 3,
+              font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+              formatter: (v, ctx) => v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' L' + variacao(litros, ctx.dataIndex) } }
+        ] },
         plugins: [ChartDataLabels],
         options: {
           responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
-          plugins: { legend: { display: false }, datalabels: { display: true },
-            tooltip: { callbacks: { label: ctx => brl(ctx.parsed.y) + ' · ' + litros[ctx.dataIndex].toLocaleString('pt-BR') + ' L' +
-              (litros[ctx.dataIndex] ? ' · R$ ' + (ctx.parsed.y / litros[ctx.dataIndex]).toLocaleString('pt-BR', { maximumFractionDigits: 3 }) + '/L' : '') } } },
+          plugins: { legend: { labels: { color: cor.muted, font: { family: 'Inter', size: 11 } } }, datalabels: { display: true },
+            tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' +
+              (ctx.dataset.yAxisID === 'y' ? brl(ctx.parsed.y) : ctx.parsed.y.toLocaleString('pt-BR') + ' L'),
+              afterBody: items => { const i = items[0].dataIndex; return litros[i] ? 'Preço médio: R$ ' + (valores[i] / litros[i]).toLocaleString('pt-BR', { maximumFractionDigits: 3 }) + '/L' : ''; } } } },
           scales: {
             x: { ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
-            y: { beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } }
+            y: { beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } },
+            // escala dos litros mais alta para a linha passar no meio das barras, longe dos valores
+            y1: { position: 'right', beginAtZero: true, max: Math.ceil(maxL * 1.9 / 1000) * 1000,
+              ticks: { color: '#5e34b5', callback: v => (v / 1000).toLocaleString('pt-BR') + ' mil L' }, grid: { display: false } }
           }
         }
       });
+
+      // Leitura: comparou o mês escolhido (ou o último) com o anterior
+      const info = document.getElementById(infoId);
+      const iAtual = mesComb ? COMB.meses.indexOf(mesComb) : COMB.meses.length - 1;
+      if (info) {
+        if (iAtual < 1 || !litros[iAtual - 1] || !litros[iAtual]) { info.innerHTML = ''; }
+        else {
+          const va = valores[iAtual - 1], vb = valores[iAtual], la = litros[iAtual - 1], lb = litros[iAtual];
+          const pa = va / la, pb = vb / lb;
+          const dv = (vb - va) / va * 100, dl = (lb - la) / la * 100, dp = (pb - pa) / pa * 100;
+          const mA = rotuloMes(COMB.meses[iAtual - 1]), mB = rotuloMes(COMB.meses[iAtual]);
+          const preco = x => 'R$ ' + x.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+          let frase, corF;
+          if (dl < 0 && dv > 0) { frase = '⚠ Abasteceu <b>menos litros</b> e <b>gastou mais</b>: o preço médio por litro subiu.'; corF = cor.bad; }
+          else if (dl > 0 && dv > 0) { frase = 'Abasteceu <b>mais litros</b> e <b>gastou mais</b>' + (dp > 0 ? ', e o litro também ficou mais caro.' : ' — o aumento veio do volume, não do preço.'); corF = cor.warn; }
+          else if (dl < 0 && dv < 0) { frase = '✅ Abasteceu <b>menos litros</b> e <b>gastou menos</b>' + (dp > 0 ? ', mas o litro ficou mais caro.' : '.'); corF = cor.good; }
+          else { frase = '✅ Abasteceu <b>mais litros</b> e <b>gastou menos</b>: o preço médio por litro caiu.'; corF = cor.good; }
+          const corDelta = (x, bomQuandoCai) => (x === 0 ? cor.muted : ((x < 0) === bomQuandoCai ? cor.good : cor.bad));
+          info.innerHTML = `
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:8px;">
+              <div class="kpi" style="padding:10px 12px;"><div class="label">Valor ${mA} → ${mB}</div>
+                <div class="mono" style="font-weight:700; color:${corDelta(dv, true)};">${fmtPct(dv)}</div></div>
+              <div class="kpi" style="padding:10px 12px;"><div class="label">Litros ${mA} → ${mB}</div>
+                <div class="mono" style="font-weight:700; color:${cor.text};">${fmtPct(dl)}</div></div>
+              <div class="kpi" style="padding:10px 12px;"><div class="label">Preço médio / litro</div>
+                <div class="mono" style="font-weight:700; color:${corDelta(dp, true)};">${preco(pa)} → ${preco(pb)} (${fmtPct(dp)})</div></div>
+            </div>
+            <div style="font-size:12.5px; color:${corF}; padding:8px 10px; border-left:3px solid ${corF}; background:${corF}12; border-radius:4px;">${frase}</div>`;
+        }
+      }
+      return ch;
     }
-    chartMeses = graficoMesAMes('combMesesChart', 'FROTA', CORES_TIPO.FROTA, chartMeses);
-    chartGmgMeses = graficoMesAMes('combGmgMesesChart', 'GMG', CORES_TIPO.GMG, chartGmgMeses);
+    chartMeses = graficoMesAMes('combMesesChart', 'combMesesInfo', 'FROTA', CORES_TIPO.FROTA, chartMeses);
+    chartGmgMeses = graficoMesAMes('combGmgMesesChart', 'combGmgInfo', 'GMG', CORES_TIPO.GMG, chartGmgMeses);
 
     // Top 10 (Frota e GMG) — em "Todos", barra empilhada mês a mês
     const PALETA_MESES = ['#0e7c86', '#5e34b5', '#d97706', '#059669', '#2563eb', '#dc2626'];
@@ -499,7 +530,7 @@
   }
 
   instalar();
-  console.log('[Combustível] v10 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
+  console.log('[Combustível] v11 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
