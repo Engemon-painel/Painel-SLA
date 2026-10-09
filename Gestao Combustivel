@@ -18,7 +18,7 @@
   let COMB = null;          // conteúdo do dados_combustivel.json
   let mesComb = '';         // '' = todos os meses; senão 'AAAA-MM'
   let mesCombIniciado = false;
-  let chartMeses = null, chartTop = null;
+  let chartMeses = null, chartTop = null, chartGmgMeses = null, chartTopGmg = null;
   let abaFrota = 'veiculos';   // 'veiculos' | 'combustivel'
 
   const brl = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -65,11 +65,67 @@
     const bloco = blocoDoMes();
     const mapa = {};
     // porPlacaTodos = todas as placas da planilha, de qualquer contrato
-    if (bloco) (bloco.porPlacaTodos || bloco.porPlaca || []).forEach(p => { mapa[chavePlaca(p.Placa)] = Number(p['Valor Total']) || 0; });
+    if (bloco) (bloco.porPlacaTodos || bloco.porPlaca || []).forEach(p => { mapa[chavePlaca(p.Placa)] = p; });
     FROTA.forEach(v => {
       if (!('_combOriginal' in v)) v._combOriginal = v.valorCombustivel;
-      v.valorCombustivel = bloco ? (mapa[chavePlaca(v.placa)] || 0) : v._combOriginal;
+      const d = bloco ? mapa[chavePlaca(v.placa)] : null;
+      v._combDet = d || null;
+      v.valorCombustivel = bloco ? (d ? Number(d['Valor Total']) || 0 : 0) : v._combOriginal;
     });
+  }
+
+  // Ranking: todos os veículos do contrato filtrado, do maior para o menor,
+  // com litros, VL/litro, hodômetro, km rodados e km/litro
+  function renderRankingCompleto() {
+    const tbody = document.getElementById('frotaRankingBody');
+    if (!tbody) return;
+    const tabela = tbody.closest('table');
+    const painel = tbody.closest('.panel');
+    if (tabela && !tabela.dataset.comb) {
+      tabela.dataset.comb = '1';
+      tabela.querySelector('thead').innerHTML = `<tr>
+        <th class="num">#</th><th>Placa</th><th>Condutor</th><th>Operação</th>
+        <th class="num">Aluguel/Compra</th><th class="num">Combustível</th><th class="num">Litros</th>
+        <th class="num">VL/Litro</th><th class="num">Hodômetro ou Horímetro</th>
+        <th class="num">KM Rodados ou Horas Trab.</th><th class="num">KM/Litro ou Litros/Hora</th><th class="num">Total</th></tr>`;
+      const rolagem = document.createElement('div');
+      rolagem.style.cssText = 'overflow:auto; max-height:640px; border-radius:8px;';
+      tabela.parentElement.insertBefore(rolagem, tabela);
+      rolagem.appendChild(tabela);
+    }
+    const c = contratoAtual();
+    const lista = (c ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c) : FROTA)
+      .map(v => {
+        const aluguel = extrairNumeroValorFrota(v.valor), comb = extrairNumeroValorFrota(v.valorCombustivel);
+        return { v, aluguel, comb, total: aluguel + comb, d: v._combDet };
+      })
+      .sort((a, b) => b.total - a.total);
+    const exibidos = c ? lista : lista.slice(0, 10);
+
+    const titulo = painel && painel.querySelector('h2');
+    if (titulo) titulo.textContent = c
+      ? 'Ranking de Gastos por Veículo — ' + c + ' (' + lista.length + ' veículos)' + (COMB ? ' · ' + (mesComb ? rotuloMes(mesComb) : 'todos os meses') : '')
+      : 'Ranking de Gastos por Veículo — Top 10 (filtre um contrato para ver todos)';
+
+    const n = (x, casas) => (Number(x) || 0).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
+    const ou = (x, f) => x ? f(x) : '—';
+    tbody.innerHTML = exibidos.map((it, i) => {
+      const d = it.d || {}, gmg = d.tipoFrota === 'GMG';
+      return `<tr>
+        <td class="num mono">${i + 1}</td>
+        <td class="mono">${esc(it.v.placa) || '—'}</td>
+        <td>${esc(it.v.condutor) || '—'}</td>
+        <td>${esc(it.v.operacao) || '—'}</td>
+        <td class="num mono">${brl(it.aluguel)}</td>
+        <td class="num mono">${brl(it.comb)}</td>
+        <td class="num mono">${ou(d.litros, x => n(x, 2))}</td>
+        <td class="num mono">${ou(d.vlLitro, x => 'R$ ' + n(x, 3))}</td>
+        <td class="num mono">${ou(d.hodometro, x => n(x, 0) + (gmg ? ' h' : ' km'))}</td>
+        <td class="num mono">${ou(d.kmRodados, x => n(x, 0) + (gmg ? ' h' : ' km'))}</td>
+        <td class="num mono">${ou(d.kmLitro, x => n(x, 2) + (gmg ? ' L/h' : ' km/L'))}</td>
+        <td class="num mono" style="font-weight:700;">${brl(it.total)}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="12" style="text-align:center; color:${cor.muted};">Nenhum veículo</td></tr>`;
   }
 
   // Aba Veículos: com filtro ativo, os cards mostram só o contrato escolhido
@@ -127,16 +183,17 @@
     lista.forEach(v => { aluguel += extrairNumeroValorFrota(v.valor); combPlacas += extrairNumeroValorFrota(v.valorCombustivel); });
     const bloco = blocoDoMes();
     const usaRelatorio = bloco && c && contratoTemCombustivel(c);
-    const comb = usaRelatorio ? bloco.total : combPlacas;
+    const frotaRel = usaRelatorio ? (bloco.porTipoFrota.find(t => t.tipo === 'FROTA') || { valor: 0 }).valor : 0;
+    const comb = usaRelatorio ? frotaRel : combPlacas;
     const periodo = COMB ? (mesComb ? rotuloMes(mesComb) : 'todos os meses') : '';
     row.innerHTML = `
       <div class="kpi"><div class="label">🏢 ${esc(c || 'Todos os contratos')}</div>
         <div class="value">${lista.length}</div><div class="delta" style="color:${cor.muted};">veículos</div></div>
       <div class="kpi"><div class="label">🚗 Aluguel / Compra</div>
         <div class="value" style="font-size:20px;">${brl(aluguel)}</div></div>
-      <div class="kpi"><div class="label">⛽ Combustível</div>
+      <div class="kpi"><div class="label">⛽ Combustível (Frota)</div>
         <div class="value" style="font-size:20px; color:${cor.warn};">${brl(comb)}</div>
-        <div class="delta" style="color:${cor.muted};">${usaRelatorio ? periodo + ' · relatório de abastecimento' : periodo + ' · soma das placas'}</div></div>
+        <div class="delta" style="color:${cor.muted};">${usaRelatorio ? periodo + ' · só TIPO FROTA = FROTA' : periodo + ' · soma das placas (Frota)'}</div></div>
       <div class="kpi"><div class="label">Σ Total</div>
         <div class="value" style="font-size:20px; color:${cor.accent};">${brl(aluguel + comb)}</div></div>`;
   }
@@ -235,14 +292,24 @@
     if (!painel.querySelector('#combMesStrip')) painel.innerHTML = `
       <h2>Combustível — Claro Infra SPC</h2>
       <div class="kpi-row" id="combTipoKpiRow" style="margin:10px 0 16px;"></div>
-      <div class="grid" style="grid-template-columns: 1.3fr 1fr; margin-bottom:0;">
+      <div class="grid" style="grid-template-columns: 1fr 1.3fr;">
         <div class="panel">
-          <h2>Valor de combustível mês a mês</h2>
+          <h2>🚗 Frota — valor mês a mês</h2>
           <div style="position:relative; height:300px;"><canvas id="combMesesChart"></canvas></div>
         </div>
         <div class="panel">
           <h2 id="combTopTitulo">Top 10 técnicos que mais usaram (Frota)</h2>
           <div style="position:relative; height:300px;"><canvas id="combTopChart"></canvas></div>
+        </div>
+      </div>
+      <div class="grid" style="grid-template-columns: 1fr 1.3fr; margin-bottom:0;">
+        <div class="panel">
+          <h2>⚡ Gerador (GMG) — valor e litros mês a mês</h2>
+          <div style="position:relative; height:300px;"><canvas id="combGmgMesesChart"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2 id="combTopGmgTitulo">Top 10 técnicos que mais abasteceram gerador (GMG)</h2>
+          <div style="position:relative; height:300px;"><canvas id="combTopGmgChart"></canvas></div>
         </div>
       </div>
       <div id="combAviso" class="mono" style="font-size:11px; color:${cor.muted}; margin-top:10px;"></div>`;
@@ -283,97 +350,119 @@
         </div>`;
       }).join('');
 
-    // gráfico mês a mês (empilhado por TIPO FROTA + total)
-    const tipos = [];
-    COMB.meses.forEach(m => COMB.porMes[m].porTipoFrota.forEach(t => { if (tipos.indexOf(t.tipo) === -1) tipos.push(t.tipo); }));
-    const ordemTipos = ['FROTA', 'GMG', 'RAC', 'BENEFICIO'];
-    tipos.sort((a, b) => (ordemTipos.indexOf(a) + 1 || 99) - (ordemTipos.indexOf(b) + 1 || 99));
-    const valorTipo = (m, tipo) => { const t = COMB.porMes[m].porTipoFrota.find(x => x.tipo === tipo); return t ? t.valor : 0; };
-    const totaisMes = COMB.meses.map(m => COMB.porMes[m].total);
-
-    const dsTipos = tipos.map(tipo => ({
-      type: 'bar', label: tipo, stack: 'v',
-      data: COMB.meses.map(m => valorTipo(m, tipo)),
-      backgroundColor: COMB.meses.map(m => (CORES_TIPO[tipo] || cor.muted) + (mesComb && m !== mesComb ? '66' : 'dd')),
-      borderRadius: 3,
-      datalabels: { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 4000, color: '#fff',
-        font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => brlCurto(v) }
-    }));
-    const dsTotal = {
-      type: 'bar', label: 'Total', stack: 'v', data: COMB.meses.map(() => 0), backgroundColor: 'rgba(0,0,0,0)',
-      datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
-        formatter: (v, ctx) => {
-          const i = ctx.dataIndex, atual = totaisMes[i], ant = i > 0 ? totaisMes[i - 1] : null;
-          const varTxt = ant ? ' (' + ((atual - ant) / ant * 100 >= 0 ? '+' : '') + ((atual - ant) / ant * 100).toFixed(1) + '%)' : '';
-          return brlCurto(atual) + varTxt;
-        } }
+    const tipoDoMes = (m, tipo) => (COMB.porMes[m].porTipoFrota.find(x => x.tipo === tipo) || { valor: 0, litros: 0 });
+    const variacao = (lista, i) => {
+      const ant = i > 0 ? lista[i - 1] : null;
+      if (!ant) return '';
+      const p = (lista[i] - ant) / ant * 100;
+      return ' (' + (p >= 0 ? '+' : '') + p.toFixed(1) + '%)';
     };
+    const corMes = (base, m) => base + (mesComb && m !== mesComb ? '66' : 'dd');
 
+    // 🚗 Frota mês a mês (só TIPO FROTA = FROTA)
+    const frotaMes = COMB.meses.map(m => tipoDoMes(m, 'FROTA').valor);
     if (chartMeses) chartMeses.destroy();
     chartMeses = new Chart(document.getElementById('combMesesChart'), {
-      data: { labels: COMB.meses.map(rotuloMes), datasets: [...dsTipos, dsTotal] },
+      type: 'bar',
+      data: { labels: COMB.meses.map(rotuloMes), datasets: [{
+        label: 'Frota', data: frotaMes, borderRadius: 4,
+        backgroundColor: COMB.meses.map(m => corMes(CORES_TIPO.FROTA, m)),
+        datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
+          formatter: (v, ctx) => brlCurto(v) + variacao(frotaMes, ctx.dataIndex) }
+      }] },
       plugins: [ChartDataLabels],
       options: {
         responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
-        plugins: {
-          legend: { labels: { color: cor.muted, font: { family: 'Inter', size: 11 }, filter: i => i.text !== 'Total' } },
-          tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Total' ? null : ctx.dataset.label + ': ' + brl(ctx.parsed.y) } },
-          datalabels: { display: true }
-        },
+        plugins: { legend: { display: false }, datalabels: { display: true },
+          tooltip: { callbacks: { label: ctx => brl(ctx.parsed.y) + ' · ' + tipoDoMes(COMB.meses[ctx.dataIndex], 'FROTA').litros.toLocaleString('pt-BR') + ' L' } } },
         scales: {
-          x: { stacked: true, ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
-          y: { stacked: true, beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } }
+          x: { ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } }
         }
       }
     });
 
-    // Top 10 técnicos (FROTA) — em "Todos", barra empilhada mês a mês
-    const top = bloco.topMotoristasFrota || [];
-    const mesAMes = !mesComb && top.length && top[0].porMes;
-    document.getElementById('combTopTitulo').textContent = 'Top 10 técnicos que mais usaram (Frota) — ' +
-      (mesAMes ? 'mês a mês' : periodo);
-    const PALETA_MESES = ['#0e7c86', '#5e34b5', '#d97706', '#059669', '#2563eb', '#dc2626'];
-    const rotuloBarra = { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 0, color: '#fff', anchor: 'center', align: 'center',
-      font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => brlCurto(v) };
-    const datasetsTop = mesAMes
-      ? [
-          ...COMB.meses.map((m, i) => ({
-            label: rotuloMes(m), data: top.map(t => t.porMes[m] || 0),
-            backgroundColor: PALETA_MESES[i % PALETA_MESES.length], borderRadius: 3, datalabels: rotuloBarra
-          })),
-          { label: 'Total', data: top.map(() => 0), backgroundColor: 'rgba(0,0,0,0)',
-            datalabels: { anchor: 'end', align: 'right', offset: 4, color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
-              formatter: (v, ctx) => brl(top[ctx.dataIndex].valor) } }
-        ]
-      : [{
-          label: 'Valor', data: top.map(t => t.valor),
-          backgroundColor: top.map((_, i) => i === 0 ? cor.bad : 'rgba(14,124,134,.8)'), borderRadius: 4,
-          datalabels: { anchor: 'end', align: 'right', color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
-            formatter: v => brl(v) }
-        }];
-    if (chartTop) chartTop.destroy();
-    chartTop = new Chart(document.getElementById('combTopChart'), {
-      type: 'bar',
-      data: { labels: top.map(t => t.motorista), datasets: datasetsTop },
+    // ⚡ Gerador (GMG) mês a mês: valor (barra) + litros (linha)
+    const gmgMes = COMB.meses.map(m => tipoDoMes(m, 'GMG').valor);
+    const gmgLitros = COMB.meses.map(m => tipoDoMes(m, 'GMG').litros);
+    if (chartGmgMeses) chartGmgMeses.destroy();
+    chartGmgMeses = new Chart(document.getElementById('combGmgMesesChart'), {
+      data: { labels: COMB.meses.map(rotuloMes), datasets: [
+        { type: 'bar', label: 'Valor (R$)', data: gmgMes, borderRadius: 4, yAxisID: 'y', order: 2,
+          backgroundColor: COMB.meses.map(m => corMes(CORES_TIPO.GMG, m)),
+          datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
+            formatter: (v, ctx) => brlCurto(v) + variacao(gmgMes, ctx.dataIndex) } },
+        { type: 'line', label: 'Litros', data: gmgLitros, yAxisID: 'y1', order: 1,
+          borderColor: '#5e34b5', backgroundColor: '#5e34b5', pointRadius: 4, tension: .3,
+          datalabels: { align: 'bottom', color: '#5e34b5', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+            formatter: v => v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' L' } }
+      ] },
       plugins: [ChartDataLabels],
       options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 90 } },
-        plugins: {
-          legend: { display: !!mesAMes, labels: { color: cor.muted, font: { family: 'Inter', size: 11 }, filter: i => i.text !== 'Total' } },
-          datalabels: { display: true },
-          tooltip: { filter: i => i.dataset.label !== 'Total', callbacks: {
-            label: ctx => (mesAMes ? ctx.dataset.label + ': ' : '') + brl(ctx.parsed.x),
-            afterBody: items => {
-              const t = top[items[0].dataIndex];
-              return t.qtd + ' abastecimentos' + (t.placas && t.placas.length ? ' · placa ' + t.placas.join(', ') : '');
-            } } }
-        },
+        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
+        plugins: { legend: { labels: { color: cor.muted, font: { family: 'Inter', size: 11 } } }, datalabels: { display: true },
+          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.dataset.yAxisID === 'y' ? brl(ctx.parsed.y) : ctx.parsed.y.toLocaleString('pt-BR') + ' L') } } },
         scales: {
-          x: { stacked: !!mesAMes, beginAtZero: true, ticks: { display: false }, grid: { display: false } },
-          y: { stacked: !!mesAMes, ticks: { color: cor.text, font: { size: 10, weight: 'bold' } }, grid: { display: false } }
+          x: { ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } },
+          y1: { position: 'right', beginAtZero: true, ticks: { color: '#5e34b5', callback: v => v.toLocaleString('pt-BR') + ' L' }, grid: { display: false } }
         }
       }
     });
+
+    // Top 10 (Frota e GMG) — em "Todos", barra empilhada mês a mês
+    const PALETA_MESES = ['#0e7c86', '#5e34b5', '#d97706', '#059669', '#2563eb', '#dc2626'];
+    function graficoTop(canvasId, tituloId, tituloBase, top, corBarra, chartAtual) {
+      const mesAMes = !mesComb && top.length && top[0].porMes;
+      document.getElementById(tituloId).textContent = tituloBase + ' — ' + (mesAMes ? 'mês a mês' : periodo);
+      const rotuloBarra = { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 0, color: '#fff', anchor: 'center', align: 'center',
+        font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => brlCurto(v) };
+      const datasets = mesAMes
+        ? [
+            ...COMB.meses.map((m, i) => ({
+              label: rotuloMes(m), data: top.map(t => t.porMes[m] || 0),
+              backgroundColor: PALETA_MESES[i % PALETA_MESES.length], borderRadius: 3, datalabels: rotuloBarra
+            })),
+            { label: 'Total', data: top.map(() => 0), backgroundColor: 'rgba(0,0,0,0)',
+              datalabels: { anchor: 'end', align: 'right', offset: 4, color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+                formatter: (v, ctx) => brl(top[ctx.dataIndex].valor) } }
+          ]
+        : [{
+            label: 'Valor', data: top.map(t => t.valor),
+            backgroundColor: top.map((_, i) => i === 0 ? cor.bad : corBarra), borderRadius: 4,
+            datalabels: { anchor: 'end', align: 'right', color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+              formatter: v => brl(v) }
+          }];
+      if (chartAtual) chartAtual.destroy();
+      return new Chart(document.getElementById(canvasId), {
+        type: 'bar',
+        data: { labels: top.map(t => t.motorista), datasets },
+        plugins: [ChartDataLabels],
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 90 } },
+          plugins: {
+            legend: { display: !!mesAMes, labels: { color: cor.muted, font: { family: 'Inter', size: 11 }, filter: i => i.text !== 'Total' } },
+            datalabels: { display: true },
+            tooltip: { filter: i => i.dataset.label !== 'Total', callbacks: {
+              label: ctx => (mesAMes ? ctx.dataset.label + ': ' : '') + brl(ctx.parsed.x),
+              afterBody: items => {
+                const t = top[items[0].dataIndex];
+                return t.qtd + ' abastecimentos' + (t.litros ? ' · ' + t.litros.toLocaleString('pt-BR') + ' L' : '') +
+                  (t.placas && t.placas.length ? ' · ' + t.placas.join(', ') : '');
+              } } }
+          },
+          scales: {
+            x: { stacked: !!mesAMes, beginAtZero: true, ticks: { display: false }, grid: { display: false } },
+            y: { stacked: !!mesAMes, ticks: { color: cor.text, font: { size: 10, weight: 'bold' } }, grid: { display: false } }
+          }
+        }
+      });
+    }
+    chartTop = graficoTop('combTopChart', 'combTopTitulo', 'Top 10 técnicos que mais usaram (Frota)',
+      bloco.topMotoristasFrota || [], 'rgba(14,124,134,.8)', chartTop);
+    chartTopGmg = graficoTop('combTopGmgChart', 'combTopGmgTitulo', 'Top 10 técnicos que mais abasteceram gerador (GMG)',
+      bloco.topMotoristasGmg || [], 'rgba(217,119,6,.8)', chartTopGmg);
+    if (!(bloco.topMotoristasGmg || []).length) console.warn('[Combustível] JSON sem "topMotoristasGmg" — atualize o script_combustivel.ts no Excel');
 
     const aviso = document.getElementById('combAviso');
     aviso.textContent = COMB.atualizadoEm
@@ -392,6 +481,7 @@
       ajustarCardsContrato();
       renderMatrizAreaTipo();
       renderCustosContrato();
+      renderRankingCompleto();
       renderChipsMes();
       if (abaFrota === 'combustivel') renderCombustivel();
     };
@@ -400,7 +490,7 @@
   }
 
   instalar();
-  console.log('[Combustível] módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._comb));
+  console.log('[Combustível] v7 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._comb));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
