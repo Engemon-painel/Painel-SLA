@@ -302,7 +302,7 @@
       <div class="kpi-row" id="combTipoKpiRow" style="margin:10px 0 16px;"></div>
       <div class="grid" style="grid-template-columns: 1fr 1.3fr;">
         <div class="panel">
-          <h2>🚗 Frota — valor mês a mês</h2>
+          <h2>🚗 Frota — valor e litros mês a mês</h2>
           <div style="position:relative; height:300px;"><canvas id="combMesesChart"></canvas></div>
         </div>
         <div class="panel">
@@ -370,56 +370,46 @@
     };
     const corMes = (base, m) => base + (mesComb && m !== mesComb ? '66' : 'dd');
 
-    // 🚗 Frota mês a mês (só TIPO FROTA = FROTA)
-    const frotaMes = COMB.meses.map(m => tipoDoMes(m, 'FROTA').valor);
-    if (chartMeses) chartMeses.destroy();
-    chartMeses = new Chart(document.getElementById('combMesesChart'), {
-      type: 'bar',
-      data: { labels: COMB.meses.map(rotuloMes), datasets: [{
-        label: 'Frota', data: frotaMes, borderRadius: 4,
-        backgroundColor: COMB.meses.map(m => corMes(CORES_TIPO.FROTA, m)),
-        datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
-          formatter: (v, ctx) => brlCurto(v) + variacao(frotaMes, ctx.dataIndex) }
-      }] },
-      plugins: [ChartDataLabels],
-      options: {
-        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
-        plugins: { legend: { display: false }, datalabels: { display: true },
-          tooltip: { callbacks: { label: ctx => brl(ctx.parsed.y) + ' · ' + tipoDoMes(COMB.meses[ctx.dataIndex], 'FROTA').litros.toLocaleString('pt-BR') + ' L' } } },
-        scales: {
-          x: { ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
-          y: { beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } }
+    // Gráfico mês a mês: valor + variação em cima da barra, litros dentro da barra
+    function graficoMesAMes(canvasId, tipo, corBase, chartAtual) {
+      const valores = COMB.meses.map(m => tipoDoMes(m, tipo).valor);
+      const litros = COMB.meses.map(m => tipoDoMes(m, tipo).litros);
+      const varLitros = i => {
+        const ant = i > 0 ? litros[i - 1] : 0;
+        if (!ant) return '';
+        const p = (litros[i] - ant) / ant * 100;
+        return ' (' + (p >= 0 ? '+' : '') + p.toFixed(1) + '%)';
+      };
+      if (chartAtual) chartAtual.destroy();
+      return new Chart(document.getElementById(canvasId), {
+        type: 'bar',
+        data: { labels: COMB.meses.map(rotuloMes), datasets: [{
+          label: tipo, data: valores, borderRadius: 4,
+          backgroundColor: COMB.meses.map(m => corMes(corBase, m)),
+          datalabels: { labels: {
+            valor: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
+              formatter: (v, ctx) => brlCurto(v) + variacao(valores, ctx.dataIndex) },
+            litros: { anchor: 'center', align: 'center', color: '#fff', textAlign: 'center',
+              font: { size: 12, family: 'JetBrains Mono', weight: '700' },
+              display: ctx => litros[ctx.dataIndex] > 0,
+              formatter: (v, ctx) => ['⛽ ' + litros[ctx.dataIndex].toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' L', varLitros(ctx.dataIndex).trim()] }
+          } }
+        }] },
+        plugins: [ChartDataLabels],
+        options: {
+          responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
+          plugins: { legend: { display: false }, datalabels: { display: true },
+            tooltip: { callbacks: { label: ctx => brl(ctx.parsed.y) + ' · ' + litros[ctx.dataIndex].toLocaleString('pt-BR') + ' L' +
+              (litros[ctx.dataIndex] ? ' · R$ ' + (ctx.parsed.y / litros[ctx.dataIndex]).toLocaleString('pt-BR', { maximumFractionDigits: 3 }) + '/L' : '') } } },
+          scales: {
+            x: { ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } }
+          }
         }
-      }
-    });
-
-    // ⚡ Gerador (GMG) mês a mês: valor (barra) + litros (linha)
-    const gmgMes = COMB.meses.map(m => tipoDoMes(m, 'GMG').valor);
-    const gmgLitros = COMB.meses.map(m => tipoDoMes(m, 'GMG').litros);
-    if (chartGmgMeses) chartGmgMeses.destroy();
-    chartGmgMeses = new Chart(document.getElementById('combGmgMesesChart'), {
-      data: { labels: COMB.meses.map(rotuloMes), datasets: [
-        { type: 'bar', label: 'Valor (R$)', data: gmgMes, borderRadius: 4, yAxisID: 'y', order: 2,
-          backgroundColor: COMB.meses.map(m => corMes(CORES_TIPO.GMG, m)),
-          datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
-            formatter: (v, ctx) => brlCurto(v) + variacao(gmgMes, ctx.dataIndex) } },
-        { type: 'line', label: 'Litros', data: gmgLitros, yAxisID: 'y1', order: 1,
-          borderColor: '#5e34b5', backgroundColor: '#5e34b5', pointRadius: 4, tension: .3,
-          datalabels: { align: 'bottom', color: '#5e34b5', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
-            formatter: v => v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' L' } }
-      ] },
-      plugins: [ChartDataLabels],
-      options: {
-        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
-        plugins: { legend: { labels: { color: cor.muted, font: { family: 'Inter', size: 11 } } }, datalabels: { display: true },
-          tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + (ctx.dataset.yAxisID === 'y' ? brl(ctx.parsed.y) : ctx.parsed.y.toLocaleString('pt-BR') + ' L') } } },
-        scales: {
-          x: { ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
-          y: { beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } },
-          y1: { position: 'right', beginAtZero: true, ticks: { color: '#5e34b5', callback: v => v.toLocaleString('pt-BR') + ' L' }, grid: { display: false } }
-        }
-      }
-    });
+      });
+    }
+    chartMeses = graficoMesAMes('combMesesChart', 'FROTA', CORES_TIPO.FROTA, chartMeses);
+    chartGmgMeses = graficoMesAMes('combGmgMesesChart', 'GMG', CORES_TIPO.GMG, chartGmgMeses);
 
     // Top 10 (Frota e GMG) — em "Todos", barra empilhada mês a mês
     const PALETA_MESES = ['#0e7c86', '#5e34b5', '#d97706', '#059669', '#2563eb', '#dc2626'];
@@ -509,7 +499,7 @@
   }
 
   instalar();
-  console.log('[Combustível] v9 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
+  console.log('[Combustível] v10 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
