@@ -289,7 +289,7 @@
       ancora.insertAdjacentElement('afterend', painel);
     }
     // (re)monta a estrutura se estiver faltando (ex.: depois do aviso de "sem dados")
-    if (!painel.querySelector('#combMesStrip')) painel.innerHTML = `
+    if (!painel.querySelector('#combTipoKpiRow')) painel.innerHTML = `
       <h2>Combustível — Claro Infra SPC</h2>
       <div class="kpi-row" id="combTipoKpiRow" style="margin:10px 0 16px;"></div>
       <div class="grid" style="grid-template-columns: 1fr 1.3fr;">
@@ -350,7 +350,10 @@
         </div>`;
       }).join('');
 
-    const tipoDoMes = (m, tipo) => (COMB.porMes[m].porTipoFrota.find(x => x.tipo === tipo) || { valor: 0, litros: 0 });
+    const tipoDoMes = (m, tipo) => {
+      const t = COMB.porMes[m].porTipoFrota.find(x => x.tipo === tipo) || {};
+      return { valor: Number(t.valor) || 0, litros: Number(t.litros) || 0 };
+    };
     const variacao = (lista, i) => {
       const ant = i > 0 ? lista[i - 1] : null;
       if (!ant) return '';
@@ -465,6 +468,12 @@
     if (!(bloco.topMotoristasGmg || []).length) console.warn('[Combustível] JSON sem "topMotoristasGmg" — atualize o script_combustivel.ts no Excel');
 
     const aviso = document.getElementById('combAviso');
+    const jsonAntigo = !COMB.geral || !COMB.geral.topMotoristasGmg || !(COMB.geral.porPlacaTodos || [])[0] || !('litros' in COMB.geral.porPlacaTodos[0]);
+    if (jsonAntigo) {
+      aviso.innerHTML = `<span style="color:${cor.bad}; font-weight:700;">⚠ O dados_combustivel.json foi gerado pela versão ANTIGA do script (sem litros, km e ranking de gerador). Atualize o Office Script de combustível no Excel com o script_combustivel.ts novo e rode o fluxo.</span>`;
+      console.warn('[Combustível] dados_combustivel.json no formato antigo — gerado em', COMB.atualizadoEm);
+      return;
+    }
     aviso.textContent = COMB.atualizadoEm
       ? 'Relatório de abastecimento atualizado em ' + new Date(COMB.atualizadoEm).toLocaleString('pt-BR') + '. O mês selecionado aqui também define o "Valor Combustível" de todas as placas na tabela e no ranking abaixo.'
       : '';
@@ -490,7 +499,7 @@
   }
 
   instalar();
-  console.log('[Combustível] v7 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._comb));
+  console.log('[Combustível] v8 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._comb));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
