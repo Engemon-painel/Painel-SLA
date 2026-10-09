@@ -18,7 +18,8 @@
   let COMB = null;          // conteúdo do dados_combustivel.json
   let mesComb = '';         // '' = todos os meses; senão 'AAAA-MM'
   let mesCombIniciado = false;
-  let chartMeses = null, chartTop = null, chartGmgMeses = null, chartTopGmg = null, chartTopSup = null;
+  let chartMeses = null, chartTop = null, chartGmgMeses = null, chartTopGmg = null, chartSup = null, chartSupTec = null;
+  let supSelecionado = '';
   let abaFrota = 'veiculos';   // 'veiculos' | 'combustivel'
 
   const brl = v => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -67,7 +68,7 @@
     const chave = Object.keys(COMB.grupos).find(k => normC(k) === alvo);
     return chave ? COMB.grupos[chave] : null;
   }
-  const BLOCO_VAZIO = { total: 0, qtdAbastecimentos: 0, litros: 0, porTipoFrota: [], topMotoristasFrota: [], topMotoristasGmg: [], topSupervisores: [] };
+  const BLOCO_VAZIO = { total: 0, qtdAbastecimentos: 0, litros: 0, porTipoFrota: [], topMotoristasFrota: [], topMotoristasGmg: [], topSupervisores: [], tecnicos: [] };
   function blocoDoMes() {
     const g = grupoAtual();
     if (!g) return null;
@@ -341,14 +342,126 @@
           <div style="position:relative; height:300px;"><canvas id="combTopGmgChart"></canvas></div>
         </div>
       </div>
-      <div class="grid" style="grid-template-columns: 1fr; margin:16px 0 0;">
+      <div class="grid" style="grid-template-columns: 1fr 1.2fr; margin:16px 0 0;">
         <div class="panel">
-          <h2 id="combTopSupTitulo">Top 5 supervisores — consumo de frota</h2>
-          <div id="combTopSupWrap" style="position:relative; height:240px;"><canvas id="combTopSupChart"></canvas></div>
+          <h2 id="combSupTitulo">Supervisores — consumo da equipe</h2>
+          <div class="mono" id="combSupFonte" style="font-size:11px; color:${cor.muted}; margin:2px 0 10px;"></div>
+          <div id="combSupWrap" style="position:relative; height:300px;"><canvas id="combSupChart"></canvas></div>
+        </div>
+        <div class="panel">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+            <h2 style="margin:0;">Top 5 técnicos do supervisor</h2>
+            <select id="combSupSelect" class="mono" style="margin-left:auto; font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid ${cor.line}; background:#fff; min-width:240px;"></select>
+          </div>
+          <div style="position:relative; height:230px;"><canvas id="combSupTecChart"></canvas></div>
+          <div id="combSupTecTabela" style="margin-top:10px; overflow:auto;"></div>
         </div>
       </div>
       <div id="combAviso" class="mono" style="font-size:11px; color:${cor.muted}; margin-top:10px;"></div>`;
     return painel;
+  }
+
+  // Supervisor de cada técnico: coluna da base de combustível; senão, Organograma (COLABORADORES)
+  function mapaSupervisorOrganograma() {
+    const m = {};
+    try {
+      (typeof COLABORADORES !== 'undefined' ? COLABORADORES : []).forEach(c => {
+        const nome = c.nome || c.colaborador || c.nomeColaborador || '';
+        const sup = String(c.supervisor || c.nomeSupervisor || '').replace(/\s+/g, ' ').trim();
+        if (nome && sup) m[normC(nome)] = sup;
+      });
+    } catch (e) { /* sem organograma */ }
+    return m;
+  }
+
+  function renderSupervisores(bloco, periodo) {
+    const wrap = document.getElementById('combSupWrap');
+    const fonte = document.getElementById('combSupFonte');
+    const select = document.getElementById('combSupSelect');
+    if (!wrap || !select) return;
+    const tecnicos = bloco.tecnicos || [];
+    const org = mapaSupervisorOrganograma();
+    let daBase = 0, doOrg = 0, sem = 0;
+    const porSup = {};
+    tecnicos.forEach(t => {
+      let sup = t.supervisor;
+      if (sup) daBase++; else { sup = org[normC(t.nome)] || ''; if (sup) doOrg++; else { sup = 'Sem supervisor'; sem++; } }
+      const k = normC(sup);
+      if (!porSup[k]) porSup[k] = { nome: sup, frota: 0, gmg: 0, tecnicos: [] };
+      porSup[k].frota += t.frota; porSup[k].gmg += t.gmg; porSup[k].tecnicos.push(t);
+    });
+    const lista = Object.values(porSup).sort((a, b) => (b.frota + b.gmg) - (a.frota + a.gmg));
+    fonte.textContent = !tecnicos.length ? '' :
+      (daBase ? 'Supervisor da coluna da base de combustível' : 'Supervisor pelo Organograma (nome do técnico)') +
+      ' · ' + periodo + (sem ? ' · ' + sem + ' técnico(s) sem supervisor encontrado' : '') +
+      (!daBase && !(bloco.tecnicos) ? '' : '');
+
+    if (!tecnicos.length) {
+      if (chartSup) { chartSup.destroy(); chartSup = null; }
+      if (chartSupTec) { chartSupTec.destroy(); chartSupTec = null; }
+      fonte.textContent = COMB._antigo || !('tecnicos' in bloco)
+        ? 'O dados_combustivel.json ainda não traz os técnicos por supervisor. Atualize o script_combustivel.ts no Excel e rode o fluxo.'
+        : 'Sem abastecimentos de frota ou gerador neste período.';
+      select.innerHTML = ''; document.getElementById('combSupTecTabela').innerHTML = '';
+      return;
+    }
+
+    // ranking de supervisores (até 10), empilhado Frota + Gerador
+    const topSup = lista.filter(x => x.nome !== 'Sem supervisor').slice(0, 10);
+    if (!supSelecionado || !porSup[supSelecionado]) supSelecionado = topSup.length ? normC(topSup[0].nome) : normC(lista[0].nome);
+    wrap.style.height = Math.max(200, topSup.length * 30 + 60) + 'px';
+    const rotuloDentro = { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 1500, color: '#fff', anchor: 'center', align: 'center',
+      font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => brlCurto(v) };
+    const totalFim = (arr) => ({ label: 'Total', data: arr.map(() => 0), backgroundColor: 'rgba(0,0,0,0)', stack: 's',
+      datalabels: { anchor: 'end', align: 'right', offset: 4, color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+        formatter: (v, ctx) => brl(arr[ctx.dataIndex].frota + arr[ctx.dataIndex].gmg) } });
+    const opcoes = (aoClicar) => ({
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 95 } }, onClick: aoClicar,
+      plugins: { legend: { labels: { color: cor.muted, font: { family: 'Inter', size: 11 }, filter: i => i.text !== 'Total' } },
+        datalabels: { display: true }, tooltip: { filter: i => i.dataset.label !== 'Total', callbacks: { label: ctx => ctx.dataset.label + ': ' + brl(ctx.parsed.x) } } },
+      scales: { x: { stacked: true, beginAtZero: true, ticks: { display: false }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: cor.text, font: { size: 10, weight: 'bold' } }, grid: { display: false } } }
+    });
+    if (chartSup) chartSup.destroy();
+    chartSup = new Chart(document.getElementById('combSupChart'), {
+      type: 'bar',
+      data: { labels: topSup.map(x => x.nome), datasets: [
+        { label: 'Frota', data: topSup.map(x => x.frota), backgroundColor: topSup.map(x => normC(x.nome) === supSelecionado ? CORES_TIPO.FROTA : CORES_TIPO.FROTA + '99'), stack: 's', borderRadius: 3, datalabels: rotuloDentro },
+        { label: 'Gerador (GMG)', data: topSup.map(x => x.gmg), backgroundColor: topSup.map(x => normC(x.nome) === supSelecionado ? CORES_TIPO.GMG : CORES_TIPO.GMG + '99'), stack: 's', borderRadius: 3, datalabels: rotuloDentro },
+        totalFim(topSup)
+      ] },
+      plugins: [ChartDataLabels],
+      options: opcoes((evt, els) => { if (els && els.length) { supSelecionado = normC(topSup[els[0].index].nome); renderSupervisores(bloco, periodo); } })
+    });
+    document.getElementById('combSupTitulo').textContent = 'Supervisores — consumo da equipe (Frota + Gerador) · clique para ver os técnicos';
+
+    // select com todos os supervisores
+    select.innerHTML = lista.map(x => `<option value="${esc(normC(x.nome))}">${esc(x.nome)} — ${brl(x.frota + x.gmg)}</option>`).join('');
+    select.value = supSelecionado;
+    select.onchange = () => { supSelecionado = select.value; renderSupervisores(bloco, periodo); };
+
+    // Top 5 técnicos do supervisor escolhido
+    const sel = porSup[supSelecionado];
+    const top5 = sel.tecnicos.slice().sort((a, b) => (b.frota + b.gmg) - (a.frota + a.gmg)).slice(0, 5);
+    if (chartSupTec) chartSupTec.destroy();
+    chartSupTec = new Chart(document.getElementById('combSupTecChart'), {
+      type: 'bar',
+      data: { labels: top5.map(t => t.nome), datasets: [
+        { label: 'Frota', data: top5.map(t => t.frota), backgroundColor: CORES_TIPO.FROTA, stack: 's', borderRadius: 3, datalabels: rotuloDentro },
+        { label: 'Gerador (GMG)', data: top5.map(t => t.gmg), backgroundColor: CORES_TIPO.GMG, stack: 's', borderRadius: 3, datalabels: rotuloDentro },
+        totalFim(top5)
+      ] },
+      plugins: [ChartDataLabels],
+      options: opcoes(null)
+    });
+    const n0 = x => (Number(x) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+    document.getElementById('combSupTecTabela').innerHTML = `<table>
+      <thead><tr><th>Técnico</th><th class="num">Frota</th><th class="num">Litros frota</th><th class="num">Gerador</th><th class="num">Litros GMG</th><th class="num">Total</th></tr></thead>
+      <tbody>${top5.map(t => `<tr><td>${esc(t.nome)}</td><td class="num">${brl(t.frota)}</td><td class="num">${n0(t.litrosFrota)} L</td>
+        <td class="num">${brl(t.gmg)}</td><td class="num">${n0(t.litrosGmg)} L</td><td class="num" style="font-weight:700;">${brl(t.frota + t.gmg)}</td></tr>`).join('')}
+        <tr style="font-weight:700; border-top:2px solid ${cor.line};"><td>Equipe toda (${sel.tecnicos.length} técnicos)</td>
+        <td class="num">${brl(sel.frota)}</td><td></td><td class="num">${brl(sel.gmg)}</td><td></td><td class="num">${brl(sel.frota + sel.gmg)}</td></tr>
+      </tbody></table>`;
   }
 
   function renderCombustivel() {
@@ -530,28 +643,14 @@
       bloco.topMotoristasFrota || [], 'rgba(14,124,134,.8)', chartTop);
     chartTopGmg = graficoTop('combTopGmgChart', 'combTopGmgTitulo', 'Top 10 técnicos que mais abasteceram gerador (GMG)',
       bloco.topMotoristasGmg || [], 'rgba(217,119,6,.8)', chartTopGmg);
-    const sups = bloco.topSupervisores || [];
-    const wrapSup = document.getElementById('combTopSupWrap');
-    if (!COMB.temSupervisor || !sups.length) {
-      if (chartTopSup) { chartTopSup.destroy(); chartTopSup = null; }
-      document.getElementById('combTopSupTitulo').textContent = 'Top 5 supervisores — consumo de frota';
-      wrapSup.style.height = 'auto';
-      wrapSup.innerHTML = `<p style="font-size:13px; color:${cor.muted};">${COMB.temSupervisor
-        ? 'Sem abastecimentos de frota com supervisor neste período.'
-        : 'A coluna "Supervisor" ainda não chegou no dados_combustivel.json. Atualize o script_combustivel.ts no Excel e rode o fluxo.'}</p>`;
-    } else {
-      if (!document.getElementById('combTopSupChart')) { wrapSup.innerHTML = '<canvas id="combTopSupChart"></canvas>'; }
-      wrapSup.style.height = Math.max(180, sups.length * 44 + 40) + 'px';
-      chartTopSup = graficoTop('combTopSupChart', 'combTopSupTitulo', 'Top 5 supervisores — consumo de frota da equipe',
-        sups, 'rgba(37,99,235,.8)', chartTopSup);
-    }
+    renderSupervisores(bloco, periodo);
 
     if (!(bloco.topMotoristasGmg || []).length) console.warn('[Combustível] JSON sem "topMotoristasGmg" — atualize o script_combustivel.ts no Excel');
 
     const aviso = document.getElementById('combAviso');
     const jsonAntigo = COMB._antigo;
     if (jsonAntigo) {
-      aviso.innerHTML = `<span style="color:${cor.bad}; font-weight:700;">⚠ O dados_combustivel.json foi gerado pela versão ANTIGA do script (só Claro, sem os outros contratos e sem supervisor). Atualize o Office Script de combustível no Excel com o script_combustivel.ts novo e rode o fluxo.</span>`;
+      aviso.innerHTML = `<span style="color:${cor.bad}; font-weight:700;">⚠ O dados_combustivel.json foi gerado pela versão ANTIGA do script (sem os outros contratos e sem os técnicos por supervisor). Atualize o Office Script de combustível no Excel com o script_combustivel.ts novo e rode o fluxo.</span>`;
       console.warn('[Combustível] dados_combustivel.json no formato antigo — gerado em', COMB.atualizadoEm);
       return;
     }
@@ -582,7 +681,7 @@
   }
 
   instalar();
-  console.log('[Combustível] v12 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
+  console.log('[Combustível] v13 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
