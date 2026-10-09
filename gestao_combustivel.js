@@ -245,20 +245,42 @@
     const gridGraficos = pTipo ? pTipo.parentElement : null;
     const pVeiculos = painelDe('frotaTable');
 
-    const selectContrato = document.getElementById('frotaContratoTopo');
-    const abas = document.createElement('div');
-    abas.id = 'frotaAbas';
-    abas.className = 'month-strip';
-    abas.style.marginLeft = '12px';
-    abas.innerHTML = `<div class="chip active" data-aba="veiculos">🚗 Veículos</div><div class="chip" data-aba="combustivel">⛽ Combustível</div>`;
-    selectContrato.insertAdjacentElement('afterend', abas);
+    // Layout igual ao da Preventiva: menu lateral com as abas + conteúdo à direita
+    if (!document.getElementById('fr-estilos')) {
+      const st = document.createElement('style'); st.id = 'fr-estilos';
+      st.textContent = `
+        .fr-layout{display:flex;gap:20px;align-items:flex-start}
+        .fr-menu{width:200px;flex:0 0 200px;background:var(--panel,#fff);border:1px solid var(--line,#e1e5f0);border-radius:14px;
+          padding:10px;position:sticky;top:20px;box-shadow:0 2px 8px rgba(27,36,64,.06)}
+        .fr-menu .nav-group{margin-bottom:0}
+        .fr-menu .nav-group-label{cursor:default}
+        .fr-menu .nav-group-label:hover{color:var(--muted,#6b7590)}
+        .fr-conteudo{flex:1;min-width:0}
+        .fr-barra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px !important;padding:10px 14px;
+          border:1px solid var(--line,#e1e5f0);border-radius:12px;background:var(--panel,#fff);box-shadow:0 2px 8px rgba(27,36,64,.06)}
+        @media (max-width:860px){.fr-layout{flex-direction:column}.fr-menu{width:100%;position:static}}`;
+      document.head.appendChild(st);
+    }
+    const tituloSecao = secao.querySelector(':scope > h2');
+    if (tituloSecao) tituloSecao.style.display = 'none';
+    const layout = document.createElement('div'); layout.className = 'fr-layout';
+    const abas = document.createElement('nav'); abas.id = 'frotaAbas'; abas.className = 'fr-menu';
+    abas.innerHTML = `<div class="nav-group"><div class="nav-group-label"><span>Gestão de Frotas</span></div>
+      <div class="nav-group-items">
+        <div class="nav-item fr-aba active" data-aba="veiculos"><span class="nav-icon">🚗</span> Veículos</div>
+        <div class="nav-item fr-aba" data-aba="combustivel"><span class="nav-icon">⛽</span> Combustível</div>
+      </div></div>`;
+    const conteudo = document.createElement('div'); conteudo.className = 'fr-conteudo';
+    filtroTopo.parentElement.insertBefore(layout, filtroTopo);
+    layout.appendChild(abas); layout.appendChild(conteudo);
+    conteudo.appendChild(filtroTopo);
+    filtroTopo.classList.add('fr-barra');
 
     const chipsMes = document.createElement('div');
     chipsMes.id = 'combMesStrip';
     chipsMes.className = 'month-strip';
     chipsMes.style.cssText = 'margin-left:auto; display:none;';
     filtroTopo.appendChild(chipsMes);
-    filtroTopo.style.marginBottom = '16px';
 
     const abaV = document.createElement('div'); abaV.id = 'frotaAbaVeiculos';
     const abaC = document.createElement('div'); abaC.id = 'frotaAbaCombustivel'; abaC.style.display = 'none';
@@ -296,9 +318,9 @@
     // O que não foi pedido fica escondido (o código original continua funcionando)
     [gridGraficos, pVeiculos].forEach(el => { if (el) oculto.appendChild(el); });
 
-    abas.querySelectorAll('.chip').forEach(ch => ch.onclick = () => {
+    abas.querySelectorAll('.fr-aba').forEach(ch => ch.onclick = () => {
       abaFrota = ch.dataset.aba;
-      abas.querySelectorAll('.chip').forEach(x => x.classList.toggle('active', x === ch));
+      abas.querySelectorAll('.fr-aba').forEach(x => x.classList.toggle('active', x === ch));
       abaV.style.display = abaFrota === 'veiculos' ? '' : 'none';
       abaC.style.display = abaFrota === 'combustivel' ? '' : 'none';
       renderFrota();   // redesenha os gráficos da aba que ficou visível
@@ -681,7 +703,7 @@
   }
 
   instalar();
-  console.log('[Combustível] v13 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
+  console.log('[Combustível] v14 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
