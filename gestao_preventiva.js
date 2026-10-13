@@ -17,6 +17,10 @@
    "Distribuição por Equipe" não mostra mais Cota sugerida / Cota por dia.
    Agora mostra a Capacidade no mês de cada equipe e o que ela já fez.
 
+   ALTERADO (09/10/2026): Setembro/2026 fixo na Visão mensal com o fechamento
+   oficial: 1.392 programadas, 1.288 executadas (93%) — campo "fixo: true" no
+   HISTORICO_MENSAL faz o número valer mesmo que o mês exista na base.
+
    ALTERADO (07/10/2026): a aba "Capacidade MOP Móvel" ganhou o filtro
    Executor (MOP / EPS / Todos), sempre com Equipe Responsável MÓVEL.
    Saíram o card "Necessário por Dia" e as barras de projeção do gráfico.
@@ -65,7 +69,8 @@
     { mes: '2026-06', programadas: 1446, executadas: 1284 },
     { mes: '2026-07', programadas: 1327, executadas: 1264 },
     { mes: '2026-08', programadas: 1267, executadas: 1216 },
-    { mes: '2026-09', programadas: 1484, executadas: 1420 }
+    // fixo: true = número oficial de fechamento; vale mesmo que o mês exista na base
+    { mes: '2026-09', programadas: 1392, executadas: 1288, fixo: true }
   ];
 
   // ---- EQUIPES MOP · MÓVEL (aba "Capacidade MOP Móvel") — edite aqui ----
@@ -392,8 +397,10 @@
     const ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     // Meses que existem no JSON (atual + travados) são calculados da base;
     // os demais vêm do HISTORICO_MENSAL.
-    const serie = HISTORICO_MENSAL.filter(h => !todosMeses[h.mes]).map(h => ({ ...h }));
+    const serie = HISTORICO_MENSAL.filter(h => h.fixo || !todosMeses[h.mes]).map(h => ({ ...h }));
+    const fixos = HISTORICO_MENSAL.filter(h => h.fixo).map(h => h.mes);
     Object.keys(todosMeses).forEach(k => {
+      if (fixos.includes(k)) return;   // mês com número oficial fixo no HISTORICO_MENSAL
       const regsMes = todosMeses[k].registros;
       serie.push({ mes: k, programadas: regsMes.length,
         executadas: regsMes.filter(executadaEm(k)).length, atual: k === mesBase });
