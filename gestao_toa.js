@@ -27,7 +27,8 @@
   let COLABS = [];
   let ultimaCarga = 0;
   let carregando = null;
-  const estado = { inicio:'', fim:'', supervisor:'', ignorarFds:true, busca:'' };
+  const estado = { inicio:'', fim:'', supervisor:'', ignorarFds:true, busca:'', aba:'d1',
+    quadro: { d1: { dia:'', status:'', busca:'' }, d0: { dia:'', status:'', busca:'' } } };
   let chartSup = null, chartDia = null;
 
   // ---------- utilitários ----------
@@ -70,6 +71,49 @@
   function chavePrincipal(s){ const k = chavesNome(s); return k.length ? k[0] : ''; }
   function mesmoSupervisor(a, b){ return semAcento(a) === semAcento(b); }
 
+  // ---------- abas D-1 / D-0 ----------
+  function quadroHtml(q, titulo, dica){
+    return `<div class="panel" style="margin-bottom:16px;">
+      <h2>${titulo}</h2>
+      <div class="hint">${dica} Técnicos ativos do Organograma, sem Cirion.</div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:4px 0 12px;">
+        <label for="toaQ${q}Dia" class="mono" style="${ESTILO_LABEL}">Dia</label>
+        <input type="date" id="toaQ${q}Dia" class="mono" style="${ESTILO_SELECT}">
+        <div class="chip" id="toaQ${q}Padrao">${q === 'd0' ? 'Base mais recente' : 'Dia anterior'}</div>
+        <label for="toaQ${q}Status" class="mono" style="${ESTILO_LABEL} margin-left:8px;">Mostrar</label>
+        <select id="toaQ${q}Status" class="mono" style="${ESTILO_SELECT} min-width:200px;">
+          <option value="">Todos</option>
+          <option value="fez">Fez serviço</option>
+          <option value="sem">Na base sem concluir</option>
+          <option value="fora">Não apareceu na base</option>
+        </select>
+        <div class="search" style="margin-left:8px;">
+          <input id="toaQ${q}Busca" type="search" placeholder="Buscar técnico..." aria-label="Buscar técnico">
+        </div>
+        <span id="toaQ${q}Contagem" class="mono" style="font-size:11px; color:var(--muted); margin-left:auto;"></span>
+      </div>
+      <div class="kpi-row" id="toaQ${q}Kpis" style="margin-bottom:14px;"></div>
+      <div style="overflow:auto; max-height:520px; border-radius:8px;"><table id="toaQ${q}Table"></table></div>
+    </div>`;
+  }
+
+  // D-0 = data mais recente da base; D-1 = dia anterior que tem dados (ou o dia de calendário anterior).
+  function diaPadrao(q){
+    const max = maiorData();
+    if(!max) return '';
+    if(q === 'd0') return max;
+    const anteriores = Array.from(new Set(TOA.map(t => t.data))).filter(d => d < max).sort();
+    return anteriores.length ? anteriores[anteriores.length - 1] : somarDias(max, -1);
+  }
+
+  function mostrarAba(){
+    ['d1', 'd0'].forEach(a => {
+      const el = document.getElementById('toaAba-' + a);
+      if(el) el.style.display = estado.aba === a ? '' : 'none';
+    });
+    document.querySelectorAll('#pagina-toa [data-toa-aba]').forEach(b => b.classList.toggle('ativa', b.dataset.toaAba === estado.aba));
+  }
+
   // ---------- estrutura (menu + página) ----------
   const ESTILO_SELECT = 'font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text);';
   const ESTILO_LABEL = 'font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;';
@@ -97,58 +141,83 @@
     pg.id = 'pagina-toa';
     pg.style.display = 'none';
     pg.innerHTML = `
+      <style>
+        #pagina-toa .toa-abas{ display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 16px; }
+        #pagina-toa .toa-aba{ display:flex; align-items:center; gap:8px; padding:10px 16px; border-radius:10px;
+          border:1px solid var(--line); background:var(--panel-2); color:var(--text); font-family:'Inter', sans-serif;
+          font-size:13px; font-weight:600; cursor:pointer; }
+        #pagina-toa .toa-aba:hover{ background:rgba(14,124,134,.10); }
+        #pagina-toa .toa-aba.ativa{ background:rgba(14,124,134,.14); color:var(--accent); border-color:rgba(14,124,134,.35); }
+        #pagina-toa .toa-aba small{ font-weight:500; color:var(--muted); font-size:11px; }
+      </style>
       <div class="panel">
         <h2>Produtividade TOA</h2>
         <div class="hint" id="toaInfo">Carregando dados do TOA...</div>
 
-        <div style="margin:4px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <label for="toaInicio" class="mono" style="${ESTILO_LABEL}">De</label>
-          <input type="date" id="toaInicio" class="mono" style="${ESTILO_SELECT}">
-          <label for="toaFim" class="mono" style="${ESTILO_LABEL} margin-left:6px;">Até</label>
-          <input type="date" id="toaFim" class="mono" style="${ESTILO_SELECT}">
-          <div class="chip" data-toa-atalho="7">7 dias</div>
-          <div class="chip" data-toa-atalho="mes">Mês</div>
-          <label for="toaSupervisor" class="mono" style="${ESTILO_LABEL} margin-left:8px;">Supervisor</label>
+        <div class="toa-abas" role="tablist">
+          <button type="button" class="toa-aba" data-toa-aba="d1" role="tab">📊 D-1 <small id="toaAbaD1Dia"></small></button>
+          <button type="button" class="toa-aba" data-toa-aba="d0" role="tab">📲 D-0 <small id="toaAbaD0Dia"></small></button>
+        </div>
+
+        <div style="margin:0 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <label for="toaSupervisor" class="mono" style="${ESTILO_LABEL}">Supervisor</label>
           <select id="toaSupervisor" class="mono" style="${ESTILO_SELECT} min-width:220px;"><option value="">Todos</option></select>
-          <label class="mono" style="font-size:12px; color:var(--text); display:flex; align-items:center; gap:6px; margin-left:8px; cursor:pointer;">
-            <input type="checkbox" id="toaIgnorarFds" checked> Ignorar sábado e domingo na aderência
-          </label>
-          <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" id="toaExportar">⬇ Exportar (CSV)</button>
         </div>
 
-        <div class="kpi-row" id="toaKpis"></div>
+        <div id="toaAba-d1">
+          ${quadroHtml('d1', 'D-1 — técnicos na base do dia anterior', 'Fechamento do dia anterior à base mais recente: quem apareceu na base do TOA, quem fez serviço e quem da equipe não apareceu.')}
 
-        <div class="grid">
-          <div class="panel">
-            <h2>Média de atividades concluídas por técnico/dia — por supervisor</h2>
-            <div class="hint">Concluídas ÷ (técnicos × dias com lançamento). Supervisor da aba TOA.</div>
-            <div id="toaSupChartWrap" style="position:relative; height:300px;"><canvas id="toaSupChart"></canvas></div>
+          <div style="margin:4px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <label for="toaInicio" class="mono" style="${ESTILO_LABEL}">Período de</label>
+            <input type="date" id="toaInicio" class="mono" style="${ESTILO_SELECT}">
+            <label for="toaFim" class="mono" style="${ESTILO_LABEL} margin-left:6px;">até</label>
+            <input type="date" id="toaFim" class="mono" style="${ESTILO_SELECT}">
+            <div class="chip" data-toa-atalho="7">7 dias</div>
+            <div class="chip" data-toa-atalho="mes">Mês</div>
+            <label class="mono" style="font-size:12px; color:var(--text); display:flex; align-items:center; gap:6px; margin-left:8px; cursor:pointer;">
+              <input type="checkbox" id="toaIgnorarFds" checked> Ignorar sábado e domingo na aderência
+            </label>
+            <button type="button" class="link-base" style="margin-left:auto; cursor:pointer; border:1px solid var(--accent); font-family:'JetBrains Mono', monospace;" id="toaExportar">⬇ Exportar (CSV)</button>
           </div>
-          <div class="panel">
-            <h2>Concluídas por dia</h2>
-            <div class="hint">Barras: total de concluídas. Linha: média por técnico que lançou no dia.</div>
-            <canvas id="toaDiaChart" height="190"></canvas>
-          </div>
-        </div>
 
-        <div class="panel" style="margin-bottom:16px;">
-          <h2>Aderência ao TOA por supervisor</h2>
-          <div class="hint">% dos técnicos ativos da equipe (Organograma) que lançaram ao menos 1 atividade no dia. Passe o mouse para ver quem não lançou. Meta ${pct(META_ADERENCIA)}.</div>
-          <div style="overflow-x:auto; border-radius:8px;"><table id="toaAderenciaTable"></table></div>
-          <div id="toaNaoEncontrados" class="mono" style="font-size:11px; color:var(--muted); margin-top:10px;"></div>
-        </div>
+          <div class="kpi-row" id="toaKpis"></div>
 
-        <div class="panel">
-          <h2>Produtividade por técnico por dia</h2>
-          <div class="hint">Atividades concluídas por dia. Vazio = sem lançamento; 0 = lançou mas não concluiu nada.</div>
-          <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
-            <div class="search">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
-              <input id="toaBusca" type="search" placeholder="Buscar técnico ou supervisor..." aria-label="Buscar técnico">
+          <div class="grid">
+            <div class="panel">
+              <h2>Média de atividades concluídas por técnico/dia — por supervisor</h2>
+              <div class="hint">Concluídas ÷ (técnicos × dias com lançamento). Supervisor da aba TOA.</div>
+              <div id="toaSupChartWrap" style="position:relative; height:300px;"><canvas id="toaSupChart"></canvas></div>
             </div>
-            <span id="toaContagem" class="mono" style="font-size:11px; color:var(--muted); margin-left:auto;"></span>
+            <div class="panel">
+              <h2>Concluídas por dia</h2>
+              <div class="hint">Barras: total de concluídas. Linha: média por técnico que lançou no dia.</div>
+              <canvas id="toaDiaChart" height="190"></canvas>
+            </div>
           </div>
-          <div style="overflow-x:auto; border-radius:8px;"><table id="toaTecTable"></table></div>
+
+          <div class="panel" style="margin-bottom:16px;">
+            <h2>Aderência ao TOA por supervisor</h2>
+            <div class="hint">% dos técnicos ativos da equipe (Organograma) que lançaram ao menos 1 atividade no dia. Passe o mouse para ver quem não lançou. Meta ${pct(META_ADERENCIA)}.</div>
+            <div style="overflow-x:auto; border-radius:8px;"><table id="toaAderenciaTable"></table></div>
+            <div id="toaNaoEncontrados" class="mono" style="font-size:11px; color:var(--muted); margin-top:10px;"></div>
+          </div>
+
+          <div class="panel">
+            <h2>Produtividade por técnico por dia</h2>
+            <div class="hint">Atividades concluídas por dia. Vazio = sem lançamento; 0 = lançou mas não concluiu nada.</div>
+            <div style="display:flex; gap:8px; margin-bottom:10px; align-items:center; flex-wrap:wrap;">
+              <div class="search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
+                <input id="toaBusca" type="search" placeholder="Buscar técnico ou supervisor..." aria-label="Buscar técnico">
+              </div>
+              <span id="toaContagem" class="mono" style="font-size:11px; color:var(--muted); margin-left:auto;"></span>
+            </div>
+            <div style="overflow-x:auto; border-radius:8px;"><table id="toaTecTable"></table></div>
+          </div>
+        </div>
+
+        <div id="toaAba-d0" style="display:none;">
+          ${quadroHtml('d0', 'D-0 — técnicos na base de hoje', 'Base mais recente do TOA: quem já aparece, quem já fez serviço (concluiu ao menos 1 atividade) e quem da equipe ainda não apareceu.')}
         </div>
       </div>`;
     main.appendChild(pg);
@@ -158,6 +227,21 @@
     document.getElementById('toaSupervisor').addEventListener('change', e => { estado.supervisor = e.target.value; render(); });
     document.getElementById('toaIgnorarFds').addEventListener('change', e => { estado.ignorarFds = e.target.checked; render(); });
     document.getElementById('toaExportar').addEventListener('click', exportarCsv);
+    ['d1', 'd0'].forEach(q => {
+      const st = estado.quadro[q];
+      document.getElementById('toaQ' + q + 'Dia').addEventListener('change', e => { st.dia = e.target.value; renderQuadro(q); });
+      document.getElementById('toaQ' + q + 'Status').addEventListener('change', e => { st.status = e.target.value; renderQuadro(q); });
+      document.getElementById('toaQ' + q + 'Padrao').addEventListener('click', () => { st.dia = diaPadrao(q); renderQuadro(q); });
+      let tq;
+      document.getElementById('toaQ' + q + 'Busca').addEventListener('input', e => {
+        clearTimeout(tq);
+        tq = setTimeout(() => { st.busca = e.target.value; renderQuadro(q); }, 200);
+      });
+    });
+    pg.querySelectorAll('[data-toa-aba]').forEach(b => {
+      b.addEventListener('click', () => { estado.aba = b.dataset.toaAba; mostrarAba(); render(); });
+    });
+    mostrarAba();
     let t;
     document.getElementById('toaBusca').addEventListener('input', e => {
       clearTimeout(t);
@@ -165,13 +249,93 @@
     });
     pg.querySelectorAll('[data-toa-atalho]').forEach(ch => {
       ch.addEventListener('click', () => {
-        const fim = maiorData();
+        const fim = diaPadrao('d1');
         if(!fim) return;
         estado.fim = fim;
         estado.inicio = ch.dataset.toaAtalho === 'mes' ? fim.slice(0, 8) + '01' : somarDias(fim, -6);
         render();
       });
     });
+  }
+
+  // ---------- cruzamento de nomes TOA x Organograma ----------
+  // O Organograma é a referência: cada nome do TOA é trocado pelo nome do
+  // Organograma correspondente. Aceita acento diferente, sobrenome a mais/a menos,
+  // ordem diferente e 1 letra trocada em nomes com 5+ letras.
+  let AJUSTES = [];   // [{ toa, organograma }]
+
+  function tokensNome(s){
+    return semAcento(String(s || '').replace(/\(.*?\)/g, ' '))
+      .replace(/[^a-z ]/g, ' ').split(/\s+/)
+      .filter(x => x && PALAVRAS_IGNORADAS.indexOf(x) === -1);
+  }
+  function distancia(a, b){
+    let ant = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for(let i = 1; i <= a.length; i++){
+      const atual = [i];
+      for(let j = 1; j <= b.length; j++){
+        atual[j] = Math.min(ant[j] + 1, atual[j - 1] + 1, ant[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+      ant = atual;
+    }
+    return ant[b.length];
+  }
+  function tokIgual(a, b){
+    if(a === b) return true;
+    return a.length >= 5 && b.length >= 5 && Math.abs(a.length - b.length) <= 1 && distancia(a, b) <= 1;
+  }
+  // Pontua o quanto o nome do TOA (tt) bate com o do Organograma (to). 0 = não bate.
+  function pontuar(tt, to){
+    if(!tt.length || !to.length || !tokIgual(tt[0], to[0])) return 0;   // primeiro nome tem que bater
+    let comuns = 0;
+    tt.forEach(x => { if(to.some(y => tokIgual(x, y))) comuns++; });
+    if(comuns < 2) return 0;
+    const ultimoOk = to.some(y => tokIgual(tt[tt.length - 1], y)) ? 5 : 0;
+    return comuns * 10 + ultimoOk - Math.abs(tt.length - to.length);
+  }
+
+  function ajustarNomesToa(){
+    AJUSTES = [];
+    const org = COLABS.filter(c => c.ativo && c.nome).map(c => ({ nome: c.nome, tokens: tokensNome(c.nome), sup: semAcento(c.supervisor) }));
+    const porChave = {};
+    org.forEach(o => chavesNome(o.nome).forEach(k => { if(!porChave[k]) porChave[k] = o.nome; }));
+
+    const resolvido = {};   // nome TOA -> nome Organograma
+    const nomesToa = {};
+    TOA.forEach(t => { if(!nomesToa[t.recurso]) nomesToa[t.recurso] = semAcento(t.supervisor); });
+
+    Object.keys(nomesToa).forEach(nomeToa => {
+      // 1) igual (sem acento) ou primeiro + último nome
+      const exato = chavesNome(nomeToa).map(k => porChave[k]).find(Boolean);
+      if(exato){ resolvido[nomeToa] = exato; return; }
+
+      // 2) melhor pontuação, desde que não empate com outro nome
+      const tt = tokensNome(nomeToa);
+      let melhor = null, pMelhor = 0, pSegundo = 0;
+      org.forEach(o => {
+        const p = pontuar(tt, o.tokens);
+        if(p > pMelhor){ pSegundo = pMelhor; pMelhor = p; melhor = o; }
+        else if(p > pSegundo){ pSegundo = p; }
+      });
+      if(melhor && pMelhor > pSegundo){ resolvido[nomeToa] = melhor.nome; return; }
+
+      // 3) mesmo primeiro nome e mesmo supervisor, e só um assim na equipe
+      const sup = nomesToa[nomeToa];
+      if(sup && tt.length){
+        const candidatos = org.filter(o => o.sup === sup && o.tokens.length && tokIgual(o.tokens[0], tt[0]));
+        if(candidatos.length === 1){ resolvido[nomeToa] = candidatos[0].nome; }
+      }
+    });
+
+    TOA.forEach(t => {
+      const novo = resolvido[t.recurso];
+      if(novo && novo !== t.recurso){
+        if(!AJUSTES.some(a => a.toa === t.recurso)) AJUSTES.push({ toa: t.recurso, organograma: novo });
+        t.recursoToa = t.recurso;
+        t.recurso = novo;
+      }
+    });
+    AJUSTES.sort((a, b) => a.organograma.localeCompare(b.organograma, 'pt-BR'));
   }
 
   // ---------- dados ----------
@@ -209,9 +373,10 @@
           if(s && supsExcluidos.has(s) && !supsValidos.has(s)) return false; // supervisor só da Cirion
           return true;
         });
+        ajustarNomesToa();
         ultimaCarga = Date.now();
         if(!estado.fim && TOA.length){
-          estado.fim = maiorData();
+          estado.fim = diaPadrao('d1');
           estado.inicio = somarDias(estado.fim, -6);
         }
       })
@@ -345,12 +510,12 @@
 
     if(!TOA.length){
       info.textContent = 'Sem dados do TOA no dados.json. Rode o Office Script atualizado (item 48) com a aba "TOA" preenchida.';
-      ['toaKpis','toaAderenciaTable','toaTecTable','toaNaoEncontrados'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = ''; });
+      ['toaKpis','toaAderenciaTable','toaTecTable','toaNaoEncontrados','toaQd1Kpis','toaQd1Table','toaQd0Kpis','toaQd0Table'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = ''; });
       return;
     }
 
     const min = menorData(), max = maiorData();
-    if(!estado.fim) estado.fim = max;
+    if(!estado.fim) estado.fim = diaPadrao('d1');
     if(!estado.inicio) estado.inicio = somarDias(estado.fim, -6);
     if(estado.inicio > estado.fim){ const x = estado.inicio; estado.inicio = estado.fim; estado.fim = x; }
     info.style.color = '';
@@ -377,10 +542,95 @@
     const r = calcular();
     ultimoCalculo = r;
 
+    renderQuadro('d1');
+    renderQuadro('d0');
+    const a1 = document.getElementById('toaAbaD1Dia'), a0 = document.getElementById('toaAbaD0Dia');
+    if(a1) a1.textContent = fmtDiaCurto(estado.quadro.d1.dia || diaPadrao('d1'));
+    if(a0) a0.textContent = fmtDiaCurto(estado.quadro.d0.dia || diaPadrao('d0'));
     renderKpis(r);
     renderGraficos(r);
     renderAderencia(r);
     renderTabelaTecnicos();
+  }
+
+  // ---------- quadro do dia (D-1 e D-0): quem está na base e quem fez serviço ----------
+  function renderQuadro(q){
+    const st = estado.quadro[q];
+    const tabela = document.getElementById('toaQ' + q + 'Table');
+    if(!tabela || !TOA.length) return;
+    const max = maiorData();
+    if(!st.dia || st.dia > max) st.dia = diaPadrao(q);
+    const inp = document.getElementById('toaQ' + q + 'Dia');
+    inp.value = st.dia; inp.min = menorData(); inp.max = max;
+    document.getElementById('toaQ' + q + 'Status').value = st.status;
+
+    const dia = st.dia;
+    const doDia = TOA.filter(t => t.data === dia && (!estado.supervisor || mesmoSupervisor(t.supervisor, estado.supervisor)));
+    const tecnicos = COLABS.filter(c => c.ativo && c.nome && semAcento(c.areaTecnica) === 'tecnico' &&
+      (!estado.supervisor || mesmoSupervisor(c.supervisor, estado.supervisor)));
+
+    // Técnicos que aparecem na base do dia
+    const linhas = {};
+    doDia.forEach(t => {
+      const k = chavePrincipal(t.recurso);
+      if(!k) return;
+      if(!linhas[k]) linhas[k] = { nome: t.recurso, supervisor: t.supervisor || '', total: 0, concluidas: 0, noOrg: false, ausente: false };
+      linhas[k].total += Number(t.total) || 0;
+      linhas[k].concluidas += Number(t.concluidas) || 0;
+    });
+    // Equipe do Organograma: marca quem apareceu e inclui quem não apareceu
+    tecnicos.forEach(c => {
+      const k = chavesNome(c.nome).find(x => linhas[x]);
+      if(k){
+        linhas[k].noOrg = true;
+        if(!linhas[k].supervisor) linhas[k].supervisor = c.supervisor || '';
+      } else {
+        const kn = chavePrincipal(c.nome);
+        if(kn && !linhas[kn]) linhas[kn] = { nome: c.nome, supervisor: c.supervisor || '', total: 0, concluidas: 0, noOrg: true, ausente: true };
+      }
+    });
+
+    const todas = Object.values(linhas).map(l => {
+      l.situacao = l.ausente ? 'fora' : (l.concluidas > 0 ? 'fez' : 'sem');
+      return l;
+    });
+    const naBase = todas.filter(l => !l.ausente);
+    const fez = todas.filter(l => l.situacao === 'fez');
+    const sem = todas.filter(l => l.situacao === 'sem');
+    const fora = todas.filter(l => l.situacao === 'fora');
+    const concluidas = naBase.reduce((s, l) => s + l.concluidas, 0);
+
+    const kpi = (rotulo, valor, cor, extra) => `<div class="kpi"><div class="label">${rotulo}</div><div class="value" style="color:${cor}">${valor}</div>${extra ? `<div class="delta" style="color:${COR.muted};">${extra}</div>` : ''}</div>`;
+    document.getElementById('toaQ' + q + 'Kpis').innerHTML =
+      kpi('📅 Dia', fmtData(dia).slice(0, 5) + ' ' + DIAS_SEMANA[diaSemana(dia)], COR.text) +
+      kpi('📲 Na base do TOA', naBase.length, COR.accent, 'técnicos com lançamento no dia') +
+      kpi('✅ Fizeram serviço', fez.length, COR.good, concluidas + ' atividades concluídas') +
+      kpi('⏳ Na base sem concluir', sem.length, COR.warn) +
+      kpi('🚫 Não apareceram', fora.length, COR.bad, 'técnicos da equipe sem lançamento');
+
+    const ordem = { fez: 0, sem: 1, fora: 2 };
+    const busca = semAcento(st.busca);
+    const lista = todas
+      .filter(l => !st.status || l.situacao === st.status)
+      .filter(l => !busca || semAcento(l.nome + ' ' + l.supervisor).includes(busca))
+      .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || ordem[a.situacao] - ordem[b.situacao] || b.concluidas - a.concluidas || a.nome.localeCompare(b.nome, 'pt-BR'));
+
+    document.getElementById('toaQ' + q + 'Contagem').textContent = lista.length + ' técnico' + (lista.length === 1 ? '' : 's');
+
+    if(!lista.length){
+      tabela.innerHTML = `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico para esse filtro.</td></tr></tbody>`;
+      return;
+    }
+    const pill = s => s === 'fez' ? '<span class="pill good">Fez serviço</span>'
+      : (s === 'sem' ? '<span class="pill warn">Na base sem concluir</span>' : '<span class="pill bad">Não apareceu</span>');
+    tabela.innerHTML = '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Lançadas</th><th class="num">Concluídas</th><th>Situação</th></tr></thead><tbody>' +
+      lista.map(l => `<tr>
+        <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
+        <td style="white-space:nowrap;">${esc(l.nome)}${!l.noOrg ? ` <span class="mono" style="font-size:10px; color:${COR.muted};" title="Nome não encontrado entre os técnicos ativos do Organograma">(fora do Organograma)</span>` : ''}</td>
+        <td class="num">${l.ausente ? '' : l.total}</td>
+        <td class="num">${l.ausente ? '' : l.concluidas}</td>
+        <td>${pill(l.situacao)}</td>
+      </tr>`).join('') + '</tbody>';
   }
 
   function renderKpis(r){
@@ -487,11 +737,15 @@
     }
 
     const ne = document.getElementById('toaNaoEncontrados');
-    if(r.naoEncontrados.length){
-      ne.innerHTML = `⚠ ${r.naoEncontrados.length} nome(s) do TOA não encontrados entre os ativos do Organograma (não entram na aderência): <span title="${esc(r.naoEncontrados.join(', '))}" style="text-decoration:underline dotted; cursor:help;">ver nomes</span>`;
-    } else {
-      ne.textContent = '';
+    const partes = [];
+    if(AJUSTES.length){
+      const lista = AJUSTES.map(a => a.toa + ' → ' + a.organograma).join('\n');
+      partes.push(`✔ ${AJUSTES.length} nome(s) do TOA ajustados para o nome do Organograma: <span title="${esc(lista)}" style="text-decoration:underline dotted; cursor:help;">ver ajustes</span>`);
     }
+    if(r.naoEncontrados.length){
+      partes.push(`⚠ ${r.naoEncontrados.length} nome(s) do TOA não encontrados entre os ativos do Organograma (não entram na aderência): <span title="${esc(r.naoEncontrados.join('\n'))}" style="text-decoration:underline dotted; cursor:help;">ver nomes</span>`);
+    }
+    ne.innerHTML = partes.join('<br>');
   }
 
   function renderTabelaTecnicos(){
