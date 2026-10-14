@@ -609,7 +609,7 @@
       return l;
     });
     const iniciaram = todas.filter(l => l.iniciou).length;
-    const naoIniciaram = todas.filter(l => !l.ausente && !l.iniciou).length;
+    const naoIniciaram = todas.filter(l => !l.iniciou).length;
     const naBase = todas.filter(l => !l.ausente);
     const fez = todas.filter(l => l.situacao === 'fez');
     const sem = todas.filter(l => l.situacao === 'sem');
@@ -628,12 +628,12 @@
       kpi('⏳ Na base sem concluir', sem.length, COR.warn) +
       kpi('🚫 Não apareceram', fora.length, COR.bad, 'técnicos da equipe sem lançamento') +
       kpi('🔵 Iniciaram expediente', iniciaram, '#2563eb', 'com atividade no TOA (inclui Pendente e Refeição)') +
-      kpi('🟠 Não iniciaram', naoIniciaram, COR.warn, 'na base, mas sem nenhuma atividade');
+      kpi('🟠 Não iniciaram', naoIniciaram, COR.warn, 'sem nenhuma atividade no TOA no dia');
 
     const ordem = { fez: 0, sem: 1, fora: 2 };
     const busca = semAcento(st.busca);
     const lista = todas
-      .filter(l => !st.status || (st.status === 'ini' ? l.iniciou : st.status === 'naoini' ? (!l.ausente && !l.iniciou) : l.situacao === st.status))
+      .filter(l => !st.status || (st.status === 'ini' ? l.iniciou : st.status === 'naoini' ? !l.iniciou : l.situacao === st.status))
       .filter(l => !busca || semAcento(l.nome + ' ' + l.supervisor).includes(busca))
       .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || ordem[a.situacao] - ordem[b.situacao] || b.concluidas - a.concluidas || a.nome.localeCompare(b.nome, 'pt-BR'));
 
@@ -653,7 +653,7 @@
       if(l.ausente){
         const k = chavePrincipal(l.nome);
         const ult = ultimoDia[k];
-        return `<span class="pill bad">Não está na base do dia</span>` +
+        return `<span class="pill bad">Sem atividade no TOA no dia</span>` +
           (ult ? ` <span class="mono" style="font-size:10px; color:${COR.muted};">último lançamento ${fmtDiaCurto(ult)}</span>` : '');
       }
       const itens = Object.keys(l.status).sort((x, y) => l.status[y] - l.status[x])
@@ -668,7 +668,7 @@
         <td class="num">${l.ausente ? '' : l.total}</td>
         <td class="num">${l.ausente ? '' : l.concluidas}</td>
         <td style="white-space:nowrap;">${l.ausente
-          ? `<span class="mono" style="font-size:11px; color:${COR.muted};">— fora da base</span>`
+          ? '<span class="pill warn">🟠 Não iniciou</span>'
           : (l.iniciou
             ? '<span class="pill" style="background:rgba(37,99,235,.14); color:#1d4ed8;">🔵 Iniciou</span>'
             : '<span class="pill warn">🟠 Não iniciou</span>')}</td>
