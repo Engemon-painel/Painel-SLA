@@ -105,7 +105,7 @@
       <div style="overflow:auto; max-height:520px; border-radius:8px; margin-bottom:18px;"><table id="toaQ${q}Table"></table></div>
 
       <h2 style="font-size:14px; margin:6px 0 4px;">👥 Organograma — técnicos que não estão na base do TOA</h2>
-      <div class="hint">Técnicos ativos da equipe sem nenhuma linha na base do TOA no dia (sem atividade, folga, férias ou nome diferente).</div>
+      <div class="hint">Técnicos ativos da equipe sem nenhuma linha na base do TOA no dia e que não estavam escalados (folga, falta, atestado, sem escala ou nome diferente). Escalados sem TOA aparecem na tabela de cima como 🟠.</div>
       <div style="overflow:auto; max-height:420px; border-radius:8px;"><table id="toaQ${q}Fora"></table></div>
     </div>`;
   }
@@ -275,6 +275,52 @@
   // ordem diferente e 1 letra trocada em nomes com 5+ letras.
   let AJUSTES = [];   // [{ toa, organograma }]
 
+  // ---------- Gestão de Escala (dados_escala.json) ----------
+  // Para os supervisores que têm escala (ex.: Marcelo, Nayane, Ycaro, Esaie), a escala do
+  // dia diz quem devia trabalhar: escalado (X) sem atividade no TOA = 🟠 Não iniciou.
+  let ESCALA = null;   // { datas: [...], tecnicos: [...], porChave: {} }
+  function prepararEscala(e){
+    ESCALA = null;
+    if(!e || !Array.isArray(e.datas) || !Array.isArray(e.tecnicos)) return;
+    const porChave = {};
+    e.tecnicos.forEach(t => chavesNome(t.nome).forEach(k => { if(!porChave[k]) porChave[k] = t; }));
+    ESCALA = { datas: e.datas, tecnicos: e.tecnicos, porChave };
+  }
+  function escalaDoTecnico(nome){
+    if(!ESCALA) return null;
+    const direto = chavesNome(nome).map(k => ESCALA.porChave[k]).find(Boolean);
+    if(direto) return direto;
+    const tt = tokensNome(nome);
+    let melhor = null, p1 = 0, p2 = 0;
+    ESCALA.tecnicos.forEach(t => {
+      const p = pontuar(tt, tokensNome(t.nome));
+      if(p > p1){ p2 = p1; p1 = p; melhor = t; } else if(p > p2){ p2 = p; }
+    });
+    return melhor && p1 > p2 ? melhor : null;
+  }
+  function codigoEscala(tec, dia){
+    if(!tec || !ESCALA) return '';
+    const i = ESCALA.datas.indexOf(dia);
+    return i === -1 ? '' : String((tec.codigos || [])[i] || '').trim().toUpperCase();
+  }
+  function rotuloEscala(c){
+    const n = semAcento(c);
+    if(!n) return { txt: 'Sem escala no dia', cls: '', cor: 'rgba(107,117,144,.14)', tcor: '#6b7590' };
+    if(n === 'x') return { txt: 'Escalado', cls: '', cor: 'rgba(37,99,235,.12)', tcor: '#1d4ed8' };
+    if(n === 'fo') return { txt: 'Folga', cls: '', cor: 'rgba(107,117,144,.14)', tcor: '#6b7590' };
+    if(n === 'fbh') return { txt: 'Folga BH', cls: '', cor: 'rgba(107,117,144,.14)', tcor: '#6b7590' };
+    if(n === 'falta' || n === 'f') return { txt: 'Falta', cls: 'bad' };
+    if(n === 'atm' || n.indexOf('atestado') === 0) return { txt: 'Atestado', cls: 'warn' };
+    if(n === 'des') return { txt: 'Desligado', cls: 'bad' };
+    if(n.indexOf('treinamento') === 0) return { txt: 'Treinamento', cls: 'warn' };
+    return { txt: c, cls: 'warn' };
+  }
+  function pillEscala(c){
+    const r = rotuloEscala(c);
+    return r.cls ? `<span class="pill ${r.cls}">${esc(r.txt)}</span>`
+      : `<span class="pill" style="background:${r.cor}; color:${r.tcor};">${esc(r.txt)}</span>`;
+  }
+
   function tokensNome(s){
     return semAcento(String(s || '').replace(/\(.*?\)/g, ' '))
       .replace(/[^a-z ]/g, ' ').split(/\s+/)
@@ -364,8 +410,11 @@
   function carregar(forcar){
     if(!forcar && ultimaCarga > 0 && Date.now() - ultimaCarga < RECARREGAR_A_CADA_MS) return Promise.resolve();
     if(carregando) return carregando;
+    const pegarEscala = fetch('dados_escala.json?_=' + Date.now())
+      .then(r => r.ok ? r.json() : null).catch(() => null);
     carregando = fetch('dados.json?_=' + Date.now())
       .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(d => pegarEscala.then(e => { prepararEscala(e); return d; }))
       .then(d => {
         const todosColabs = Array.isArray(d.colaboradores) ? d.colaboradores : [];
         const excluido = c => CONTRATOS_EXCLUIDOS.some(x =>
@@ -606,6 +655,13 @@
     if(estado.supervisor){
       Object.keys(linhas).forEach(k => { if(!mesmoSupervisor(linhas[k].supervisor, estado.supervisor)) delete linhas[k]; });
     }
+    // Escala do dia (só técnicos que existem na Gestão de Escala)
+    Object.values(linhas).forEach(l => {
+      const tec = escalaDoTecnico(l.nome);
+      l.temEscala = !!tec;
+      l.codEscala = tec ? codigoEscala(tec, dia) : '';
+      l.escalado = l.codEscala === 'X';
+    });
     // Último lançamento de quem não apareceu (ajuda a conferir data/nome)
     const ultimoDia = {};
     TOA.forEach(t => { const k = chavePrincipal(t.recurso); if(k && (!ultimoDia[k] || t.data > ultimoDia[k])) ultimoDia[k] = t.data; });
@@ -617,9 +673,13 @@
       return l;
     });
     const naBase = todas.filter(l => !l.ausente);
-    const fora = todas.filter(l => l.ausente);
+    // Tabela da base: quem está no TOA + escalados (X) que não apareceram no TOA (🟠)
+    const listaBase = todas.filter(l => !l.ausente || l.escalado);
+    const fora = todas.filter(l => l.ausente && !l.escalado);
     const iniciaram = naBase.filter(l => l.iniciou).length;
-    const naoIniciaram = naBase.length - iniciaram;
+    const naoIniciaram = listaBase.filter(l => !l.iniciou).length;
+    const escalados = todas.filter(l => l.escalado);
+    const escaladosIni = escalados.filter(l => l.iniciou).length;
     const fez = naBase.filter(l => l.situacao === 'fez');
     const concluidas = naBase.reduce((s, l) => s + l.concluidas, 0);
     const equipe = todas.filter(l => l.noOrg).length;
@@ -634,8 +694,9 @@
       kpi('👥 Equipe (Organograma)', equipe, COR.text, 'técnicos ativos, sem Cirion') +
       kpi('📲 Na base do TOA', naBase.length, COR.accent, equipe ? pct(naBase.filter(l => l.noOrg).length / equipe) + ' da equipe' : '') +
       kpi('🔵 Iniciaram', iniciaram, '#2563eb', 'na base com atividade') +
-      kpi('🟠 Não iniciaram', naoIniciaram, COR.warn, 'na base sem atividade') +
-      kpi('🚫 Fora da base', fora.length, COR.bad, 'no Organograma, não estão no TOA') +
+      kpi('🟠 Não iniciaram', naoIniciaram, COR.warn, 'na base sem atividade ou escalados sem TOA') +
+      (ESCALA ? kpi('📋 Escalados (escala)', escalados.length, '#1d4ed8', escalados.length ? escaladosIni + ' iniciaram · ' + pct(escaladosIni / escalados.length) : 'nenhum escalado no dia') : '') +
+      kpi('🚫 Fora da base', fora.length, COR.bad, 'no Organograma, não estão no TOA nem escalados') +
       kpi('✅ Fizeram serviço', fez.length, COR.good, concluidas + ' atividades concluídas');
 
     // ----- resumo por supervisor -----
@@ -643,16 +704,17 @@
     todas.forEach(l => {
       const lab = String(l.supervisor || '').trim() || 'Sem supervisor';
       const k = semAcento(lab);
-      if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0 };
+      if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0, esc: 0, escIni: 0 };
       const g = porSup[k];
       if(l.noOrg) g.equipe++;
-      if(l.ausente){ g.fora++; return; }
-      g.base++;
+      if(l.escalado){ g.esc++; if(l.iniciou) g.escIni++; }
+      if(l.ausente && !l.escalado){ g.fora++; return; }
+      if(!l.ausente) g.base++;
       if(l.iniciou) g.ini++; else g.naoIni++;
       if(l.situacao === 'fez') g.fez++;
     });
     const sups = Object.values(porSup).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-    const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0 });
+    const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez','esc','escIni'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0, esc:0, escIni:0 });
     const pctCel = (n, d) => d > 0 ? `<span class="pill ${n / d >= META_ADERENCIA ? 'good' : (n / d >= META_ADERENCIA - 0.2 ? 'warn' : 'bad')}">${pct(n / d)}</span>` : '—';
     const linhaSup = (g, negrito) => `<tr${negrito ? ` style="font-weight:700; border-top:2px solid ${COR.line};"` : ''}>
       <td style="white-space:nowrap;">${esc(g.label)}</td>
@@ -663,16 +725,17 @@
       <td class="num" style="color:${COR.bad} !important;">${g.fora}</td>
       <td class="num">${g.fez}</td>
       <td class="num">${pctCel(g.ini, g.equipe)}</td>
+      ${ESCALA ? `<td class="num">${g.esc || '—'}</td><td class="num">${g.esc ? pctCel(g.escIni, g.esc) : '—'}</td>` : ''}
     </tr>`;
     document.getElementById('toaQ' + q + 'Sup').innerHTML =
-      '<thead><tr><th>Supervisor</th><th class="num">Equipe (Organograma)</th><th class="num">Na base TOA</th><th class="num">🔵 Iniciaram</th><th class="num">🟠 Não iniciaram</th><th class="num">🚫 Fora da base</th><th class="num">✅ Fizeram serviço</th><th class="num">% iniciaram da equipe</th></tr></thead><tbody>' +
+      '<thead><tr><th>Supervisor</th><th class="num">Equipe (Organograma)</th><th class="num">Na base TOA</th><th class="num">🔵 Iniciaram</th><th class="num">🟠 Não iniciaram</th><th class="num">🚫 Fora da base</th><th class="num">✅ Fizeram serviço</th><th class="num">% iniciaram da equipe</th>' + (ESCALA ? '<th class="num">📋 Escalados</th><th class="num">% iniciaram dos escalados</th>' : '') + '</tr></thead><tbody>' +
       sups.map(g => linhaSup(g, false)).join('') + linhaSup(Object.assign({ label: 'Total' }, tot), true) + '</tbody>';
 
     // ----- tabela: na base do TOA -----
     const ordem = { fez: 0, sem: 1 };
     const busca = semAcento(st.busca);
     const bate = l => !busca || semAcento(l.nome + ' ' + l.supervisor).includes(busca);
-    const lista = naBase
+    const lista = listaBase
       .filter(l => !st.status || (st.status === 'ini' ? l.iniciou : st.status === 'naoini' ? !l.iniciou : l.situacao === st.status))
       .filter(bate)
       .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || (b.iniciou - a.iniciou) || ordem[a.situacao] - ordem[b.situacao] || b.concluidas - a.concluidas || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -688,6 +751,8 @@
       return 'warn';
     }
     function situacaoToa(l){
+      if(l.ausente) return `<span class="pill warn">Escalado — sem atividade no TOA</span>` +
+        (ultimoDia[chavePrincipal(l.nome)] ? ` <span class="mono" style="font-size:10px; color:${COR.muted};">último lançamento ${fmtDiaCurto(ultimoDia[chavePrincipal(l.nome)])}</span>` : '');
       const itens = Object.keys(l.status).filter(x => semAcento(x) !== 'sem status').sort((x, y) => l.status[y] - l.status[x])
         .map(x => `<span class="pill ${corStatus(x)}" style="margin:1px 4px 1px 0;">${esc(x)} ${l.status[x]}</span>`);
       if(l.refeicao) itens.push(`<span class="pill" style="margin:1px 4px 1px 0; background:rgba(107,117,144,.14); color:${COR.muted};">Refeição ${l.refeicao}</span>`);
@@ -695,12 +760,13 @@
     }
     tabela.innerHTML = !lista.length
       ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico na base do TOA para esse filtro.</td></tr></tbody>`
-      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Lançadas</th><th class="num">Concluídas</th><th>Expediente</th><th>Situação no TOA</th></tr></thead><tbody>' +
+      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Lançadas</th><th class="num">Concluídas</th><th>Escala</th><th>Expediente</th><th>Situação no TOA</th></tr></thead><tbody>' +
         lista.map(l => `<tr>
           <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
           <td style="white-space:nowrap;">${esc(l.nome)}${!l.noOrg ? ` <span class="mono" style="font-size:10px; color:${COR.muted};" title="Nome não encontrado entre os técnicos ativos do Organograma">(fora do Organograma)</span>` : ''}</td>
-          <td class="num">${l.total}</td>
-          <td class="num">${l.concluidas}</td>
+          <td class="num">${l.ausente ? '' : l.total}</td>
+          <td class="num">${l.ausente ? '' : l.concluidas}</td>
+          <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
           <td style="white-space:nowrap;">${l.iniciou
             ? '<span class="pill" style="background:rgba(37,99,235,.14); color:#1d4ed8;">🔵 Iniciou</span>'
             : '<span class="pill warn">🟠 Não iniciou</span>'}</td>
@@ -711,12 +777,13 @@
     const tabFora = document.getElementById('toaQ' + q + 'Fora');
     tabFora.innerHTML = !listaFora.length
       ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Todos os técnicos da equipe estão na base do TOA.</td></tr></tbody>`
-      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Último lançamento no TOA</th></tr></thead><tbody>' +
+      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Escala</th><th>Último lançamento no TOA</th></tr></thead><tbody>' +
         listaFora.map(l => {
           const ult = ultimoDia[chavePrincipal(l.nome)];
           return `<tr>
             <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
             <td style="white-space:nowrap;">${esc(l.nome)}</td>
+            <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
             <td class="mono" style="font-size:12px;">${ult ? fmtData(ult) : `<span style="color:${COR.muted};">nunca apareceu no período da base</span>`}</td>
           </tr>`;
         }).join('') + '</tbody>';
