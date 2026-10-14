@@ -22,6 +22,9 @@
   // Contratos que NÃO entram na seção TOA (comparação sem acento e sem maiúsculas).
   // Vale para Contrato_2 e Unidade de Negócio do Organograma.
   const CONTRATOS_EXCLUIDOS = ['cirion'];
+  // Expediente: qualquer atividade com status no TOA (Pendente, Iniciada, em rota,
+  // Concluída, Não Concluída) ou Refeição = iniciou. Na base sem nenhuma atividade
+  // (linha sem status) = não iniciou.
 
   let TOA = [];      // [{ data:'aaaa-mm-dd', recurso, supervisor, total, concluidas }]
   let COLABS = [];
@@ -86,6 +89,8 @@
           <option value="fez">Fez serviço</option>
           <option value="sem">Na base sem concluir</option>
           <option value="fora">Não apareceu na base</option>
+          <option value="ini">🔵 Iniciou expediente</option>
+          <option value="naoini">🟠 Não iniciou expediente</option>
         </select>
         <div class="search" style="margin-left:8px;">
           <input id="toaQ${q}Busca" type="search" placeholder="Buscar técnico..." aria-label="Buscar técnico">
@@ -599,8 +604,12 @@
 
     const todas = Object.values(linhas).map(l => {
       l.situacao = l.ausente ? 'fora' : (l.concluidas > 0 ? 'fez' : 'sem');
+      l.iniciou = !l.ausente && (l.concluidas > 0 || l.refeicao > 0 ||
+        Object.keys(l.status).some(x => (Number(l.status[x]) || 0) > 0 && semAcento(x) !== 'sem status'));
       return l;
     });
+    const iniciaram = todas.filter(l => l.iniciou).length;
+    const naoIniciaram = todas.filter(l => !l.ausente && !l.iniciou).length;
     const naBase = todas.filter(l => !l.ausente);
     const fez = todas.filter(l => l.situacao === 'fez');
     const sem = todas.filter(l => l.situacao === 'sem');
@@ -617,12 +626,14 @@
       kpi('📲 Na base do TOA', naBase.length, COR.accent, 'técnicos com lançamento no dia') +
       kpi('✅ Fizeram serviço', fez.length, COR.good, concluidas + ' atividades concluídas') +
       kpi('⏳ Na base sem concluir', sem.length, COR.warn) +
-      kpi('🚫 Não apareceram', fora.length, COR.bad, 'técnicos da equipe sem lançamento');
+      kpi('🚫 Não apareceram', fora.length, COR.bad, 'técnicos da equipe sem lançamento') +
+      kpi('🔵 Iniciaram expediente', iniciaram, '#2563eb', 'com atividade no TOA (inclui Pendente e Refeição)') +
+      kpi('🟠 Não iniciaram', naoIniciaram, COR.warn, 'na base, mas sem nenhuma atividade');
 
     const ordem = { fez: 0, sem: 1, fora: 2 };
     const busca = semAcento(st.busca);
     const lista = todas
-      .filter(l => !st.status || l.situacao === st.status)
+      .filter(l => !st.status || (st.status === 'ini' ? l.iniciou : st.status === 'naoini' ? (!l.ausente && !l.iniciou) : l.situacao === st.status))
       .filter(l => !busca || semAcento(l.nome + ' ' + l.supervisor).includes(busca))
       .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || ordem[a.situacao] - ordem[b.situacao] || b.concluidas - a.concluidas || a.nome.localeCompare(b.nome, 'pt-BR'));
 
@@ -650,12 +661,17 @@
       if(l.refeicao) itens.push(`<span class="pill" style="margin:1px 4px 1px 0; background:rgba(107,117,144,.14); color:${COR.muted};">Refeição ${l.refeicao}</span>`);
       return itens.length ? itens.join('') : `<span class="pill warn">Na base</span>`;
     }
-    tabela.innerHTML = '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Lançadas</th><th class="num">Concluídas</th><th>Situação no TOA</th></tr></thead><tbody>' +
+    tabela.innerHTML = '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Lançadas</th><th class="num">Concluídas</th><th>Expediente</th><th>Situação no TOA</th></tr></thead><tbody>' +
       lista.map(l => `<tr>
         <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
         <td style="white-space:nowrap;">${esc(l.nome)}${!l.noOrg ? ` <span class="mono" style="font-size:10px; color:${COR.muted};" title="Nome não encontrado entre os técnicos ativos do Organograma">(fora do Organograma)</span>` : ''}</td>
         <td class="num">${l.ausente ? '' : l.total}</td>
         <td class="num">${l.ausente ? '' : l.concluidas}</td>
+        <td style="white-space:nowrap;">${l.ausente
+          ? `<span class="mono" style="font-size:11px; color:${COR.muted};">— fora da base</span>`
+          : (l.iniciou
+            ? '<span class="pill" style="background:rgba(37,99,235,.14); color:#1d4ed8;">🔵 Iniciou</span>'
+            : '<span class="pill warn">🟠 Não iniciou</span>')}</td>
         <td>${situacaoToa(l)}</td>
       </tr>`).join('') + '</tbody>';
   }
