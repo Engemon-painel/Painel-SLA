@@ -389,8 +389,7 @@
     document.getElementById('toaKpis').innerHTML = `
       <div class="kpi"><div class="label">✅ Atividades concluídas</div><div class="value" style="color:${COR.accent}">${k.concluidas.toLocaleString('pt-BR')}</div>
         <div class="delta" style="color:${COR.muted};">${pct(pctConcl)} das ${k.lancadas.toLocaleString('pt-BR')} lançadas</div></div>
-      <div class="kpi"><div class="label">👷 Técnicos com lançamento</div><div class="value">${k.tecnicos.toLocaleString('pt-BR')}</div>
-        <div class="delta" style="color:${COR.muted};">técnicos no Organograma (sem Cirion): ${k.equipe}</div></div>
+      <div class="kpi"><div class="label">👷 Técnicos com lançamento</div><div class="value">${k.tecnicos.toLocaleString('pt-BR')}</div></div>
       <div class="kpi"><div class="label">📈 Concluídas por técnico/dia</div><div class="value">${fmt1(k.mediaTecDia)}</div>
         <div class="delta" style="color:${COR.muted};">só dias em que o técnico lançou</div></div>
       <div class="kpi"><div class="label">📲 Aderência ao TOA</div>
