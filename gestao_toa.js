@@ -79,7 +79,7 @@
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:4px 0 12px;">
         <label for="toaQ${q}Dia" class="mono" style="${ESTILO_LABEL}">Dia</label>
         <input type="date" id="toaQ${q}Dia" class="mono" style="${ESTILO_SELECT}">
-        <div class="chip" id="toaQ${q}Padrao">${q === 'd0' ? 'Base mais recente' : 'Dia anterior'}</div>
+        <div class="chip" id="toaQ${q}Padrao">${q === 'd0' ? 'Hoje' : 'Ontem'}</div>
         <label for="toaQ${q}Status" class="mono" style="${ESTILO_LABEL} margin-left:8px;">Mostrar</label>
         <select id="toaQ${q}Status" class="mono" style="${ESTILO_SELECT} min-width:200px;">
           <option value="">Todos</option>
@@ -97,13 +97,11 @@
     </div>`;
   }
 
-  // D-0 = data mais recente da base; D-1 = dia anterior que tem dados (ou o dia de calendário anterior).
+  // D-0 = hoje (data do computador); D-1 = ontem.
+  function hojeIsoToa(){ return isoDeData(new Date()); }
   function diaPadrao(q){
-    const max = maiorData();
-    if(!max) return '';
-    if(q === 'd0') return max;
-    const anteriores = Array.from(new Set(TOA.map(t => t.data))).filter(d => d < max).sort();
-    return anteriores.length ? anteriores[anteriores.length - 1] : somarDias(max, -1);
+    const hoje = hojeIsoToa();
+    return q === 'd0' ? hoje : somarDias(hoje, -1);
   }
 
   function mostrarAba(){
@@ -165,7 +163,7 @@
         </div>
 
         <div id="toaAba-d1">
-          ${quadroHtml('d1', 'D-1 — técnicos na base do dia anterior', 'Fechamento do dia anterior à base mais recente: quem apareceu na base do TOA, quem fez serviço e quem da equipe não apareceu.')}
+          ${quadroHtml('d1', 'D-1 — técnicos na base do dia anterior', 'Fechamento de ontem: quem apareceu na base do TOA, quem fez serviço e quem da equipe não apareceu.')}
 
           <div style="margin:4px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <label for="toaInicio" class="mono" style="${ESTILO_LABEL}">Período de</label>
@@ -217,7 +215,7 @@
         </div>
 
         <div id="toaAba-d0" style="display:none;">
-          ${quadroHtml('d0', 'D-0 — técnicos na base de hoje', 'Base mais recente do TOA: quem já aparece, quem já fez serviço (concluiu ao menos 1 atividade) e quem da equipe ainda não apareceu.')}
+          ${quadroHtml('d0', 'D-0 — técnicos na base de hoje', 'Dia de hoje: quem já aparece na base do TOA, quem já fez serviço (concluiu ao menos 1 atividade) e quem da equipe ainda não apareceu.')}
         </div>
       </div>`;
     main.appendChild(pg);
@@ -370,7 +368,8 @@
           if(!t || !t.data || !t.recurso) return false;
           if(chavesNome(t.recurso).some(k => nomesExcluidos.has(k))) return false;
           const s = semAcento(t.supervisor);
-          if(s && supsExcluidos.has(s) && !supsValidos.has(s)) return false; // supervisor só da Cirion
+          const tecnicoValido = COLABS.some(c => chavesNome(c.nome).some(k => chavesNome(t.recurso).indexOf(k) !== -1));
+          if(!tecnicoValido && s && supsExcluidos.has(s) && !supsValidos.has(s)) return false; // supervisor só da Cirion
           return true;
         });
         ajustarNomesToa();
@@ -403,7 +402,7 @@
     // Quem lançou em cada dia (todas as equipes; o cruzamento é pelo nome).
     const lancouPorDia = {};
     noPeriodo.forEach(t => {
-      if(!(Number(t.total) > 0)) return;
+      if(!((Number(t.total) || 0) + (Number(t.refeicao) || 0) > 0)) return;
       if(!lancouPorDia[t.data]) lancouPorDia[t.data] = new Set();
       chavesNome(t.recurso).forEach(k => lancouPorDia[t.data].add(k));
     });
@@ -558,37 +557,45 @@
     const st = estado.quadro[q];
     const tabela = document.getElementById('toaQ' + q + 'Table');
     if(!tabela || !TOA.length) return;
-    const max = maiorData();
+    const max = [maiorData(), hojeIsoToa()].sort().pop();
     if(!st.dia || st.dia > max) st.dia = diaPadrao(q);
     const inp = document.getElementById('toaQ' + q + 'Dia');
     inp.value = st.dia; inp.min = menorData(); inp.max = max;
     document.getElementById('toaQ' + q + 'Status').value = st.status;
 
     const dia = st.dia;
-    const doDia = TOA.filter(t => t.data === dia && (!estado.supervisor || mesmoSupervisor(t.supervisor, estado.supervisor)));
-    const tecnicos = COLABS.filter(c => c.ativo && c.nome && semAcento(c.areaTecnica) === 'tecnico' &&
-      (!estado.supervisor || mesmoSupervisor(c.supervisor, estado.supervisor)));
+    const doDia = TOA.filter(t => t.data === dia);
+    const tecnicos = COLABS.filter(c => c.ativo && c.nome && semAcento(c.areaTecnica) === 'tecnico');
 
-    // Técnicos que aparecem na base do dia
+    // Técnicos que aparecem na base do dia (qualquer atividade, inclusive Refeição)
     const linhas = {};
     doDia.forEach(t => {
       const k = chavePrincipal(t.recurso);
       if(!k) return;
-      if(!linhas[k]) linhas[k] = { nome: t.recurso, supervisor: t.supervisor || '', total: 0, concluidas: 0, noOrg: false, ausente: false };
-      linhas[k].total += Number(t.total) || 0;
-      linhas[k].concluidas += Number(t.concluidas) || 0;
+      if(!linhas[k]) linhas[k] = { nome: t.recurso, supervisor: t.supervisor || '', total: 0, concluidas: 0, refeicao: 0, status: {}, noOrg: false, ausente: false };
+      const l = linhas[k];
+      l.total += Number(t.total) || 0;
+      l.concluidas += Number(t.concluidas) || 0;
+      l.refeicao += Number(t.refeicao) || 0;
+      Object.keys(t.status || {}).forEach(x => { l.status[x] = (l.status[x] || 0) + (Number(t.status[x]) || 0); });
     });
-    // Equipe do Organograma: marca quem apareceu e inclui quem não apareceu
+    // Equipe do Organograma: marca quem apareceu (supervisor do Organograma) e inclui quem não apareceu
     tecnicos.forEach(c => {
       const k = chavesNome(c.nome).find(x => linhas[x]);
       if(k){
         linhas[k].noOrg = true;
-        if(!linhas[k].supervisor) linhas[k].supervisor = c.supervisor || '';
+        if(c.supervisor) linhas[k].supervisor = c.supervisor;
       } else {
         const kn = chavePrincipal(c.nome);
-        if(kn && !linhas[kn]) linhas[kn] = { nome: c.nome, supervisor: c.supervisor || '', total: 0, concluidas: 0, noOrg: true, ausente: true };
+        if(kn && !linhas[kn]) linhas[kn] = { nome: c.nome, supervisor: c.supervisor || '', total: 0, concluidas: 0, refeicao: 0, status: {}, noOrg: true, ausente: true };
       }
     });
+    if(estado.supervisor){
+      Object.keys(linhas).forEach(k => { if(!mesmoSupervisor(linhas[k].supervisor, estado.supervisor)) delete linhas[k]; });
+    }
+    // Último lançamento de quem não apareceu (ajuda a conferir data/nome)
+    const ultimoDia = {};
+    TOA.forEach(t => { const k = chavePrincipal(t.recurso); if(k && (!ultimoDia[k] || t.data > ultimoDia[k])) ultimoDia[k] = t.data; });
 
     const todas = Object.values(linhas).map(l => {
       l.situacao = l.ausente ? 'fora' : (l.concluidas > 0 ? 'fez' : 'sem');
@@ -600,8 +607,12 @@
     const fora = todas.filter(l => l.situacao === 'fora');
     const concluidas = naBase.reduce((s, l) => s + l.concluidas, 0);
 
+    const semDados = !TOA.some(t => t.data === dia);
+    const aviso = semDados
+      ? `<div class="mono" style="flex-basis:100%; font-size:12px; color:${COR.bad}; background:rgba(220,38,38,.08); border:1px solid rgba(220,38,38,.25); border-radius:10px; padding:10px 12px;">⚠ Nenhum lançamento do TOA com data ${fmtData(dia)} no dados.json. A base mais recente que chegou ao painel é de ${fmtData(maiorData())}. Confira se a aba TOA tem as linhas desse dia e rode o fluxo de novo.</div>`
+      : '';
     const kpi = (rotulo, valor, cor, extra) => `<div class="kpi"><div class="label">${rotulo}</div><div class="value" style="color:${cor}">${valor}</div>${extra ? `<div class="delta" style="color:${COR.muted};">${extra}</div>` : ''}</div>`;
-    document.getElementById('toaQ' + q + 'Kpis').innerHTML =
+    document.getElementById('toaQ' + q + 'Kpis').innerHTML = aviso +
       kpi('📅 Dia', fmtData(dia).slice(0, 5) + ' ' + DIAS_SEMANA[diaSemana(dia)], COR.text) +
       kpi('📲 Na base do TOA', naBase.length, COR.accent, 'técnicos com lançamento no dia') +
       kpi('✅ Fizeram serviço', fez.length, COR.good, concluidas + ' atividades concluídas') +
@@ -621,15 +632,31 @@
       tabela.innerHTML = `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico para esse filtro.</td></tr></tbody>`;
       return;
     }
-    const pill = s => s === 'fez' ? '<span class="pill good">Fez serviço</span>'
-      : (s === 'sem' ? '<span class="pill warn">Na base sem concluir</span>' : '<span class="pill bad">Não apareceu</span>');
-    tabela.innerHTML = '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Lançadas</th><th class="num">Concluídas</th><th>Situação</th></tr></thead><tbody>' +
+    function corStatus(nome){
+      const n = semAcento(nome);
+      if(n.indexOf('conclu') === 0) return 'good';
+      if(n.indexOf('cancel') === 0 || n.indexOf('nao conclu') === 0 || n.indexOf('suspens') === 0) return 'bad';
+      return 'warn';
+    }
+    function situacaoToa(l){
+      if(l.ausente){
+        const k = chavePrincipal(l.nome);
+        const ult = ultimoDia[k];
+        return `<span class="pill bad">Não está na base do dia</span>` +
+          (ult ? ` <span class="mono" style="font-size:10px; color:${COR.muted};">último lançamento ${fmtDiaCurto(ult)}</span>` : '');
+      }
+      const itens = Object.keys(l.status).sort((x, y) => l.status[y] - l.status[x])
+        .map(x => `<span class="pill ${corStatus(x)}" style="margin:1px 4px 1px 0;">${esc(x)} ${l.status[x]}</span>`);
+      if(l.refeicao) itens.push(`<span class="pill" style="margin:1px 4px 1px 0; background:rgba(107,117,144,.14); color:${COR.muted};">Refeição ${l.refeicao}</span>`);
+      return itens.length ? itens.join('') : `<span class="pill warn">Na base</span>`;
+    }
+    tabela.innerHTML = '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Lançadas</th><th class="num">Concluídas</th><th>Situação no TOA</th></tr></thead><tbody>' +
       lista.map(l => `<tr>
         <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
         <td style="white-space:nowrap;">${esc(l.nome)}${!l.noOrg ? ` <span class="mono" style="font-size:10px; color:${COR.muted};" title="Nome não encontrado entre os técnicos ativos do Organograma">(fora do Organograma)</span>` : ''}</td>
         <td class="num">${l.ausente ? '' : l.total}</td>
         <td class="num">${l.ausente ? '' : l.concluidas}</td>
-        <td>${pill(l.situacao)}</td>
+        <td>${situacaoToa(l)}</td>
       </tr>`).join('') + '</tbody>';
   }
 
