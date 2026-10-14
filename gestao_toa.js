@@ -19,6 +19,9 @@
   const RECARREGAR_A_CADA_MS = 5 * 60 * 1000;
   const DIAS_SEMANA = ['dom','seg','ter','qua','qui','sex','sáb'];
   const PALAVRAS_IGNORADAS = ['de','da','do','das','dos','e'];
+  // Contratos que NÃO entram na seção TOA (comparação sem acento e sem maiúsculas).
+  // Vale para Contrato_2 e Unidade de Negócio do Organograma.
+  const CONTRATOS_EXCLUIDOS = ['cirion'];
 
   let TOA = [];      // [{ data:'aaaa-mm-dd', recurso, supervisor, total, concluidas }]
   let COLABS = [];
@@ -189,8 +192,23 @@
     carregando = fetch('dados.json?_=' + Date.now())
       .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(d => {
-        TOA = Array.isArray(d.toa) ? d.toa.filter(t => t && t.data && t.recurso) : [];
-        COLABS = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+        const todosColabs = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+        const excluido = c => CONTRATOS_EXCLUIDOS.some(x =>
+          semAcento(c.contrato).includes(x) || semAcento(c.unidadeNegocio).includes(x));
+        // Organograma sem Cirion (equipes, supervisores e aderência)
+        COLABS = todosColabs.filter(c => !excluido(c));
+        // TOA sem os técnicos que são da Cirion no Organograma
+        const nomesExcluidos = new Set();
+        todosColabs.filter(excluido).forEach(c => chavesNome(c.nome).forEach(k => nomesExcluidos.add(k)));
+        const supsExcluidos = new Set(todosColabs.filter(excluido).map(c => semAcento(c.supervisor)).filter(Boolean));
+        const supsValidos = new Set(COLABS.map(c => semAcento(c.supervisor)).filter(Boolean));
+        TOA = (Array.isArray(d.toa) ? d.toa : []).filter(t => {
+          if(!t || !t.data || !t.recurso) return false;
+          if(chavesNome(t.recurso).some(k => nomesExcluidos.has(k))) return false;
+          const s = semAcento(t.supervisor);
+          if(s && supsExcluidos.has(s) && !supsValidos.has(s)) return false; // supervisor só da Cirion
+          return true;
+        });
         ultimaCarga = Date.now();
         if(!estado.fim && TOA.length){
           estado.fim = maiorData();
@@ -372,7 +390,7 @@
       <div class="kpi"><div class="label">✅ Atividades concluídas</div><div class="value" style="color:${COR.accent}">${k.concluidas.toLocaleString('pt-BR')}</div>
         <div class="delta" style="color:${COR.muted};">${pct(pctConcl)} das ${k.lancadas.toLocaleString('pt-BR')} lançadas</div></div>
       <div class="kpi"><div class="label">👷 Técnicos com lançamento</div><div class="value">${k.tecnicos.toLocaleString('pt-BR')}</div>
-        <div class="delta" style="color:${COR.muted};">equipe no Organograma: ${k.equipe}</div></div>
+        <div class="delta" style="color:${COR.muted};">técnicos no Organograma (sem Cirion): ${k.equipe}</div></div>
       <div class="kpi"><div class="label">📈 Concluídas por técnico/dia</div><div class="value">${fmt1(k.mediaTecDia)}</div>
         <div class="delta" style="color:${COR.muted};">só dias em que o técnico lançou</div></div>
       <div class="kpi"><div class="label">📲 Aderência ao TOA</div>
