@@ -418,8 +418,14 @@ ${C} .bh-rod{font-size:11px;color:var(--bh-sub);margin-top:10px;text-align:right
   }
 
   async function iniciar() {
-    const el = document.getElementById(CONTAINER);
-    if (!el) return;
+    let el = document.getElementById(CONTAINER);
+    if (!el) {
+      // index sem o <div id="sec-bh">: usa a página antiga de BH e troca o conteúdo dela
+      const pag = document.getElementById('pagina-bancohoras');
+      if (!pag) return;
+      pag.innerHTML = `<div id="${CONTAINER}"></div>`;
+      el = document.getElementById(CONTAINER);
+    }
     if (typeof Chart === 'undefined') { el.innerHTML = '<p>Chart.js não carregado.</p>'; return; }
     try {
       const r = await fetch(ARQUIVO + '?v=' + Date.now(), { cache: 'no-store' });
