@@ -34,7 +34,7 @@
 
   let dados = null;
   const graficos = {};
-  const filtro = { co: '', sup: '', tp: '', cr: '', st: '', busca: '' };
+  const filtro = { co: '', sup: '', tp: '', cr: '', st: 'Ativo', busca: '' };
 
   // ----- util -----
   const $ = (s, r) => (r || document).querySelector(s);
