@@ -1,396 +1,434 @@
 /* =========================================================================
-   Painel do ESER — Seção "AFAZ"
-   Fonte: dados_afaz.json (gerado da aba qAFAZAtual)
-   Requer: Chart.js (datalabels opcional)
-   Uso:    <div id="sec-afaz"></div>
-           <script src="gestao_afaz.js"> (depois do Chart.js)
+   Painel-SLA · Seção AFAZ  (gestao_afaz.js)
+   Lê dados_afaz.json (gerado pelo Office Script gerar_dados_afaz.ts) e monta
+   a seção dentro de <div id="sec-afaz">.
+   Visuais:
+     1. Top 10 sites com mais pendências (por Tipo)
+     2. Tipo: Backlog x Entrante
+     3. Dias no Status por Status (faixas de dias)
+     4. Pendências por Prioridade (por Tipo)
+     5. Programado x Executado mês a mês
+   Requer Chart.js 4 (e, opcional, chartjs-plugin-datalabels) já carregados.
    ========================================================================= */
 (function () {
-  const ARQUIVO_JSON = 'dados_afaz.json';
-  const CONTAINER_PADRAO = 'sec-afaz';
+  'use strict';
 
-  // Statuses considerados "tratados/fechados" (igual à medida do Power BI).
-  const TRATADOS = new Set(['Finalizado', 'Resolvido', 'Pendência Claro']);
+  const ARQUIVO = 'dados_afaz.json';
+  const CONTAINER = 'sec-afaz';
 
-  const FILTROS = [
-    { k: 'st', rotulo: 'Status' },
-    { k: 'oc', rotulo: 'Origem Carteira' },
-    { k: 'eq', rotulo: 'Equipe Engemon' },
-    { k: 'sp', rotulo: 'Site Prioritário' }
+  const COR_TIPO = { Backlog: '#60a5fa', Entrante: '#1d4ed8', 'Sem tipo': '#94a3b8' };
+  const ORDEM_TIPO = ['Backlog', 'Entrante', 'Sem tipo'];
+  const ORDEM_PR = ['P0', 'P1', 'P2', 'P3'];
+  const FAIXAS = [
+    { nome: 'Até 15 dias', max: 15, cor: '#22c55e' },
+    { nome: '16 a 30 dias', max: 30, cor: '#a3e635' },
+    { nome: '31 a 60 dias', max: 60, cor: '#facc15' },
+    { nome: '61 a 90 dias', max: 90, cor: '#f97316' },
+    { nome: 'Mais de 90 dias', max: Infinity, cor: '#dc2626' }
   ];
+  const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8';
+  const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
-  const COR = { good: '#059669', warn: '#d97706', bad: '#dc2626', accent: '#0e7c86', muted: '#6b7590' };
-  const COR_CI = { 'Backlog': '#60a5fa', 'Entrante': '#1d4ed8', 'Prioritário': '#7c3aed' };
+  let dados = null;
+  const graficos = {};
+  const filtro = { tp: '', pr: '', st: '', ar: '', site: '', busca: '' };
 
-  // =======================================================================
-  // CALENDÁRIO DO PLANO — "Acompanhamento Semanal - Plan"
-  // Semanas ISO (segunda a domingo) de SEMANA_INICIO até SEMANA_FIM do
-  // ANO_PLANO. 2026 tem 53 semanas ISO, por isso termina em W53.
-  // =======================================================================
-  const ANO_PLANO = 2026;
-  const SEMANA_INICIO = 26;
-  const SEMANA_FIM = 53;
+  // ---------------------------------------------------------------- util
+  const $ = (sel, raiz) => (raiz || document).querySelector(sel);
+  const nf = n => Number(n || 0).toLocaleString('pt-BR');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const unicos = (arr, campo) => [...new Set(arr.map(i => i[campo]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const rotMes = m => { const [a, mm] = m.split('-'); return MES_ABREV[+mm - 1] + '/' + a.slice(2); };
+  const dataBR = s => s ? s.split('-').reverse().join('/') : '—';
+  const temDL = () => typeof window.ChartDataLabels !== 'undefined';
 
-  // Backlog Planejado Restante — meta de cada semana (a linha azul-clara
-  // do Power BI). Valores lidos do gráfico do Power BI: CONFIRA, principalmente
-  // W27 a W30, onde os números ficavam sobrepostos na imagem.
-  const PLANO_BACKLOG = {
-    26: 2076, 27: 2007, 28: 1883, 29: 1818, 30: 1716, 31: 1619, 32: 1528,
-    33: 1437, 34: 1345, 35: 1254, 36: 1167, 37: 1081, 38: 998, 39: 910,
-    40: 826, 41: 744, 42: 662, 43: 580, 44: 498, 45: 436, 46: 374,
-    47: 313, 48: 251, 49: 192, 50: 135, 51: 77, 52: 20, 53: 0
-  };
+  function faixaDe(d) { return FAIXAS.findIndex(f => d <= f.max); }
 
-  // Backlog Real Restante — fechamento de cada semana JÁ PASSADA (linha
-  // azul-escura do Power BI). O dados_afaz.json é só a foto de hoje, então
-  // o histórico fica aqui. A semana atual é calculada sozinha a partir da
-  // foto (itens Backlog ainda pendentes). Quando a semana fechar, acrescente
-  // o número dela aqui. CONFIRA W27 a W30 (números sobrepostos na imagem).
-  const HISTORICO_BACKLOG_REAL = {
-    27: 2019, 28: 1977, 29: 1918, 30: 1855, 31: 1812, 32: 1774, 33: 1715,
-    34: 1618, 35: 1616, 36: 1546, 37: 1518, 38: 1477, 39: 1468, 40: 1450
-  };
-
-  // Quais carteiras contam como "Backlog Real Restante" no cálculo da semana atual.
-  const CARTEIRAS_BACKLOG_REAL = new Set(['Backlog']);
-
-  const COR_PLANO = { planejado: '#38a5f5', real: '#2a2a8f', entrantes: '#7b1fa2' };
-
-  let dados = null, raiz = null, busca = '';
-  const sel = { st: '', oc: '', eq: '', sp: '' };
-  let gStatus = null, gEquipe = null, gPrioridade = null, gAging = null, gSemanal = null, gPlano = null;
-
-  const fmt = n => n.toLocaleString('pt-BR');
-  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const pad2 = n => (n < 10 ? '0' : '') + n;
-
-  // Segunda-feira da semana ISO "semana" do "ano".
-  function segundaDaSemanaIso(ano, semana) {
-    const jan4 = new Date(ano, 0, 4);
-    const diaSemana = (jan4.getDay() + 6) % 7; // segunda = 0
-    const segunda = new Date(ano, 0, 4 - diaSemana);
-    segunda.setDate(segunda.getDate() + (semana - 1) * 7);
-    return segunda;
-  }
-
-  // Lista de semanas do plano: [{ num: 26, label: 'W26', periodo: '22/06 – 28/06' }, ...]
-  function calendarioPlano() {
-    const semanas = [];
-    for (let w = SEMANA_INICIO; w <= SEMANA_FIM; w++) {
-      const ini = segundaDaSemanaIso(ANO_PLANO, w);
-      const fim = new Date(ini); fim.setDate(fim.getDate() + 6);
-      semanas.push({
-        num: w,
-        label: 'W' + pad2(w),
-        periodo: pad2(ini.getDate()) + '/' + pad2(ini.getMonth() + 1) + ' – ' + pad2(fim.getDate()) + '/' + pad2(fim.getMonth() + 1)
-      });
-    }
-    return semanas;
-  }
-
-  // "W07" -> 7
-  const numSemana = s => { const m = String(s || '').match(/(\d+)/); return m ? Number(m[1]) : null; };
-
-  function estilos() {
-    if (document.getElementById('afz-estilos')) return;
+  // ---------------------------------------------------------------- estilos
+  function injetarCSS() {
+    if ($('#afz-css')) return;
     const css = `
-    .afz-filtros{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px}
-    .afz-filtros label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#6b7590);text-transform:uppercase;letter-spacing:.05em}
-    .afz-filtros label:not(:first-child){margin-left:8px}
-    .afz-filtros select{font-family:'JetBrains Mono',monospace;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--line,#e1e5f0);background:var(--panel,#fff);color:var(--text,#1b2440);min-width:150px}
-    #afz-kpis{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
-    .afz-cv{position:relative;height:320px}
-    .afz-cv-plano{position:relative;height:380px}
-    .afz-rolagem{max-height:420px;overflow:auto;border-radius:8px}
-    .afz-tab-topo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-    .afz-tab-topo .search input{min-width:240px}`;
-    const st = document.createElement('style'); st.id = 'afz-estilos'; st.textContent = css;
+    #${CONTAINER} .afz-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+    #${CONTAINER} .afz-filtros select,#${CONTAINER} .afz-filtros input{padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:13px;background:#fff;color:#0f172a}
+    #${CONTAINER} .afz-chip{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border-radius:999px;background:#1d4ed8;color:#fff;font-size:12px;cursor:pointer}
+    #${CONTAINER} .afz-limpar{padding:6px 12px;border:0;border-radius:8px;background:#e2e8f0;color:#0f172a;font:inherit;font-size:13px;cursor:pointer}
+    #${CONTAINER} .afz-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+    #${CONTAINER} .afz-kpi{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px}
+    #${CONTAINER} .afz-kpi small{display:block;font-size:12px;color:#64748b}
+    #${CONTAINER} .afz-kpi b{display:block;font-size:24px;line-height:1.2;color:#0f172a}
+    #${CONTAINER} .afz-kpi span{font-size:11px;color:#64748b}
+    #${CONTAINER} .afz-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+    #${CONTAINER} .afz-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;min-width:0;grid-column:span 3}
+    #${CONTAINER} .afz-card.c2{grid-column:span 2}
+    #${CONTAINER} .afz-card.c4{grid-column:span 4}
+    #${CONTAINER} .afz-card.full{grid-column:1/-1}
+    #${CONTAINER} .afz-card h3{margin:0 0 2px;font-size:14px;color:#0f172a}
+    #${CONTAINER} .afz-card p.sub{margin:0 0 8px;font-size:12px;color:#64748b}
+    #${CONTAINER} .afz-box{position:relative;height:300px}
+    #${CONTAINER} .afz-box.alto{height:360px}
+    #${CONTAINER} .afz-tipo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center}
+    #${CONTAINER} .afz-leg{font-size:12px;color:#334155}
+    #${CONTAINER} .afz-leg div{border-left:4px solid;padding:6px 10px;margin-bottom:8px;background:#f8fafc;border-radius:0 8px 8px 0}
+    #${CONTAINER} .afz-leg b{font-size:13px}
+    #${CONTAINER} .afz-tab{overflow:auto;max-height:420px}
+    #${CONTAINER} table{width:100%;border-collapse:collapse;font-size:12px}
+    #${CONTAINER} th,#${CONTAINER} td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left;white-space:nowrap}
+    #${CONTAINER} td.ti{white-space:normal;min-width:240px}
+    #${CONTAINER} th{position:sticky;top:0;background:#f1f5f9;z-index:1}
+    #${CONTAINER} .afz-tag{display:inline-block;padding:1px 8px;border-radius:999px;color:#fff;font-size:11px}
+    #${CONTAINER} .afz-rodape{font-size:11px;color:#64748b;margin-top:8px}
+    @media (max-width:900px){#${CONTAINER} .afz-grid,#${CONTAINER} .afz-tipo{grid-template-columns:1fr}#${CONTAINER} .afz-card{grid-column:1/-1!important}}`;
+    const st = document.createElement('style');
+    st.id = 'afz-css';
+    st.textContent = css;
     document.head.appendChild(st);
   }
 
-  function esqueleto() {
-    raiz.innerHTML = `
-    <div class="afz">
+  // ---------------------------------------------------------------- layout
+  function montarLayout(el) {
+    el.innerHTML = `
       <div class="afz-filtros">
-        ${FILTROS.map(f => `<label>${f.rotulo}</label><select data-k="${f.k}"></select>`).join('')}
-        <span class="mono" style="font-size:11px;color:var(--muted,#6b7590);margin-left:auto;">
-          atualizado em ${esc(dados.gerado_em || '')}</span>
+        <select data-f="tp"><option value="">Tipo: todos</option></select>
+        <select data-f="pr"><option value="">Prioridade: todas</option></select>
+        <select data-f="st"><option value="">Status: todos</option></select>
+        <select data-f="ar"><option value="">Área/Sistema: todas</option></select>
+        <input data-f="busca" type="search" placeholder="Buscar site, título, responsável...">
+        <span id="afz-chip-site"></span>
+        <button class="afz-limpar" type="button">Limpar filtros</button>
       </div>
-
-      <div class="kpi-row" id="afz-kpis"></div>
-
-      <div class="grid">
-        <div class="panel">
-          <h2>Qtde AFAZ por Status e Carteira</h2>
-          <div class="afz-cv"><canvas id="afz-status"></canvas></div>
+      <div class="afz-kpis" id="afz-kpis"></div>
+      <div class="afz-grid">
+        <div class="afz-card">
+          <h3>Top 10 sites com mais pendências</h3>
+          <p class="sub">Separado por tipo · clique na barra para filtrar o site</p>
+          <div class="afz-box alto"><canvas id="afz-g-sites"></canvas></div>
         </div>
-        <div class="panel">
-          <h2>Qtde AFAZ por Equipe Engemon e Carteira</h2>
-          <div class="afz-cv"><canvas id="afz-equipe"></canvas></div>
-        </div>
-      </div>
-      <div class="grid">
-        <div class="panel">
-          <h2>Qtde AFAZ por Prioridade e Carteira</h2>
-          <div class="afz-cv"><canvas id="afz-prioridade"></canvas></div>
-        </div>
-        <div class="panel">
-          <h2>Aging Médio (Dias) por Status</h2>
-          <div class="afz-cv"><canvas id="afz-aging"></canvas></div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-bottom:16px;">
-        <h2>Acompanhamento Semanal — Plan</h2>
-        <div class="afz-cv-plano"><canvas id="afz-plano"></canvas></div>
-      </div>
-
-      <div class="panel" style="margin-bottom:16px;">
-        <h2>Prioritários em Esteira (por semana)</h2>
-        <div class="afz-cv"><canvas id="afz-semanal"></canvas></div>
-      </div>
-
-      <div class="panel">
-        <div class="afz-tab-topo">
-          <h2>Itens em Aberto (<span id="afz-qtd-tab">0</span>)</h2>
-          <div class="search">
-            <input id="afz-busca" type="search" placeholder="Buscar site, título, responsável...">
+        <div class="afz-card">
+          <h3>Tipo: Backlog x Entrante</h3>
+          <p class="sub">Pendências atuais por tipo de carteira</p>
+          <div class="afz-tipo">
+            <div class="afz-box"><canvas id="afz-g-tipo"></canvas></div>
+            <div class="afz-leg" id="afz-leg-tipo"></div>
           </div>
         </div>
-        <div class="afz-rolagem"><table>
-          <thead><tr><th>Status</th><th>Site</th><th>Prioridade</th><th>Título</th><th>Área/Sistema</th>
-          <th>Responsável</th><th>Carteira</th><th>Equipe</th><th>Aging (dias)</th></tr></thead>
-          <tbody id="afz-tbody"></tbody></table></div>
+        <div class="afz-card full">
+          <h3>Dias no status atual, por status</h3>
+          <p class="sub">Quantos AFAZ estão parados em cada status e há quanto tempo · média de dias ao lado da barra</p>
+          <div class="afz-box alto"><canvas id="afz-g-dias"></canvas></div>
+        </div>
+        <div class="afz-card c2">
+          <h3>Pendências por prioridade</h3>
+          <p class="sub">P0 a P3, separado por tipo</p>
+          <div class="afz-box"><canvas id="afz-g-prio"></canvas></div>
+        </div>
+        <div class="afz-card c4">
+          <h3>Programado x Executado · mês a mês</h3>
+          <p class="sub">Executado = mudanças para Finalizado, Resolvido ou Pendência Claro no mês (Logs) · % executado abaixo do mês</p>
+          <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
+        </div>
+        <div class="afz-card full">
+          <h3>AFAZ pendentes</h3>
+          <p class="sub" id="afz-tab-sub"></p>
+          <div class="afz-tab"><table>
+            <thead><tr><th>AFAZ</th><th>Site</th><th>Prioridade</th><th>Tipo</th><th>Status</th><th>Dias no status</th><th>Título</th><th>Área/Sistema</th><th>Responsável</th><th>Previsão</th></tr></thead>
+            <tbody id="afz-tbody"></tbody>
+          </table></div>
+        </div>
       </div>
-    </div>`;
+      <div class="afz-rodape" id="afz-rodape"></div>`;
 
-    raiz.querySelectorAll('.afz-filtros select').forEach(s =>
-      s.addEventListener('change', () => { sel[s.dataset.k] = s.value; atualizar(); }));
-    raiz.querySelector('#afz-busca').addEventListener('input', e => { busca = e.target.value.toLowerCase(); tabela(filtrar()); });
-  }
+    // opções dos filtros
+    const it = dados.itens;
+    const preencher = (campo, valores) => {
+      const sel = $(`select[data-f="${campo}"]`, el);
+      valores.forEach(v => sel.insertAdjacentHTML('beforeend', `<option value="${esc(v)}">${esc(v)}</option>`));
+    };
+    preencher('tp', ORDEM_TIPO.filter(t => it.some(i => i.tp === t)));
+    preencher('pr', ORDEM_PR.filter(p => it.some(i => i.pr === p)));
+    preencher('st', unicos(it, 'st'));
+    preencher('ar', unicos(it, 'ar'));
 
-  function filtrar(ignorar) {
-    return dados.registros.filter(r => FILTROS.every(f => f.k === ignorar || !sel[f.k] || r[f.k] === sel[f.k]));
-  }
-
-  function opcoes() {
-    raiz.querySelectorAll('.afz-filtros select').forEach(s => {
-      const k = s.dataset.k;
-      const vals = [...new Set(filtrar(k).map(r => r[k]))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
-      if (sel[k] && !vals.includes(sel[k])) vals.push(sel[k]);
-      s.innerHTML = '<option value="">Todos</option>' +
-        vals.map(v => `<option value="${esc(v)}"${v === sel[k] ? ' selected' : ''}>${esc(v)}</option>`).join('');
+    el.querySelectorAll('[data-f]').forEach(c => c.addEventListener(c.tagName === 'INPUT' ? 'input' : 'change', () => {
+      filtro[c.dataset.f] = c.value.trim();
+      atualizar();
+    }));
+    $('.afz-limpar', el).addEventListener('click', () => {
+      Object.keys(filtro).forEach(k => filtro[k] = '');
+      el.querySelectorAll('[data-f]').forEach(c => c.value = '');
+      atualizar();
     });
   }
 
-  function atualizar() {
-    opcoes();
-    const regs = filtrar();
-    const pendentes = regs.filter(r => !TRATADOS.has(r.st));
-    const tratados = regs.filter(r => TRATADOS.has(r.st));
-    const backlogPendente = pendentes.filter(r => r.ci === 'Backlog').length;
-    const entrantesPendentes = pendentes.filter(r => r.ci === 'Entrante').length;
-    const prioritariosPendentes = pendentes.filter(r => r.ci === 'Prioritário').length;
-
-    raiz.querySelector('#afz-kpis').innerHTML = `
-      <div class="kpi"><div class="label">📥 Pendentes AFAZ</div><div class="value">${fmt(pendentes.length)}</div></div>
-      <div class="kpi"><div class="label">📦 Backlog Pendente</div><div class="value">${fmt(backlogPendente)}</div></div>
-      <div class="kpi"><div class="label">🆕 Entrantes Pendentes</div><div class="value">${fmt(entrantesPendentes)}</div></div>
-      <div class="kpi"><div class="label">⭐ Prioritários Pendentes</div><div class="value" style="color:${COR.bad}">${fmt(prioritariosPendentes)}</div></div>
-      <div class="kpi"><div class="label">✅ Total Tratado</div><div class="value" style="color:${COR.good}">${fmt(tratados.length)}</div></div>`;
-
-    graficoEmpilhado('afz-status', gStatus, v => (gStatus = v), pendentes, 'st');
-    graficoEmpilhado('afz-equipe', gEquipe, v => (gEquipe = v), pendentes, 'eq');
-    graficoEmpilhado('afz-prioridade', gPrioridade, v => (gPrioridade = v), pendentes, 'pr', ['P0', 'P1', 'P2', 'P3']);
-    graficoAging(pendentes);
-    graficoPlano();
-    graficoSemanal();
-    tabela(pendentes);
+  // ---------------------------------------------------------------- filtro
+  function filtrados() {
+    const b = filtro.busca.toLowerCase();
+    return dados.itens.filter(i =>
+      (!filtro.tp || i.tp === filtro.tp) &&
+      (!filtro.pr || i.pr === filtro.pr) &&
+      (!filtro.st || i.st === filtro.st) &&
+      (!filtro.ar || i.ar === filtro.ar) &&
+      (!filtro.site || i.s === filtro.site) &&
+      (!b || [i.s, i.ti, i.resp, i.ar, i.id].some(v => String(v || '').toLowerCase().includes(b))));
   }
 
-  // "Acompanhamento Semanal - Plan": as três linhas do Power BI no calendário
-  // W26–W53. É série histórica, então NÃO respeita os filtros da página.
-  function graficoPlano() {
-    const semanas = calendarioPlano();
+  // ---------------------------------------------------------------- charts
+  function desenhar(id, cfg) {
+    if (graficos[id]) graficos[id].destroy();
+    const cv = document.getElementById(id);
+    if (!cv) return;
+    if (temDL()) cfg.plugins = (cfg.plugins || []).concat([window.ChartDataLabels]);
+    cfg.options = cfg.options || {};
+    cfg.options.responsive = true;
+    cfg.options.maintainAspectRatio = false;
+    cfg.options.locale = 'pt-BR';
+    graficos[id] = new Chart(cv, cfg);
+  }
 
-    // Entrantes acumulados vêm do dados_afaz.json. A série começa no ano
-    // anterior (W35 de 2025...), por isso os rótulos se repetem: como ela está
-    // em ordem cronológica, a última ocorrência de cada "Wnn" é a de 2026.
-    const serieEntr = Array.isArray(dados.entrantesAcumulados) ? dados.entrantesAcumulados : [];
-    const entrPorSemana = {};
-    serieEntr.forEach(s => { const n = numSemana(s.semana); if (n !== null) entrPorSemana[n] = s.entrantesAcumulados; });
-    const semanaAtual = serieEntr.length ? numSemana(serieEntr[serieEntr.length - 1].semana) : null;
-
-    // Backlog real: histórico fixo + semana atual calculada da foto de hoje.
-    const realPorSemana = Object.assign({}, HISTORICO_BACKLOG_REAL);
-    if (semanaAtual !== null && realPorSemana[semanaAtual] === undefined) {
-      realPorSemana[semanaAtual] = dados.registros.filter(r => !TRATADOS.has(r.st) && CARTEIRAS_BACKLOG_REAL.has(r.ci)).length;
+  // rótulo dentro da barra só se couber
+  const dlDentro = {
+    color: '#fff', font: { size: 10, weight: '600' }, formatter: v => v ? nf(v) : '',
+    display: c => {
+      const v = c.dataset.data[c.dataIndex];
+      if (!v) return false;
+      const esc = c.chart.scales[c.chart.options.indexAxis === 'y' ? 'x' : 'y'];
+      return Math.abs(esc.getPixelForValue(v) - esc.getPixelForValue(0)) > 24; // só se couber
     }
+  };
 
-    // Depois da semana atual não há dado real: fica em branco (só o plano segue até W53).
-    const valorAte = (mapa, w) => (semanaAtual !== null && w > semanaAtual) ? null : (mapa[w] ?? null);
+  function porTipo(itens, chave, ordem) {
+    const rotulos = ordem;
+    const tipos = ORDEM_TIPO.filter(t => itens.some(i => i.tp === t));
+    return tipos.map(t => ({
+      label: t, backgroundColor: COR_TIPO[t], stack: 's', datalabels: dlDentro,
+      data: rotulos.map(r => itens.filter(i => i[chave] === r && i.tp === t).length)
+    }));
+  }
 
-    const labels = semanas.map(s => s.label);
-    const planejado = semanas.map(s => PLANO_BACKLOG[s.num] ?? null);
-    const real = semanas.map(s => valorAte(realPorSemana, s.num));
-    const entrantes = semanas.map(s => valorAte(entrPorSemana, s.num));
+  function totalNoFim(datasets) {
+    // plugin simples: escreve o total no fim da barra empilhada horizontal/vertical
+    return {
+      id: 'totais',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const horiz = chart.options.indexAxis === 'y';
+        const metas = chart.data.datasets.map((d, k) => chart.getDatasetMeta(k)).filter(m => !m.hidden);
+        if (!metas.length) return;
+        ctx.save();
+        ctx.font = '600 11px sans-serif';
+        ctx.fillStyle = '#0f172a';
+        chart.data.labels.forEach((_, i) => {
+          const tot = metas.reduce((s, m) => s + (chart.data.datasets[m.index].data[i] || 0), 0);
+          if (!tot) return;
+          const el = metas[metas.length - 1].data[i];
+          const txt = typeof datasets === 'function' ? datasets(i, tot) : nf(tot);
+          if (horiz) { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, el.x + 6, el.y); }
+          else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(txt, el.x, el.y - 4); }
+        });
+        ctx.restore();
+      }
+    };
+  }
 
-    const temLabels = typeof ChartDataLabels !== 'undefined';
-    const rotulo = (cor, align) => temLabels
-      ? { display: ctx => ctx.dataset.data[ctx.dataIndex] !== null, align: align, anchor: 'center', offset: 4,
-          color: cor, font: { size: 9, weight: '700' }, formatter: v => fmt(v) }
-      : undefined;
-
-    if (gPlano) gPlano.destroy();
-    gPlano = new Chart(raiz.querySelector('#afz-plano'), {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [
-          { label: 'Backlog Planejado Restante', data: planejado, borderColor: COR_PLANO.planejado, backgroundColor: COR_PLANO.planejado,
-            borderWidth: 3, tension: 0.15, pointRadius: 2, datalabels: rotulo('#1b2440', 'bottom') },
-          { label: 'Backlog Real Restante', data: real, borderColor: COR_PLANO.real, backgroundColor: COR_PLANO.real,
-            borderWidth: 3, tension: 0.15, pointRadius: 2, spanGaps: false, datalabels: rotulo('#1b2440', 'top') },
-          { label: 'Entrantes em Esteira Acumulados', data: entrantes, borderColor: COR_PLANO.entrantes, backgroundColor: COR_PLANO.entrantes,
-            borderWidth: 3, tension: 0.15, pointRadius: 2, spanGaps: false, datalabels: rotulo('#1b2440', 'bottom') }
-        ]
-      },
-      plugins: temLabels ? [ChartDataLabels] : [],
+  // 1. Top 10 sites
+  function gSites(itens) {
+    const cont = {};
+    itens.forEach(i => { if (i.s) cont[i.s] = (cont[i.s] || 0) + 1; });
+    const top = Object.entries(cont).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+    desenhar('afz-g-sites', {
+      type: 'bar',
+      data: { labels: top, datasets: porTipo(itens.filter(i => top.includes(i.s)), 's', top) },
+      plugins: [totalNoFim()],
       options: {
-        responsive: true, maintainAspectRatio: false,
-        layout: { padding: { top: 18 } },
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { position: 'top', align: 'start', labels: { boxWidth: 10, font: { size: 11 } } },
-          tooltip: {
-            callbacks: {
-              title: items => {
-                const s = semanas[items[0].dataIndex];
-                return s.label + ' · ' + s.periodo + (s.num === semanaAtual ? ' (semana atual)' : '');
-              }
-            }
-          }
+        indexAxis: 'y', layout: { padding: { right: 36 } },
+        scales: { x: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' } }, y: { stacked: true, grid: { display: false } } },
+        plugins: { legend: { position: 'bottom' } },
+        onClick: (e, els, ch) => {
+          if (!els.length) return;
+          filtro.site = ch.data.labels[els[0].index];
+          setTimeout(atualizar, 0); // não destruir o gráfico dentro do próprio evento
         },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 10 }, autoSkip: false, maxRotation: 0 } },
-          y: { display: false, beginAtZero: true }
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
+    });
+  }
+
+  // 2. Tipo
+  function gTipo(itens) {
+    const tipos = ORDEM_TIPO.filter(t => itens.some(i => i.tp === t));
+    const qt = tipos.map(t => itens.filter(i => i.tp === t).length);
+    const tot = qt.reduce((a, b) => a + b, 0);
+    desenhar('afz-g-tipo', {
+      type: 'doughnut',
+      data: { labels: tipos, datasets: [{ data: qt, backgroundColor: tipos.map(t => COR_TIPO[t]), borderWidth: 2, borderColor: '#fff' }] },
+      options: {
+        cutout: '58%',
+        plugins: {
+          legend: { position: 'bottom' },
+          datalabels: { color: '#fff', font: { weight: '700', size: 12 }, formatter: v => tot ? `${nf(v)}\n${Math.round(v / tot * 100)}%` : '', textAlign: 'center' }
+        }
+      }
+    });
+
+    // legenda explicativa: período de abertura de cada tipo + tratados
+    const leg = tipos.map((t, k) => {
+      const datas = itens.filter(i => i.tp === t && i.ab).map(i => i.ab).sort();
+      const periodo = datas.length ? `Abertos de ${dataBR(datas[0])} a ${dataBR(datas[datas.length - 1])}` : '';
+      const trat = (dados.tratados || {})[t] || 0;
+      return `<div style="border-color:${COR_TIPO[t]}"><b>${esc(t)}</b> · ${nf(qt[k])} pendentes<br>${periodo}<br>${nf(trat)} já tratados</div>`;
+    }).join('');
+    $('#afz-leg-tipo').innerHTML = leg +
+      '<div style="border-color:#cbd5e1">Backlog = carteira que já estava em aberto · Entrante = demanda nova que entrou na carteira</div>';
+  }
+
+  // 3. Dias no status por status
+  function gDias(itens) {
+    const grupos = {};
+    itens.forEach(i => { (grupos[i.st] = grupos[i.st] || []).push(i.dst || 0); });
+    const status = Object.keys(grupos).sort((a, b) => grupos[b].length - grupos[a].length);
+    const medias = status.map(s => grupos[s].reduce((a, b) => a + b, 0) / grupos[s].length);
+    const datasets = FAIXAS.map((f, k) => ({
+      label: f.nome, backgroundColor: f.cor, stack: 'd',
+      datalabels: Object.assign({}, dlDentro, { color: k === 1 || k === 2 ? '#0f172a' : '#fff' }),
+      data: status.map(s => grupos[s].filter(d => faixaDe(d) === k).length)
+    }));
+    desenhar('afz-g-dias', {
+      type: 'bar',
+      data: { labels: status, datasets },
+      plugins: [totalNoFim((i, tot) => `${nf(tot)} · média ${Math.round(medias[i])} d`)],
+      options: {
+        indexAxis: 'y', layout: { padding: { right: 120 } },
+        scales: { x: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' } }, y: { stacked: true, grid: { display: false } } },
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: { callbacks: { footer: its => `Média no status: ${Math.round(medias[its[0].dataIndex])} dias · Máx: ${Math.max(...grupos[status[its[0].dataIndex]])} dias` } }
         }
       }
     });
   }
 
-  // Prioritários em Esteira por semana — série histórica pronta do
-  // dados_afaz.json; não respeita os filtros da página.
-  function graficoSemanal() {
-    const serie = Array.isArray(dados.semanal) ? dados.semanal : [];
-    const temLabels = typeof ChartDataLabels !== 'undefined';
-    if (gSemanal) gSemanal.destroy();
-    gSemanal = new Chart(raiz.querySelector('#afz-semanal'), {
-      type: 'line',
-      data: {
-        labels: serie.map(s => s.semana),
-        datasets: [{ label: 'Prioritários em Esteira', data: serie.map(s => s.prioritariosEmEsteira),
-          borderColor: '#7c3aed', backgroundColor: '#7c3aed', tension: 0.3, pointRadius: 4 }]
-      },
-      plugins: temLabels ? [ChartDataLabels] : [],
+  // 4. Prioridade
+  function gPrio(itens) {
+    const prs = ORDEM_PR.filter(p => itens.some(i => i.pr === p));
+    desenhar('afz-g-prio', {
+      type: 'bar',
+      data: { labels: prs, datasets: porTipo(itens, 'pr', prs) },
+      plugins: [totalNoFim()],
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false },
-          datalabels: temLabels ? { align: 'top', color: '#7c3aed', font: { size: 10, weight: '700' } } : undefined },
-        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#e1e5f0' } } }
+        layout: { padding: { top: 18 } },
+        scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' } } },
+        plugins: { legend: { position: 'bottom' } }
       }
     });
   }
 
-  // Barras horizontais empilhadas por Carteira Indicador (Backlog / Entrante / Prioritário).
-  function graficoEmpilhado(canvasId, atual, setAtual, regs, campo, ordemFixa) {
-    const CIS = ['Backlog', 'Entrante', 'Prioritário'];
-    const porCat = {};
-    regs.forEach(r => {
-      const cat = r[campo] || 'Sem valor';
-      if (!porCat[cat]) porCat[cat] = { Backlog: 0, Entrante: 0, 'Prioritário': 0 };
-      if (porCat[cat][r.ci] !== undefined) porCat[cat][r.ci]++;
-    });
-    let cats = Object.keys(porCat);
-    cats = ordemFixa ? ordemFixa.filter(c => porCat[c]) :
-      cats.sort((a, b) => (porCat[b].Backlog + porCat[b].Entrante + porCat[b]['Prioritário']) - (porCat[a].Backlog + porCat[a].Entrante + porCat[a]['Prioritário']));
-
-    const temLabels = typeof ChartDataLabels !== 'undefined';
-    if (atual) atual.destroy();
-    const novo = new Chart(raiz.querySelector('#' + canvasId), {
+  // 5. Programado x Executado
+  function gProg() {
+    const prog = dados.programado || {}, exe = dados.executado || {};
+    const mesAtual = new Date().toISOString().slice(0, 7);
+    const meses = [...new Set([...Object.keys(prog), ...Object.keys(exe)])].sort();
+    const vProg = meses.map(m => prog[m] != null ? prog[m] : null);
+    const vExe = meses.map(m => m <= mesAtual ? (exe[m] || 0) : null);
+    const pct = meses.map((m, k) => vProg[k] && vExe[k] != null ? Math.round(vExe[k] / vProg[k] * 100) : null);
+    const corPct = v => v == null ? '#64748b' : v >= 100 ? '#16a34a' : v >= 80 ? '#ca8a04' : '#dc2626';
+    const rotulo = { anchor: 'end', align: 'end', offset: 2, font: { size: 10, weight: '600' }, formatter: v => v == null ? '' : nf(v) };
+    desenhar('afz-g-prog', {
       type: 'bar',
       data: {
-        labels: cats,
-        datasets: CIS.map(ci => ({ label: ci, data: cats.map(c => porCat[c][ci]), backgroundColor: COR_CI[ci], stack: 's' }))
+        // cada rótulo do eixo X tem duas linhas: mês e % executado
+        labels: meses.map((m, k) => [rotMes(m), pct[k] == null ? '' : pct[k] + '%']),
+        datasets: [
+          { label: 'Programado', data: vProg, backgroundColor: COR_PROG, datalabels: Object.assign({ color: '#475569' }, rotulo) },
+          { label: 'Executado', data: vExe, backgroundColor: COR_EXEC, datalabels: Object.assign({ color: COR_EXEC }, rotulo) }
+        ]
       },
-      plugins: temLabels ? [ChartDataLabels] : [],
       options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
-          datalabels: temLabels ? { color: '#fff', font: { size: 9, weight: '700' }, formatter: v => v || '' } : undefined
+        layout: { padding: { top: 20 } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: false,
+               color: c => c.tick && c.tick.label && c.tick.label[1] ? corPct(pct[c.index]) : '#475569' } },
+          y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Qtde AFAZ' } }
         },
-        scales: { x: { stacked: true, beginAtZero: true, grid: { color: '#e1e5f0' } }, y: { stacked: true, grid: { display: false } } }
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: { callbacks: {
+            title: its => rotMes(meses[its[0].dataIndex]),
+            footer: its => pct[its[0].dataIndex] == null ? '' : `Executado: ${pct[its[0].dataIndex]}% do programado` } }
+        }
       }
     });
-    setAtual(novo);
+    return { mesAtual, prog: prog[mesAtual], exe: exe[mesAtual] || 0 };
   }
 
-  function graficoAging(regs) {
-    const soma = {}, qtd = {};
-    regs.forEach(r => {
-      if (r.tst == null) return;
-      const st = r.st;
-      soma[st] = (soma[st] || 0) + r.tst / 24;
-      qtd[st] = (qtd[st] || 0) + 1;
-    });
-    const linhas = Object.keys(soma).map(st => ({ st, media: soma[st] / qtd[st] })).sort((a, b) => b.media - a.media);
-
-    const temLabels = typeof ChartDataLabels !== 'undefined';
-    if (gAging) gAging.destroy();
-    gAging = new Chart(raiz.querySelector('#afz-aging'), {
-      type: 'bar',
-      data: { labels: linhas.map(l => l.st), datasets: [{ label: 'Aging Médio (dias)', data: linhas.map(l => Math.round(l.media * 10) / 10), backgroundColor: 'rgba(14,124,134,.75)', borderRadius: 4 }] },
-      plugins: temLabels ? [ChartDataLabels] : [],
-      options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, datalabels: temLabels ? { anchor: 'end', align: 'end', color: '#000', font: { size: 10, weight: '700' } } : undefined },
-        scales: { x: { beginAtZero: true, grid: { color: '#e1e5f0' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
-      }
-    });
+  // ---------------------------------------------------------------- KPIs / tabela
+  function kpis(itens, pm) {
+    const n = t => itens.filter(i => i.tp === t).length;
+    const trat = Object.values(dados.tratados || {}).reduce((a, b) => a + b, 0);
+    const medDias = itens.length ? Math.round(itens.reduce((s, i) => s + (i.dst || 0), 0) / itens.length) : 0;
+    const ader = pm.prog ? Math.round(pm.exe / pm.prog * 100) + '%' : '—';
+    const cards = [
+      ['AFAZ pendentes', nf(itens.length), `média de ${medDias} dias no status`],
+      ['Backlog pendente', nf(n('Backlog')), ''],
+      ['Entrante pendente', nf(n('Entrante')), ''],
+      ['P0 pendentes', nf(itens.filter(i => i.pr === 'P0').length), ''],
+      ['Total tratado', nf(trat), 'Finalizado, Resolvido, Pendência Claro'],
+      [`Executado ${rotMes(pm.mesAtual)}`, nf(pm.exe), pm.prog ? `de ${nf(pm.prog)} programados · ${ader}` : 'sem programação no mês']
+    ];
+    $('#afz-kpis').innerHTML = cards.map(c => `<div class="afz-kpi"><small>${c[0]}</small><b>${c[1]}</b><span>${c[2]}</span></div>`).join('');
   }
 
-  function tabela(regs) {
-    const lista = regs.filter(r => !busca ||
-      [r.s, r.ti, r.resp, r.ar].some(v => String(v ?? '').toLowerCase().includes(busca)));
-    raiz.querySelector('#afz-qtd-tab').textContent = fmt(lista.length);
-    raiz.querySelector('#afz-tbody').innerHTML = lista.slice(0, 500).map(r => `<tr>
-      <td><span class="pill ${r.st === 'Aberto' ? 'warn' : 'bad'}">${esc(r.st)}</span></td>
-      <td>${esc(r.s)}</td><td>${esc(r.pr)}</td><td>${esc(r.ti)}</td><td>${esc(r.ar)}</td>
-      <td>${esc(r.resp)}</td><td>${esc(r.oc)}</td><td>${esc(r.eq)}</td>
-      <td class="num mono">${r.tst != null ? fmt(Math.round(r.tst / 24)) : '--'}</td>
-    </tr>`).join('') || '<tr><td colspan="9" style="text-align:center;color:#6b7590">Nenhum item encontrado</td></tr>';
+  function tabela(itens) {
+    const lista = itens.slice().sort((a, b) => (b.dst || 0) - (a.dst || 0));
+    const LIM = 500;
+    $('#afz-tbody').innerHTML = lista.slice(0, LIM).map(i => {
+      const f = FAIXAS[faixaDe(i.dst || 0)];
+      return `<tr><td>${esc(i.id)}</td><td>${esc(i.s)}</td><td>${esc(i.pr)}</td>
+        <td><span class="afz-tag" style="background:${COR_TIPO[i.tp] || '#94a3b8'}">${esc(i.tp)}</span></td>
+        <td>${esc(i.st)}</td><td><span class="afz-tag" style="background:${f.cor};color:${f.max === 30 || f.max === 60 ? '#0f172a' : '#fff'}">${nf(i.dst)} d</span></td>
+        <td class="ti">${esc(i.ti)}</td><td>${esc(i.ar)}</td><td>${esc(i.resp)}</td><td>${dataBR(i.prev)}</td></tr>`;
+    }).join('');
+    $('#afz-tab-sub').textContent = `${nf(lista.length)} itens, do mais parado para o mais recente` + (lista.length > LIM ? ` · mostrando os ${LIM} primeiros (use os filtros)` : '');
   }
 
-  async function montar(idContainer) {
-    raiz = document.getElementById(idContainer || CONTAINER_PADRAO);
-    if (!raiz) return;
-    estilos();
+  // ---------------------------------------------------------------- ciclo
+  function atualizar() {
+    const itens = filtrados();
+    $('#afz-chip-site').innerHTML = filtro.site ? `<span class="afz-chip" title="Remover">Site: ${esc(filtro.site)} ✕</span>` : '';
+    const chip = $('#afz-chip-site .afz-chip');
+    if (chip) chip.onclick = () => { filtro.site = ''; atualizar(); };
+    gSites(itens);
+    gTipo(itens);
+    gDias(itens);
+    gPrio(itens);
+    const pm = gProg();
+    kpis(itens, pm);
+    tabela(itens);
+  }
+
+  async function iniciar() {
+    const el = document.getElementById(CONTAINER);
+    if (!el) return;
+    if (typeof Chart === 'undefined') { el.innerHTML = '<p>Chart.js não carregado.</p>'; return; }
     try {
-      dados = window.DADOS_AFAZ ||
-        await fetch(ARQUIVO_JSON + '?v=' + Date.now(), { cache: 'no-store' }).then(r => { if (!r.ok) throw r.status; return r.json(); });
-      esqueleto();
-      atualizar();
+      const r = await fetch(ARQUIVO + '?v=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      dados = await r.json();
     } catch (e) {
-      raiz.innerHTML = `<div style="padding:20px;color:#b00020">Não foi possível carregar ${ARQUIVO_JSON} (${esc(e)}).</div>`;
+      el.innerHTML = `<p style="color:#dc2626">Não foi possível carregar ${ARQUIVO}: ${esc(e.message)}</p>`;
+      return;
+    }
+    dados.itens = dados.itens || [];
+    injetarCSS();
+    montarLayout(el);
+    atualizar();
+    if (dados.geradoEm) {
+      $('#afz-rodape').textContent = 'Dados gerados em ' + new Date(dados.geradoEm).toLocaleString('pt-BR');
     }
   }
 
-  function redesenhar() {
-    [gStatus, gEquipe, gPrioridade, gAging, gSemanal, gPlano].forEach(g => { if (g) g.resize(); });
-  }
+  // gráficos criados com a seção escondida ficam com tamanho 0: redimensiona ao aparecer
+  window.afazResize = () => Object.values(graficos).forEach(g => g.resize());
 
-  window.PainelAFAZ = { montar, redesenhar };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => montar());
-  else montar();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
+  else iniciar();
 })();
