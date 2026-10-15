@@ -107,7 +107,8 @@ ${C} th{position:sticky;top:0;background:#f1f5f9;color:#334155;z-index:1}
 ${C} td.num,${C} th.num{text-align:right}
 ${C} td.nm{max-width:240px;overflow:hidden;text-overflow:ellipsis}${C} td.nm small{display:block;color:#64748b;font-size:11px;overflow:hidden;text-overflow:ellipsis}
 ${C} .bh-tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:600}
-${C} .pos{color:${VERDE};font-weight:700}${C} .neg{color:${VERMELHO};font-weight:700}
+${C} .pos,${C} td.num.pos{color:${VERDE}!important;font-weight:700}${C} .neg,${C} td.num.neg{color:${VERMELHO}!important;font-weight:700}
+${C} th{text-transform:none;letter-spacing:0;font-size:12px;font-weight:600}
 ${C} .bh-ins{margin:10px 0 0;padding:10px 12px;background:#f8fafc;border-radius:10px;font-size:12px}
 ${C} .bh-ins ul{margin:4px 0 0;padding-left:18px}
 ${C} .bh-ins li{margin:3px 0}
