@@ -405,6 +405,41 @@
     tabela(itens);
   }
 
+  // Aceita o JSON novo ({itens, tratados, programado, executado}) e também o formato antigo
+  // (lista com todos os AFAZ e campos oc/ci/tst). Retorna true se for o formato antigo.
+  function normalizar(d) {
+    if (Array.isArray(d.itens) && d.itens.length) return false;
+    const lista = Array.isArray(d) ? d
+      : (d.registros || d.dados || d.afaz || d.itens ||
+         Object.values(d).find(v => Array.isArray(v) && v.length && v[0] && typeof v[0] === 'object' && 'st' in v[0]) || []);
+    const TRATADOS = ['finalizado', 'resolvido', 'pendência claro', 'pendencia claro'];
+    const tipoDe = r => {
+      const t = String(r.tp || r.oc || r.ci || '').trim();
+      return /backlog/i.test(t) ? 'Backlog' : /entrante/i.test(t) ? 'Entrante' : 'Sem tipo';
+    };
+    const isoData = v => {
+      if (!v) return null;
+      const m = String(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+      return String(v).slice(0, 10);
+    };
+    const tratados = {};
+    const itens = [];
+    lista.forEach(r => {
+      const st = String(r.st || '').trim();
+      const tp = tipoDe(r);
+      if (TRATADOS.includes(st.toLowerCase())) { tratados[tp] = (tratados[tp] || 0) + 1; return; }
+      const dst = r.dst != null ? Number(r.dst) : Math.round((Number(r.tst) || 0) / 24);
+      itens.push({ id: r.id, pr: r.pr, s: r.s, st, ti: r.ti, ab: isoData(r.ab), ar: r.ar, resp: r.resp, prev: isoData(r.prev), tp, dst });
+    });
+    d.itens = itens;
+    d.tratados = d.tratados || tratados;
+    d.programado = d.programado || {};
+    d.executado = d.executado || {};
+    d.geradoEm = d.geradoEm || d.gerado_em || d.atualizado_em || null;
+    return lista.length > 0;
+  }
+
   async function iniciar() {
     const el = document.getElementById(CONTAINER);
     if (!el) return;
@@ -417,12 +452,17 @@
       el.innerHTML = `<p style="color:#dc2626">Não foi possível carregar ${ARQUIVO}: ${esc(e.message)}</p>`;
       return;
     }
-    dados.itens = dados.itens || [];
+    const formatoAntigo = normalizar(dados);
     injetarCSS();
     montarLayout(el);
     atualizar();
     if (dados.geradoEm) {
       $('#afz-rodape').textContent = 'Dados gerados em ' + new Date(dados.geradoEm).toLocaleString('pt-BR');
+    }
+    if (formatoAntigo) {
+      el.insertAdjacentHTML('afterbegin', '<div style="padding:10px 14px;margin-bottom:12px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:13px">' +
+        '⚠ O dados_afaz.json está no formato antigo (gerado pelo Office Script anterior). O painel funciona, mas o gráfico ' +
+        'Programado x Executado fica vazio. Troque o script do fluxo pelo gerar_dados_afaz.ts novo.</div>');
     }
   }
 
