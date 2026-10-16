@@ -32,7 +32,7 @@
   const COR_FX_NEG = ['#fca5a5', '#f87171', '#ef4444', '#b91c1c'];
   const VERDE = '#0f9d58', VERMELHO = '#dc2626', AZUL = '#0b3a75';
 
-  let dados = null;
+  let dados = null, dadosBrutos = null;
   const graficos = {};
   const filtro = { co: '', sup: '', tp: '', cr: '', st: 'Ativo', busca: '' };
 
@@ -434,6 +434,29 @@ ${C} .bh-rod{font-size:11px;color:var(--bh-sub);margin-top:10px;text-align:right
     resumo(itens, pos, neg);
   }
 
+  // Lê o JSON mesmo quando o Power Automate grava embrulhado: {"result":"{...}"}, {"body":...} ou texto
+  async function lerJson(url) {
+    const r = await fetch(url + '?v=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ao abrir ' + url);
+    let d = JSON.parse((await r.text()).replace(/^\uFEFF/, ''));
+    for (let i = 0; i < 4; i++) {
+      if (typeof d === 'string') { d = JSON.parse(d); continue; }
+      if (d && typeof d === 'object' && !Array.isArray(d)) {
+        const emb = ['result', 'body', 'Result', 'Body', 'content', 'value'].find(k => k in d && Object.keys(d).length <= 3);
+        if (emb) { d = d[emb]; continue; }
+      }
+      break;
+    }
+    return d;
+  }
+  function diagnostico(el, nome, d) {
+    const tipo = Array.isArray(d) ? 'lista com ' + d.length + ' itens' : typeof d;
+    const chaves = d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d).slice(0, 15).join(', ') : '—';
+    el.insertAdjacentHTML('afterbegin', `<div style="padding:12px 14px;margin-bottom:12px;border-radius:10px;background:#fee2e2;color:#991b1b;font-size:13px">
+      ⚠ ${nome} foi lido, mas não tem registros no formato esperado.<br>Tipo recebido: <b>${tipo}</b> · campos no topo: <b>${chaves}</b><br>
+      Mande um print desta mensagem para ajustar.</div>`);
+  }
+
   async function iniciar() {
     let el = document.getElementById(CONTAINER);
     if (!el) {
@@ -445,17 +468,20 @@ ${C} .bh-rod{font-size:11px;color:var(--bh-sub);margin-top:10px;text-align:right
     }
     if (typeof Chart === 'undefined') { el.innerHTML = '<p>Chart.js não carregado.</p>'; return; }
     try {
-      const r = await fetch(ARQUIVO + '?v=' + Date.now(), { cache: 'no-store' });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      dados = await r.json();
+      dados = await lerJson(ARQUIVO);
+      dadosBrutos = Array.isArray(dados) ? dados : Object.assign({}, dados);
     } catch (e) {
       el.innerHTML = `<p style="color:#dc2626">Não foi possível carregar ${ARQUIVO}: ${esc(e.message)}</p>`;
       return;
     }
-    dados.itens = dados.itens || [];
+    if (Array.isArray(dados)) dados = { itens: dados };
+    if (!Array.isArray(dados.itens)) {
+      dados.itens = Object.values(dados).find(v => Array.isArray(v) && v.length && v[0] && typeof v[0] === 'object' && 'h' in v[0]) || [];
+    }
     css();
     layout(el);
     atualizar();
+    if (!dados.itens.length) diagnostico(el, ARQUIVO, dadosBrutos);
     if (dados.geradoEm) $('#bh-rod').textContent = 'Atualizado em ' + new Date(dados.geradoEm).toLocaleString('pt-BR');
   }
 
