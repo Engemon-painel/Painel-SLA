@@ -198,78 +198,36 @@ ${C} .bh-rod{font-size:11px;color:var(--bh-sub);margin-top:10px;text-align:right
     opc('co', unicos(it, 'co'));
     opc('sup', unicos(it, 'sup'));
     opc('cr', ORDEM_CRIT.filter(c => it.some(i => i.cr === c)), nomeCrit);
-    // ===== FILTRO STATUS CORRIGIDO =====
-
-// Padroniza os status recebidos do JSON
-const normalizarStatus = valor => {
-    const s = String(valor || '')
-        .trim()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toUpperCase();
-
-    if (['ATIVO', 'ATIVA'].includes(s)) return 'Ativo';
-
-    if (['DEMITIDO', 'DEMITIDA', 'DESLIGADO', 'DESLIGADA'].includes(s))
-        return 'Demitido';
-
-    if (s === 'FERIAS') return 'Férias';
-
-    if (['AFASTADO', 'AFASTADA'].includes(s))
-        return 'Afastado';
-
-    return 'Não informado';
-};
-
-// Corrige o status dos registros sem excluir funcionários
-it.forEach(i => {
-    i.st = normalizarStatus(i.st ?? i.status);
-});
-
-// Preenche o filtro apenas com os status encontrados
-const statusValidos = [
-    'Ativo',
-    'Demitido',
-    'Férias',
-    'Afastado',
-    'Não informado'
-];
-
-const statusDisponiveis = statusValidos.filter(
-    status => it.some(i => i.st === status)
-);
-
-opc('st', statusDisponiveis);
-
-// Inicia mostrando somente funcionários ativos
-const seletorStatus = $('select[data-f="st"]', el);
-
-filtro.st = statusDisponiveis.includes('Ativo')
-    ? 'Ativo'
-    : '';
-
-seletorStatus.value = filtro.st;
+    // ----- filtro de status: padroniza os textos e começa mostrando só os ativos -----
+    const normalizarStatus = v => {
+      const s = String(v || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+      if (!s) return 'Não informado';
+      if (['ATIVO', 'ATIVA'].includes(s)) return 'Ativo';
+      if (['DEMITIDO', 'DEMITIDA', 'DESLIGADO', 'DESLIGADA'].includes(s)) return 'Demitido';
+      if (s === 'FERIAS') return 'Férias';
+      if (['AFASTADO', 'AFASTADA'].includes(s)) return 'Afastado';
+      return String(v).trim(); // outros status (ex.: PLACA) ficam como vieram
+    };
+    it.forEach(i => { i.st = normalizarStatus(i.st); });
+    const ORDEM_ST = ['Ativo', 'Férias', 'Afastado', 'Demitido'];
+    const statusDisponiveis = unicos(it, 'st').sort((a, b) =>
+      (ORDEM_ST.indexOf(a) < 0 ? 99 : ORDEM_ST.indexOf(a)) - (ORDEM_ST.indexOf(b) < 0 ? 99 : ORDEM_ST.indexOf(b)) || a.localeCompare(b, 'pt-BR'));
+    opc('st', statusDisponiveis);
+    const statusPadrao = () => statusDisponiveis.includes('Ativo') ? 'Ativo' : '';
+    filtro.st = statusPadrao();
+    $('select[data-f="st"]', el).value = filtro.st;
 
     el.querySelectorAll('[data-f]').forEach(c => c.addEventListener(c.tagName === 'INPUT' ? 'input' : 'change', () => {
       filtro[c.dataset.f] = c.value.trim();
       atualizar();
     }));
     $('.bh-limpar', el).addEventListener('click', () => {
-
-    Object.keys(filtro).forEach(k => filtro[k] = '');
-
-    const seletor = $('select[data-f="st"]', el);
-
-    filtro.st = [...seletor.options].some(
-        o => o.value === 'Ativo'
-    ) ? 'Ativo' : '';
-
-    el.querySelectorAll('[data-f]').forEach(c => {
-        c.value = c.dataset.f === 'st' ? filtro.st : '';
+      Object.keys(filtro).forEach(k => filtro[k] = '');
+      filtro.st = statusPadrao();
+      el.querySelectorAll('[data-f]').forEach(c => c.value = c.dataset.f === 'st' ? filtro.st : '');
+      atualizar();
     });
-
-    atualizar();
-});
+  } // fim do layout()
 
   function filtrados() {
     const b = filtro.busca.toLowerCase();
