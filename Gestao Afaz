@@ -29,7 +29,7 @@
   const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8';
   const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
-  let dados = null;
+  let dados = null, dadosBrutos = null;
   const graficos = {};
   const filtro = { tp: '', pr: '', st: '', ar: '', site: '', busca: '' };
 
@@ -440,18 +440,41 @@
     return lista.length > 0;
   }
 
+  // Lê o JSON mesmo quando o Power Automate grava embrulhado: {"result":"{...}"}, {"body":...} ou texto
+  async function lerJson(url) {
+    const r = await fetch(url + '?v=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ao abrir ' + url);
+    let d = JSON.parse((await r.text()).replace(/^\uFEFF/, ''));
+    for (let i = 0; i < 4; i++) {
+      if (typeof d === 'string') { d = JSON.parse(d); continue; }
+      if (d && typeof d === 'object' && !Array.isArray(d)) {
+        const emb = ['result', 'body', 'Result', 'Body', 'content', 'value'].find(k => k in d && Object.keys(d).length <= 3);
+        if (emb) { d = d[emb]; continue; }
+      }
+      break;
+    }
+    return d;
+  }
+  function diagnostico(el, nome, d) {
+    const tipo = Array.isArray(d) ? 'lista com ' + d.length + ' itens' : typeof d;
+    const chaves = d && typeof d === 'object' && !Array.isArray(d) ? Object.keys(d).slice(0, 15).join(', ') : '—';
+    el.insertAdjacentHTML('afterbegin', `<div style="padding:12px 14px;margin-bottom:12px;border-radius:10px;background:#fee2e2;color:#991b1b;font-size:13px">
+      ⚠ ${nome} foi lido, mas não tem registros no formato esperado.<br>Tipo recebido: <b>${tipo}</b> · campos no topo: <b>${chaves}</b><br>
+      Mande um print desta mensagem para ajustar.</div>`);
+  }
+
   async function iniciar() {
     const el = document.getElementById(CONTAINER);
     if (!el) return;
     if (typeof Chart === 'undefined') { el.innerHTML = '<p>Chart.js não carregado.</p>'; return; }
     try {
-      const r = await fetch(ARQUIVO + '?v=' + Date.now(), { cache: 'no-store' });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      dados = await r.json();
+      dados = await lerJson(ARQUIVO);
+      dadosBrutos = Array.isArray(dados) ? dados : Object.assign({}, dados);
     } catch (e) {
       el.innerHTML = `<p style="color:#dc2626">Não foi possível carregar ${ARQUIVO}: ${esc(e.message)}</p>`;
       return;
     }
+    if (Array.isArray(dados)) dados = { registros: dados };
     const formatoAntigo = normalizar(dados);
     injetarCSS();
     montarLayout(el);
@@ -459,6 +482,7 @@
     if (dados.geradoEm) {
       $('#afz-rodape').textContent = 'Dados gerados em ' + new Date(dados.geradoEm).toLocaleString('pt-BR');
     }
+    if (!dados.itens.length && !Object.keys(dados.tratados || {}).length) diagnostico(el, ARQUIVO, dadosBrutos);
     if (formatoAntigo) {
       el.insertAdjacentHTML('afterbegin', '<div style="padding:10px 14px;margin-bottom:12px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:13px">' +
         '⚠ O dados_afaz.json está no formato antigo (gerado pelo Office Script anterior). O painel funciona, mas o gráfico ' +
