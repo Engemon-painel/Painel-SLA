@@ -674,23 +674,38 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
     return (snapCache[sha] = it);
   }
   // ---- mês a mês: folhas fechadas do historico_bh.json + folha em andamento (dados_bh.json)
-  const chaveMat = m => String(m || '').split('-').pop().replace(/\D/g, '').replace(/^0+/, '');
-  const chaveNome = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  // matrícula pode vir "02 - 005225", "005225", "5225", "02005225"... gera várias chaves para casar
+  const chavesMat = m => {
+    const txt = String(m == null ? '' : m), tudo = txt.replace(/\D/g, ''), fim = txt.split('-').pop().replace(/\D/g, '');
+    const semZero = v => v.replace(/^0+/, '');
+    return [...new Set([tudo, semZero(tudo), fim, semZero(fim), tudo.slice(-6), semZero(tudo.slice(-6)), semZero(tudo.slice(-5))].filter(v => v && v.length >= 3))];
+  };
+  const chaveNome = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const chaveNomeCurta = n => { const p = chaveNome(n).split(' '); return p.length > 1 ? p[0] + ' ' + p[p.length - 1] : p[0]; };
   const isoBr = iso => String(iso || '').split('-').reverse().join('/');
-  let histArquivo = null;
+  let histArquivo = null, cruzamento = null;
   // só centro de custo da Claro (Descricao C.C); se o item não tiver C.C., mantém
   const ehClaro = cc => !cc || /CLARO/i.test(String(cc));
   const ccDe = i => i.cc || i.ccd || i.descCC || i.centroCusto || '';
   async function carregarFolhas() {
     if (!histArquivo) histArquivo = await lerJson(ARQ_HIST);
-    const porMat = {}, porNome = {};
-    dados.itens.forEach(i => { porMat[chaveMat(i.m)] = i; porNome[chaveNome(i.n)] = i; });
-    const achar = x => porMat[chaveMat(x.m)] || porNome[chaveNome(x.n)];
+    const porMat = {}, porNome = {}, porCurto = {};
+    dados.itens.forEach(i => {
+      chavesMat(i.m).forEach(k => { if (!porMat[k]) porMat[k] = i; });
+      porNome[chaveNome(i.n)] = i;
+      const c = chaveNomeCurta(i.n); porCurto[c] = porCurto[c] === undefined ? i : null; // nome curto só se for único
+    });
+    const achar = x => {
+      for (const k of chavesMat(x.m)) if (porMat[k]) return porMat[k];
+      return porNome[chaveNome(x.n)] || porCurto[chaveNomeCurta(x.n)] || null;
+    };
+    const naoAchados = new Map();
     const folhas = (histArquivo.periodos || []).map(p => ({
       per: p.comp,
       tit: 'Folha ' + isoBr(p.ini) + ' a ' + isoBr(p.fim) + ' · saldo atual no fechamento',
       itens: (p.itens || []).filter(x => ehClaro(x.cc)).map(x => {
         const a = achar(x);
+        if (!a && x.st !== 'DEMITIDO') naoAchados.set(x.m, x.n);
         return { m: x.m, n: x.n, sup: a ? (a.sup || '') : SEM_SUP, co: a ? (a.co || '') : '', st: normalizarStatus(x.st), h: +x.h || 0 };
       })
     }));
@@ -705,6 +720,11 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
       folhas.push({ per: comp, tit: 'Folha ' + pad2(ini.getDate()) + '/' + pad2(ini.getMonth() + 1) + ' a 14/' + pad2(fim.getMonth() + 1) + ' em andamento · saldo de hoje', itens: dados.itens });
     }
     hist = folhas.sort((a, b) => a.per.localeCompare(b.per)).slice(-MAX_PERIODOS);
+    const ex = dados.itens.slice(0, 3).map(i => i.m).join(', ');
+    cruzamento = naoAchados.size
+      ? `${naoAchados.size} funcionários ativos do histórico não foram encontrados no BH de hoje e ficaram em "${SEM_SUP}". ` +
+        `Exemplos do histórico: ${[...naoAchados].slice(0, 3).map(([m, n]) => m + ' ' + n).join(' · ')}. Matrículas no BH de hoje: ${ex}.`
+      : '';
   }
 
   async function carregarHistorico() {
@@ -772,6 +792,7 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
     $('#bh-ev-sub').textContent = `${nomeMet} · ${n} ${gran === 'mes' ? (n === 1 ? 'mês' : 'meses') : (n === 1 ? 'semana' : 'semanas')} de histórico (${rotPer(pers[0])}${n > 1 ? ' a ' + rotPer(pers[n - 1]) : ''}) ${gran === 'mes' ? ' · folhas de 15 a 14, saldo no fechamento' : ''} · só C.C. Claro · demitidos não entram · filtros de tipo e criticidade não se aplicam aqui${tab[SEM_SUP] ? ' · "' + SEM_SUP + '" = funcionários do histórico que não estão mais no BH de hoje (geralmente desligados), sem supervisor conhecido' : ''}`;
     const avisos = [];
     if (histErro) avisos.push(histErro);
+    if (gran === 'mes' && cruzamento && tab[SEM_SUP]) avisos.push(cruzamento);
     if (n < 2 && !histErro) avisos.push(`O histórico está começando: só existe ${rotPer(pers[0])}. A comparação aparece quando houver ${gran === 'mes' ? 'o próximo mês' : 'a próxima semana'} — enquanto isso, experimente "Semana a semana".`);
     msg.innerHTML = avisos.map(a => `<div class="bh-aviso">⚠ ${esc(a)}</div>`).join('');
 
