@@ -1318,6 +1318,16 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }
     if (Array.isArray(dados)) dados = { itens: dados };
     if (!Array.isArray(dados.itens)) dados.itens = itensDe(dados);
+    // o dados_bh.json publicado é de pendências (script trocado no fluxo)? avisa em vez de quebrar a tela
+    const pareceBH = i => i && typeof i === 'object' && 'h' in i && Array.isArray(i.bh);
+    if (dados.itens.length && !dados.itens.some(pareceBH)) {
+      el.innerHTML = `<div style="padding:14px 16px;border-radius:12px;background:#fee2e2;color:#991b1b;font-size:14px;line-height:1.5">
+        ⚠ <b>O ${ARQUIVO} publicado não tem o saldo de banco de horas.</b><br>
+        ${dados.itens[0] && 'tipo' in dados.itens[0] ? 'Ele está com a lista de <b>pendências</b> no lugar — o fluxo diário rodou o script de pendências e salvou com o nome ' + ARQUIVO + '.' : 'O conteúdo não está no formato esperado.'}<br>
+        Restaure o script original do ${ARQUIVO} no fluxo (Histórico de versões do OneDrive) e rode o fluxo de novo.</div>`;
+      return;
+    }
+    dados.itens.forEach(i => { if (!Array.isArray(i.bh)) i.bh = []; });
     css();
     layout(el);
     atualizar();
