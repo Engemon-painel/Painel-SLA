@@ -66,7 +66,7 @@
     'SAUDÁVEL': '#16a34a', 'NORMAL': '#16a34a', 'LEVE': '#4ade80', 'ATENÇÃO': '#facc15', 'CRÍTICO': '#f97316',
     'MUITO CRÍTICO': '#dc2626', 'IDADE INDETERMINADA': '#94a3b8'
   };
-  const ORDEM_CRIT = ['MUITO CRÍTICO', 'CRÍTICO', 'ATENÇÃO', 'LEVE', 'SAUDÁVEL', 'IDADE INDETERMINADA'];
+  const ORDEM_CRIT = ['MUITO CRÍTICO', 'CRÍTICO', 'ATENÇÃO', 'LEVE', 'NORMAL', 'SAUDÁVEL', 'IDADE INDETERMINADA'];
   const COR_FX_POS = ['#16a34a', '#84cc16', '#facc15', '#f59e0b', '#f97316', '#ef4444', '#b91c1c', '#94a3b8'];
   const COR_FX_NEG = ['#fca5a5', '#f87171', '#ef4444', '#b91c1c'];
   const VERDE = '#0f9d58', VERMELHO = '#dc2626', AZUL = '#0b3a75', LARANJA = '#ea580c';
@@ -765,7 +765,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   let histArquivo = null, cruzamento = null;
   // só centro de custo da Claro (Descricao C.C); se o item não tiver C.C., mantém
   const ehClaro = cc => !cc || /CLARO/i.test(String(cc));
-  const ccDe = i => i.cc || i.ccd || i.descCC || i.centroCusto || '';
+  const ccDe = i => i.cc || i.projeto || i.ccd || i.descCC || '';
   const foraDaEvolucao = i => chavesMat(i.m).some(k => excluidos.has(k));
   async function carregarFolhas() {
     if (!histArquivo) histArquivo = await lerJson(ARQ_HIST);
@@ -1048,7 +1048,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       if (mudou) salvarLocais(l);
     } catch (e) {
       pend = [];
-      pendErro = 'Não foi possível carregar ' + ARQ_PEND + ': ' + e.message;
+      pendErro = 'As pendências ainda não chegaram ao painel: o dados_bh.json publicado não traz o campo "pendencias". ' +
+        'Rode o fluxo diário uma vez (com o script único) para gerar o dados_bh.json novo.';
     }
     renderPend();
   }
@@ -1286,6 +1287,14 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }
     return d;
   }
+  // garante que fx seja uma faixa conhecida (o script antigo gravava texto de função no lugar)
+  function corrigirFaixa(i) {
+    if (FX_POS.includes(i.fx) || FX_NEG.includes(i.fx)) return;
+    if (String(i.tp).toUpperCase() === 'NEGATIVO') { i.fx = String(i.faixaNegativa || '').trim().toUpperCase() || i.fx; return; }
+    const f = String(i.faixaMaisCritica || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    const mapa = { '0 A 30': '0-30', '31 A 60': '31-60', '61 A 90': '61-90', '91 A 120': '91-120', '121 A 150': '121-150', '151 A 180': '151-180', '>180': '>180' };
+    i.fx = mapa[f] || (/PR[ÉE]/.test(f) ? FX_POS[7] : (f || i.fx));
+  }
   // acha a lista de colaboradores dentro do JSON
   function itensDe(d) {
     if (Array.isArray(d)) return d;
@@ -1319,6 +1328,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }
     if (Array.isArray(dados)) dados = { itens: dados };
     if (!Array.isArray(dados.itens)) dados.itens = itensDe(dados);
+    dados.itens.forEach(corrigirFaixa);
     css();
     layout(el);
     atualizar();
