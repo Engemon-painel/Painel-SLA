@@ -10,7 +10,7 @@
      📊 Visão geral            — o painel de antes
      ⏳ Por faixa de tempo      — colaboradores por idade das horas no banco
      📝 Pendências             — o gestor justifica as pendências de ponto
-        (campo "pendencias" do dados_bh.json, gerado pelo mesmo script); a justificativa vai para o fluxo do Power
+        (dados_pend_bh.json, gerado pelo script_pendencias_bh); a justificativa vai para o fluxo do Power
         Automate, que grava na aba "Justificativas" da planilha.
      📈 Evolução por supervisor — saldo mês a mês (ou semana a semana) e quem
         aumentou/diminuiu.
@@ -26,7 +26,7 @@
   const ARQUIVO = 'dados_bh.json';
   const ARQ_HIST = 'historico_bh.json';   // folhas fechadas (15 a 14)
   // ----- Pendências (justificativa do gestor) -----
-  const ARQ_PEND = 'dados_pend_bh.json';   // só usado se o dados_bh.json não trouxer "pendencias"
+  const ARQ_PEND = 'dados_pend_bh.json';   // gerado pelo script_pendencias_bh
   // Cole aqui a URL do gatilho "Quando uma solicitação HTTP for recebida" do fluxo "BH - Gravar justificativa"
   const FLUXO_JUSTIFICATIVA = '';
   // Tratativas que o gestor pode escolher em cada tipo de pendência
@@ -58,15 +58,15 @@
   const ACAO_POS = ['Saldo saudável', 'Acompanhar', 'Acompanhar', 'Planejar folgas', 'Programar folgas',
     'Compensação imediata', 'Compensação imediata', 'Validar origem das horas'];
   // Negativo: tamanho do débito
-  const FX_NEG = ['0 A -8H', '-8H01 A -16H', '-16H01 A -30H', '>-30H'];   // como vem da coluna Faixa_Negativa
-  const ROT_NEG = ['0 a -8 h', '-8 a -16 h', '-16 a -30 h', 'Abaixo de -30 h'];
+  const FX_NEG = ['0 A -8H', '-8H01 A -16H', '-16H01 A -24H', 'ABAIXO DE -24H'];
+  const ROT_NEG = ['0 a -8 h', '-8 a -16 h', '-16 a -24 h', 'Abaixo de -24 h'];
   const ACAO_NEG = ['Monitorar', 'Acompanhamento próximo', 'Plano de reposição', 'Reposição imediata'];
 
   const CRIT = {
-    'SAUDÁVEL': '#16a34a', 'NORMAL': '#16a34a', 'LEVE': '#4ade80', 'ATENÇÃO': '#facc15', 'CRÍTICO': '#f97316',
+    'SAUDÁVEL': '#16a34a', 'LEVE': '#4ade80', 'ATENÇÃO': '#facc15', 'CRÍTICO': '#f97316',
     'MUITO CRÍTICO': '#dc2626', 'IDADE INDETERMINADA': '#94a3b8'
   };
-  const ORDEM_CRIT = ['MUITO CRÍTICO', 'CRÍTICO', 'ATENÇÃO', 'LEVE', 'NORMAL', 'SAUDÁVEL', 'IDADE INDETERMINADA'];
+  const ORDEM_CRIT = ['MUITO CRÍTICO', 'CRÍTICO', 'ATENÇÃO', 'LEVE', 'SAUDÁVEL', 'IDADE INDETERMINADA'];
   const COR_FX_POS = ['#16a34a', '#84cc16', '#facc15', '#f59e0b', '#f97316', '#ef4444', '#b91c1c', '#94a3b8'];
   const COR_FX_NEG = ['#fca5a5', '#f87171', '#ef4444', '#b91c1c'];
   const VERDE = '#0f9d58', VERMELHO = '#dc2626', AZUL = '#0b3a75', LARANJA = '#ea580c';
@@ -1038,8 +1038,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
   async function carregarPend() {
     try {
-      // as pendências vêm dentro do dados_bh.json (script único); se não vierem, tenta o arquivo separado
-      const d = (dadosBrutos && !Array.isArray(dadosBrutos) && dadosBrutos.pendencias) ? dadosBrutos.pendencias : await lerJson(ARQ_PEND);
+      const d = await lerJson(ARQ_PEND);
       pend = Array.isArray(d) ? d : (d.itens || []);
       pendGerado = (d && d.geradoEm) || '';
       // limpa o que já voltou no JSON
@@ -1048,8 +1047,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       if (mudou) salvarLocais(l);
     } catch (e) {
       pend = [];
-      pendErro = 'As pendências ainda não chegaram ao painel: o dados_bh.json publicado não traz o campo "pendencias". ' +
-        'Rode o fluxo diário uma vez (com o script único) para gerar o dados_bh.json novo.';
+      pendErro = 'Não encontrei o ' + ARQ_PEND + ' no repositório. Ele é gerado pelo script_pendencias_bh no fluxo diário.';
     }
     renderPend();
   }
@@ -1287,14 +1285,6 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }
     return d;
   }
-  // garante que fx seja uma faixa conhecida (o script antigo gravava texto de função no lugar)
-  function corrigirFaixa(i) {
-    if (FX_POS.includes(i.fx) || FX_NEG.includes(i.fx)) return;
-    if (String(i.tp).toUpperCase() === 'NEGATIVO') { i.fx = String(i.faixaNegativa || '').trim().toUpperCase() || i.fx; return; }
-    const f = String(i.faixaMaisCritica || '').trim().toUpperCase().replace(/\s+/g, ' ');
-    const mapa = { '0 A 30': '0-30', '31 A 60': '31-60', '61 A 90': '61-90', '91 A 120': '91-120', '121 A 150': '121-150', '151 A 180': '151-180', '>180': '>180' };
-    i.fx = mapa[f] || (/PR[ÉE]/.test(f) ? FX_POS[7] : (f || i.fx));
-  }
   // acha a lista de colaboradores dentro do JSON
   function itensDe(d) {
     if (Array.isArray(d)) return d;
@@ -1328,7 +1318,6 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }
     if (Array.isArray(dados)) dados = { itens: dados };
     if (!Array.isArray(dados.itens)) dados.itens = itensDe(dados);
-    dados.itens.forEach(corrigirFaixa);
     css();
     layout(el);
     atualizar();
