@@ -9,6 +9,9 @@
    ALTERADO (18/10/2026): três abas.
      📊 Visão geral            — o painel de antes
      ⏳ Por faixa de tempo      — colaboradores por idade das horas no banco
+     📝 Pendências             — o gestor justifica as pendências de ponto
+        (campo "pendencias" do dados_bh.json, gerado pelo mesmo script); a justificativa vai para o fluxo do Power
+        Automate, que grava na aba "Justificativas" da planilha.
      📈 Evolução por supervisor — saldo mês a mês (ou semana a semana) e quem
         aumentou/diminuiu.
         · Mês a mês: historico_bh.json (gerado da planilha de histórico, coluna
@@ -22,6 +25,25 @@
 
   const ARQUIVO = 'dados_bh.json';
   const ARQ_HIST = 'historico_bh.json';   // folhas fechadas (15 a 14)
+  // ----- Pendências (justificativa do gestor) -----
+  const ARQ_PEND = 'dados_pend_bh.json';   // só usado se o dados_bh.json não trouxer "pendencias"
+  // Cole aqui a URL do gatilho "Quando uma solicitação HTTP for recebida" do fluxo "BH - Gravar justificativa"
+  const FLUXO_JUSTIFICATIVA = '';
+  // Tratativas que o gestor pode escolher em cada tipo de pendência
+  // Tratativas que o gestor pode escolher (as mesmas da fórmula do Status_Automatico)
+  const TRATATIVAS = {
+    'HORA EXTRA': ['PAGAMENTO HE', 'BANCO DE HORAS', 'AJUSTAR PONTO', 'APENAS JUSTIFICAR'],
+    'PONTO ABERTO': ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'],
+    'SEM MARCACAO': ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'],
+    'INTERJORNADA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO'],
+    'FOLGA NAO CUMPRIDA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO', 'AUSENTE']
+  };
+  const TRAT_PADRAO = ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'];
+  const TAREFAS_HE = [
+    'HE01 — Hora Extra Operacional oriunda de atividade Programada',
+    'HE02 — Hora Extra Operacional oriunda de chamado Emergencial',
+    'HE1 — HORA EXTRA COBERTURA'
+  ];
   const SEM_SUP = 'Sem supervisor (saiu do BH)';   // está no histórico mas não no dados_bh.json de hoje, então não dá para saber o supervisor
   const CONTAINER = 'sec-bh';
 
@@ -36,12 +58,12 @@
   const ACAO_POS = ['Saldo saudável', 'Acompanhar', 'Acompanhar', 'Planejar folgas', 'Programar folgas',
     'Compensação imediata', 'Compensação imediata', 'Validar origem das horas'];
   // Negativo: tamanho do débito
-  const FX_NEG = ['0 A -8H', '-8H01 A -16H', '-16H01 A -24H', 'ABAIXO DE -24H'];
-  const ROT_NEG = ['0 a -8 h', '-8 a -16 h', '-16 a -24 h', 'Abaixo de -24 h'];
+  const FX_NEG = ['0 A -8H', '-8H01 A -16H', '-16H01 A -30H', '>-30H'];   // como vem da coluna Faixa_Negativa
+  const ROT_NEG = ['0 a -8 h', '-8 a -16 h', '-16 a -30 h', 'Abaixo de -30 h'];
   const ACAO_NEG = ['Monitorar', 'Acompanhamento próximo', 'Plano de reposição', 'Reposição imediata'];
 
   const CRIT = {
-    'SAUDÁVEL': '#16a34a', 'LEVE': '#4ade80', 'ATENÇÃO': '#facc15', 'CRÍTICO': '#f97316',
+    'SAUDÁVEL': '#16a34a', 'NORMAL': '#16a34a', 'LEVE': '#4ade80', 'ATENÇÃO': '#facc15', 'CRÍTICO': '#f97316',
     'MUITO CRÍTICO': '#dc2626', 'IDADE INDETERMINADA': '#94a3b8'
   };
   const ORDEM_CRIT = ['MUITO CRÍTICO', 'CRÍTICO', 'ATENÇÃO', 'LEVE', 'SAUDÁVEL', 'IDADE INDETERMINADA'];
@@ -182,6 +204,37 @@ ${C} .bh-d.up{color:${LARANJA}}${C} .bh-d.dn{color:${VERDE}}
 ${C} .bh-cmp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:#475569;margin:0 0 10px}
 ${C} .bh-cmp select{padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:12px;background:#fff}
 ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;border-top:2px solid #94a3b8}
+${C} .bh-cont{margin-left:auto;background:#dc2626;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px}
+${C} .bh-pd-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}
+${C} .bh-pd-kpis .bh-k{border:0;text-align:left;font:inherit;cursor:pointer;opacity:.75;transition:opacity .15s,transform .15s}
+${C} .bh-pd-kpis .bh-k b{font-size:26px}
+${C} .bh-pd-kpis .bh-k:hover,${C} .bh-pd-kpis .bh-k.on{opacity:1}
+${C} .bh-pd-kpis .bh-k.on{box-shadow:0 0 0 3px #fff,0 0 0 5px #0b3a75}
+${C} .bh-sel{padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:12px;background:#fff}
+${C} .bh-pd-det{max-width:300px;white-space:normal;min-width:200px;font-size:11.5px;color:#334155}
+${C} .bh-pd-just{max-width:260px;white-space:normal;min-width:160px}
+${C} .bh-pd-just small,${C} .bh-pd-env,${C} .bh-pd-err{display:block;font-size:11px;color:#64748b;white-space:normal}
+${C} .bh-pd-env{color:#2563eb}${C} .bh-pd-err{color:#dc2626;font-weight:600;max-width:200px}
+${C} .bh-pd-btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;color:#0b3a75;white-space:nowrap}
+${C} .bh-pd-btn:hover{border-color:#0b3a75}
+${C} .bh-pd-btn.on{background:#0b3a75;color:#fff;border-color:#0b3a75}
+${C} .bh-pd-btn:disabled{opacity:.6;cursor:wait}
+${C} .bh-pd-lote{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:10px;padding:8px 12px;background:#eff6ff;border-radius:10px;font-size:13px}
+${C} .bh-modal{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 14px;overflow:auto}
+${C} .bh-modal-box{background:#fff;border-radius:16px;width:min(720px,100%);padding:18px 20px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+${C} .bh-modal-topo{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+${C} .bh-modal-topo h3{margin:0;font-size:17px;color:#0b2545}
+${C} .bh-x{border:0;background:transparent;font-size:18px;cursor:pointer;color:#64748b}
+${C} .bh-modal-lista{max-height:150px;overflow:auto;background:#f8fafc;border-radius:10px;padding:8px 12px;font-size:12px;margin-bottom:12px}
+${C} .bh-modal-lista div{margin:3px 0}${C} .bh-modal-lista span{color:#64748b}
+${C} .bh-form{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+${C} .bh-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#334155}
+${C} .bh-form label.largo{grid-column:1/-1}
+${C} .bh-form select,${C} .bh-form input,${C} .bh-form textarea{padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:13px;font-weight:400;color:#0f172a;background:#fff}
+${C} .bh-form textarea{resize:vertical}
+${C} .bh-prev{margin:12px 0 4px;font-size:12px;font-weight:700}
+${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+@media (max-width:700px){${C} .bh-form{grid-template-columns:1fr}${C} .bh-pd-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:1100px){${C} .bh-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}${C} .bh-g>*{grid-column:1/-1!important}}
 @media (max-width:600px){${C} .bh-kpis{grid-template-columns:1fr}}`;
     document.head.appendChild(s);
@@ -200,6 +253,7 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
       <button type="button" data-aba="geral" class="on"><span class="ic">📊</span>Visão Geral</button>
       <button type="button" data-aba="faixa"><span class="ic">👥</span>Funcionários por Faixa</button>
       <button type="button" data-aba="evol"><span class="ic">📈</span>Evolução por Supervisor</button>
+      <button type="button" data-aba="pend"><span class="ic">📝</span>Pendências<span class="bh-cont" hidden></span></button>
     </nav>
     <div class="bh-conteudo">
     <div class="bh-filtros">
@@ -282,6 +336,26 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
         </div>
         <div class="bh-chips" id="bh-chips"></div>
         <div class="bh-tab" style="max-height:620px;margin-top:12px"><table><thead id="bh-fx-head"></thead><tbody id="bh-fx-body"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ================= ABA: PENDÊNCIAS ================= -->
+    <div class="bh-aba" data-p="pend" hidden>
+      <div id="bh-pd-msg"></div>
+      <div class="bh-pd-kpis" id="bh-pd-kpis"></div>
+      <div class="bh-c">
+        <div class="bh-evtopo">
+          <div>
+            <h3>Pendências de ponto para o gestor justificar</h3>
+            <p class="sub" id="bh-pd-sub" style="margin:0">Carregando pendências…</p>
+          </div>
+          <div class="ctl">
+            <select id="bh-pd-tipo" class="bh-sel"></select>
+            <div class="bh-seg" id="bh-pd-sit"></div>
+          </div>
+        </div>
+        <div class="bh-pd-lote" id="bh-pd-lote" hidden></div>
+        <div class="bh-tab" style="max-height:640px;margin-top:10px"><table><thead id="bh-pd-head"></thead><tbody id="bh-pd-body"></tbody></table></div>
       </div>
     </div>
 
@@ -899,6 +973,285 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
       (sups.length > 1 ? `<tr class="tot"><td>Total</td>${pers.map((_, k) => celula(total, k)).join('')}${tendencia(total)}</tr>` : '');
   }
 
+  // =====================================================================
+  // ABA: PENDÊNCIAS — o gestor justifica cada pendência de ponto
+  // Leitura: dados_pend_bh.json (Office Script exportar_pendencias_bh.ts).
+  // Gravação: POST para o fluxo do Power Automate (FLUXO_JUSTIFICATIVA), que
+  // roda o Office Script gravar_justificativa_bh.ts e grava na aba
+  // "Justificativas" da planilha (uma linha por pendência, chave = ID).
+  // =====================================================================
+  const COLS_J = ['ID', 'Matricula', 'Colaborador', 'Data', 'Pendencia', 'Supervisor', 'Pagamento_HE_Permitido',
+    'Justificativa_Obrigatoria', 'Tratativa_Gestor', 'Tarefa_HE', 'Chamado', 'Local_Atendimento', 'Horario_Ajuste_Marcacoes',
+    'Justificativa_Gestor', 'Respondido_Por', 'Data_Resposta_Gestor', 'Status_RH', 'Observacao_RH', 'Data_Ajuste_RH',
+    'Status_Automatico', 'Status Pendência'];
+  const ORDEM_SIT = ['Erro na Justificativa', 'Pendente', 'Justificado', 'Concluído'];
+  const COR_SIT = { 'Pendente': '#f59e0b', 'Erro na Justificativa': '#dc2626', 'Justificado': '#0f9d58', 'Concluído': '#334155' };
+  const SITS = [['tratar', 'A tratar'], ['Pendente', 'Pendente'], ['Erro na Justificativa', 'Com erro'], ['Justificado', 'Justificado'], ['Concluído', 'Concluído RH'], ['', 'Todas']];
+
+  let pend = null, pendErro = '', pendGerado = '';
+  const pendSel = new Set();
+  const pendFiltro = { tipo: '', sit: 'tratar' };
+
+  const up = v => String(v == null ? '' : v).trim().toUpperCase();
+  const dataBr = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(iso || ''); };
+  const agoraBr = () => { const d = new Date(); return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
+
+  // MESMA regra da fórmula do Status_Automatico da planilha (e dos Office Scripts).
+  // Colunas da fórmula: B=Pendencia R=Pagamento_HE_Permitido T=Tratativa U=Tarefa_HE X=Horário Y=Justificativa AA=Status_RH
+  function calcularStatus(j, hePerm, tipo) {
+    const trat = up(j.trat), rh = up(j.stRH), pend = up(tipo);
+    const auto =
+      !trat ? 'AGUARDANDO GESTOR' :
+      !String(j.texto || '').trim() ? 'INCOMPLETO - FALTA JUSTIFICATIVA' :
+      rh === 'NÃO REALIZADO - DEVOLVIDO' ? 'DEVOLVIDO AO GESTOR' :
+      trat === 'PAGAMENTO HE' && pend !== 'HORA EXTRA' ? 'INVÁLIDO - PAGAMENTO HE SOMENTE PARA HORA EXTRA' :
+      trat === 'BANCO DE HORAS' && pend !== 'HORA EXTRA' ? 'INVÁLIDO - BANCO DE HORAS SOMENTE PARA HORA EXTRA' :
+      trat === 'PAGAMENTO HE' && up(hePerm) === 'NÃO' ? 'INVÁLIDO - BH NEGATIVO NÃO PERMITE PAGAMENTO' :
+      trat === 'PAGAMENTO HE' && !String(j.tarefa || '').trim() ? 'INCOMPLETO - FALTA TAREFA HE' :
+      trat === 'AJUSTAR PONTO' && (pend === 'PONTO ABERTO' || pend === 'SEM MARCACAO') && !String(j.horario || '').trim() ? 'INCOMPLETO - FALTA HORÁRIO/MARCAÇÃO' :
+      ['PAGAMENTO HE', 'AJUSTAR PONTO', 'AUSENTE'].includes(trat) && rh === 'AJUSTADO' ? 'CONCLUÍDO' :
+      trat === 'PAGAMENTO HE' ? 'PRONTO PARA RH - HE' :
+      trat === 'AJUSTAR PONTO' ? 'AGUARDANDO RH - AJUSTE DE PONTO' :
+      trat === 'AUSENTE' ? 'AGUARDANDO RH - AUSÊNCIA' :
+      trat === 'BANCO DE HORAS' ? 'TRATADO - BANCO DE HORAS' :
+      trat === 'APENAS JUSTIFICAR' ? 'TRATADO - JUSTIFICADO' : 'CONCLUÍDO';
+    return [auto, statusPendencia(auto)];
+  }
+  // Status Pendência a partir do Status_Automatico
+  function statusPendencia(auto) {
+    if (auto === 'AGUARDANDO GESTOR') return 'Pendente';
+    if (/^(INCOMPLETO|INVÁLIDO|DEVOLVIDO)/.test(auto)) return 'Erro na Justificativa';
+    if (auto === 'CONCLUÍDO') return 'Concluído';
+    return 'Justificado';
+  }
+
+  // justificativas enviadas por este navegador e ainda não vistas no JSON
+  const CH_LOCAL = 'bhJustEnviadas';
+  const locais = () => { try { return JSON.parse(localStorage.getItem(CH_LOCAL) || '{}'); } catch (e) { return {}; } };
+  const salvarLocais = o => { try { localStorage.setItem(CH_LOCAL, JSON.stringify(o)); } catch (e) { } };
+  function justDe(it) {
+    const l = locais()[it.id];
+    if (l && (!pendGerado || new Date(pendGerado) < new Date(l.em))) return Object.assign({}, l.j, { enviado: true });
+    return it.just || {};
+  }
+  const sitDe = it => { const j = justDe(it); return j.status || calcularStatus(j, it.hePerm, it.tipo)[1]; };
+
+  async function carregarPend() {
+    try {
+      // as pendências vêm dentro do dados_bh.json (script único); se não vierem, tenta o arquivo separado
+      const d = (dadosBrutos && !Array.isArray(dadosBrutos) && dadosBrutos.pendencias) ? dadosBrutos.pendencias : await lerJson(ARQ_PEND);
+      pend = Array.isArray(d) ? d : (d.itens || []);
+      pendGerado = (d && d.geradoEm) || '';
+      // limpa o que já voltou no JSON
+      const l = locais(); let mudou = false;
+      Object.keys(l).forEach(id => { if (pendGerado && new Date(pendGerado) >= new Date(l[id].em)) { delete l[id]; mudou = true; } });
+      if (mudou) salvarLocais(l);
+    } catch (e) {
+      pend = [];
+      pendErro = 'Não foi possível carregar ' + ARQ_PEND + ': ' + e.message;
+    }
+    renderPend();
+  }
+
+  function pendFiltrados() {
+    const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
+    return (pend || []).filter(i =>
+      (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
+      (!filtro.st || normalizarStatus(i.st) === filtro.st) && (!filtro.tp || i.tpSaldo === filtro.tp) &&
+      (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)));
+  }
+
+  function renderPend() {
+    const msg = $('#bh-pd-msg');
+    if (!msg) return;
+    if (!pend) { $('#bh-pd-sub').textContent = 'Carregando pendências…'; return; }
+    const avisos = [];
+    if (pendErro) avisos.push(pendErro);
+    if (!FLUXO_JUSTIFICATIVA) avisos.push('O envio das justificativas ainda não está ligado (falta a URL do fluxo do Power Automate em FLUXO_JUSTIFICATIVA). Enquanto isso, use "Copiar para Excel" no formulário e cole na aba Justificativas.');
+    msg.innerHTML = avisos.map(a => `<div class="bh-aviso">⚠ ${esc(a)}</div>`).join('');
+
+    const base = pendFiltrados();
+    const cont = {}; ORDEM_SIT.forEach(s => cont[s] = 0);
+    base.forEach(i => { cont[sitDe(i)] = (cont[sitDe(i)] || 0) + 1; });
+    const aTratar = cont['Pendente'] + cont['Erro na Justificativa'];
+
+    // contador no menu
+    const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="pend"] .bh-cont');
+    if (nav) { nav.textContent = aTratar; nav.hidden = !aTratar; }
+
+    // cards
+    const cards = [['tratar', 'A tratar', aTratar, '#b45309'], ['Pendente', 'Pendentes', cont['Pendente'], COR_SIT['Pendente']],
+      ['Erro na Justificativa', 'Com erro', cont['Erro na Justificativa'], COR_SIT['Erro na Justificativa']],
+      ['Justificado', 'Justificadas', cont['Justificado'], COR_SIT['Justificado']], ['Concluído', 'Concluídas RH', cont['Concluído'], COR_SIT['Concluído']]];
+    $('#bh-pd-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${pendFiltro.sit === c[0] ? ' on' : ''}" data-s="${esc(c[0])}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[0] === 'tratar' ? 'pendentes + com erro' : pct(c[2], base.length) + '% do total'}</span></button>`).join('');
+    $('#bh-pd-kpis').querySelectorAll('button').forEach(b => b.onclick = () => { pendFiltro.sit = b.dataset.s; pendSel.clear(); renderPend(); });
+
+    // tipo de pendência
+    const tipos = {}; base.forEach(i => tipos[i.tipo] = (tipos[i.tipo] || 0) + 1);
+    const sTipo = $('#bh-pd-tipo');
+    sTipo.innerHTML = `<option value="">Tipo: todos (${nf(base.length)})</option>` + Object.keys(tipos).sort().map(t => `<option value="${esc(t)}"${pendFiltro.tipo === t ? ' selected' : ''}>${esc(t)} (${nf(tipos[t])})</option>`).join('');
+    sTipo.onchange = () => { pendFiltro.tipo = sTipo.value; pendSel.clear(); renderPend(); };
+    const seg = $('#bh-pd-sit');
+    seg.innerHTML = SITS.map(([v, r]) => `<button type="button" data-s="${esc(v)}" class="${pendFiltro.sit === v ? 'on' : ''}">${r}</button>`).join('');
+    seg.querySelectorAll('button').forEach(b => b.onclick = () => { pendFiltro.sit = b.dataset.s; pendSel.clear(); renderPend(); });
+
+    const lista = base.filter(i => {
+      const s = sitDe(i);
+      return (!pendFiltro.tipo || i.tipo === pendFiltro.tipo) &&
+        (!pendFiltro.sit || (pendFiltro.sit === 'tratar' ? (s === 'Pendente' || s === 'Erro na Justificativa') : s === pendFiltro.sit));
+    }).sort((a, b) => ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (b.dias || 0) - (a.dias || 0) || String(a.n).localeCompare(String(b.n), 'pt-BR'));
+    [...pendSel].forEach(id => { if (!lista.some(i => i.id === id)) pendSel.delete(id); });
+
+    $('#bh-pd-sub').textContent = `${nf(lista.length)} pendências na lista · marque várias do mesmo tipo para justificar de uma vez` + (pendGerado ? ' · base de ' + new Date(pendGerado).toLocaleString('pt-BR') : '');
+
+    $('#bh-pd-head').innerHTML = `<tr><th style="width:26px"><input type="checkbox" id="bh-pd-todos" title="Marcar todas"></th><th>Situação</th><th>Pendência</th><th>Colaborador</th><th>Data</th><th>Detalhe / o que verificar</th><th>Supervisor</th><th class="num">Saldo BH</th><th class="num">Dias</th><th>Justificativa</th><th></th></tr>`;
+    const MAX = 600;
+    $('#bh-pd-body').innerHTML = lista.slice(0, MAX).map(i => {
+      const j = justDe(i), s = sitDe(i), auto = j.auto || calcularStatus(j, i.hePerm, i.tipo)[0];
+      const fechado = s === 'Concluído';  // CONCLUÍDO (RH marcou AJUSTADO)
+      return `<tr data-id="${esc(i.id)}">
+        <td>${fechado ? '' : `<input type="checkbox" class="bh-pd-ck"${pendSel.has(i.id) ? ' checked' : ''}>`}</td>
+        <td>${tag(s, COR_SIT[s] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}${s === 'Erro na Justificativa' ? `<small class="bh-pd-err">${esc(auto)}</small>` : ''}</td>
+        <td><b>${esc(i.tipo)}</b></td>
+        <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)} · ${esc(i.area || '')}</small></td>
+        <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
+        <td class="bh-pd-det" title="${esc(i.det)}">${esc(i.det)}</td>
+        <td>${esc(i.sup || '—')}</td>
+        <td class="num ${i.saldo < 0 ? 'neg' : 'pos'}">${hMin(+i.saldo || 0)}<small style="display:block;font-weight:500;color:#64748b">HE paga: ${esc(i.hePerm)}</small></td>
+        <td class="num">${nf(i.dias)}</td>
+        <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b>${j.tarefa ? ' · ' + esc(String(j.tarefa).split('—')[0].trim()) : ''}${j.chamado ? ' · ch. ' + esc(j.chamado) : ''}<small>${esc(j.texto || '')}</small>${j.por ? `<small>por ${esc(j.por)}${j.dataResp ? ' em ' + esc(j.dataResp) : ''}</small>` : ''}${j.obsRH ? `<small>RH: ${esc(j.obsRH)}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
+        <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
+    }).join('') || '<tr><td colspan="11">Nenhuma pendência nesse filtro 🎉</td></tr>';
+    if (lista.length > MAX) $('#bh-pd-body').insertAdjacentHTML('beforeend', `<tr><td colspan="11" style="color:#64748b">Mostrando ${MAX} de ${nf(lista.length)} · use os filtros para reduzir</td></tr>`);
+
+    $('#bh-pd-body').querySelectorAll('tr[data-id]').forEach(tr => {
+      const id = tr.dataset.id, ck = tr.querySelector('.bh-pd-ck'), bt = tr.querySelector('.bh-pd-btn');
+      if (ck) ck.onchange = () => { ck.checked ? pendSel.add(id) : pendSel.delete(id); loteBar(lista); };
+      if (bt) bt.onclick = () => abrirForm([id]);
+    });
+    const todos = $('#bh-pd-todos');
+    todos.onchange = () => { lista.slice(0, MAX).forEach(i => { if (sitDe(i) !== 'Concluído') todos.checked ? pendSel.add(i.id) : pendSel.delete(i.id); }); renderPend(); };
+    loteBar(lista);
+  }
+
+  function loteBar(lista) {
+    const bar = $('#bh-pd-lote');
+    if (!pendSel.size) { bar.hidden = true; return; }
+    const sel = lista.filter(i => pendSel.has(i.id));
+    const tipos = [...new Set(sel.map(i => i.tipo))];
+    bar.hidden = false;
+    bar.innerHTML = `<b>${nf(sel.length)} selecionada(s)</b>` +
+      (tipos.length > 1 ? `<span class="bh-pd-err">Selecione só um tipo de pendência para justificar junto (marcou: ${esc(tipos.join(', '))})</span>`
+        : `<button type="button" class="bh-pd-btn on" id="bh-pd-lote-ok">Justificar selecionadas</button>`) +
+      `<button type="button" class="bh-pd-btn" id="bh-pd-lote-limpar">Limpar seleção</button>`;
+    const ok = $('#bh-pd-lote-ok'); if (ok) ok.onclick = () => abrirForm([...pendSel]);
+    $('#bh-pd-lote-limpar').onclick = () => { pendSel.clear(); renderPend(); };
+  }
+
+  function abrirForm(ids) {
+    const itens = ids.map(id => pend.find(i => i.id === id)).filter(Boolean);
+    if (!itens.length) return;
+    const tipo = itens[0].tipo;
+    const permitido = itens.every(i => up(i.hePerm) === 'SIM');
+    const atual = itens.length === 1 ? justDe(itens[0]) : {};
+    const trats = TRATATIVAS[tipo] || TRAT_PADRAO;
+    const gestores = [...new Set((pend || []).map(i => String(i.sup || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const porPadrao = atual.por || String(filtro.sup || itens[0].sup || '').trim();
+    const ehHE = tipo === 'HORA EXTRA';
+
+    const modal = document.createElement('div');
+    modal.className = 'bh-modal';
+    modal.innerHTML = `<div class="bh-modal-box" role="dialog" aria-modal="true">
+      <div class="bh-modal-topo"><h3>Justificar · ${esc(tipo)}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
+      <div class="bh-modal-lista">${itens.slice(0, 8).map(i => `<div><b>${esc(i.n)}</b> · ${dataBr(i.d)} (${esc(i.dia || '')}) · <span>${esc(i.det)}</span></div>`).join('')}${itens.length > 8 ? `<div>… e mais ${itens.length - 8}</div>` : ''}</div>
+      ${ehHE && !permitido ? '<div class="bh-aviso">⚠ BH negativo: a HE não pode ser paga. Use "BANCO DE HORAS" para compensar o débito.</div>' : ''}
+      <div class="bh-form">
+        <label>Quem está justificando<select data-c="por">${gestores.map(g => `<option${g === porPadrao ? ' selected' : ''}>${esc(g)}</option>`).join('')}${gestores.includes(porPadrao) || !porPadrao ? '' : `<option selected>${esc(porPadrao)}</option>`}</select></label>
+        <label>Tratativa<select data-c="trat"><option value="">— escolha —</option>${trats.map(t => `<option value="${esc(t)}"${atual.trat === t ? ' selected' : ''}${t === 'PAGAMENTO HE' && !permitido ? ' disabled' : ''}>${esc(t)}${t === 'PAGAMENTO HE' && !permitido ? ' (bloqueado: BH negativo)' : ''}</option>`).join('')}</select></label>
+        <label data-campo="tarefa">Tarefa da HE<select data-c="tarefa"><option value="">— escolha —</option>${TAREFAS_HE.map(t => `<option${atual.tarefa === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>
+        <label data-campo="chamado">Chamado<input data-c="chamado" value="${esc(atual.chamado || '')}" placeholder="Nº do chamado"></label>
+        <label data-campo="local">Local de atendimento<input data-c="local" value="${esc(atual.local || '')}" placeholder="Ex.: SPO VMN, SMFRC12"></label>
+        <label data-campo="horario">Horário para ajuste das marcações<input data-c="horario" value="${esc(atual.horario || '')}" placeholder="Ex.: entrada 06:00 / saída 14:20"></label>
+        <label class="largo">Justificativa<textarea data-c="texto" rows="3" placeholder="Explique o motivo (obrigatório)">${esc(atual.texto || '')}</textarea></label>
+      </div>
+      <div class="bh-prev" id="bh-prev"></div>
+      <div class="bh-modal-pe">
+        <button type="button" class="bh-pd-btn" data-a="copiar" title="Copia as linhas no formato da aba Justificativas">📋 Copiar para Excel</button>
+        <span style="flex:1"></span>
+        <button type="button" class="bh-pd-btn" data-a="cancelar">Cancelar</button>
+        <button type="button" class="bh-pd-btn on" data-a="enviar">Enviar justificativa${itens.length > 1 ? ' (' + itens.length + ')' : ''}</button>
+      </div>
+    </div>`;
+    document.getElementById(CONTAINER).appendChild(modal);
+
+    const campo = c => modal.querySelector(`[data-c="${c}"]`);
+    const ler = () => ({ por: campo('por').value.trim(), trat: campo('trat').value, tarefa: campo('tarefa').value, chamado: campo('chamado').value.trim(),
+      local: campo('local').value.trim(), horario: campo('horario').value.trim(), texto: campo('texto').value.trim() });
+    const mostrar = () => {
+      const j = ler();
+      modal.querySelector('[data-campo="tarefa"]').hidden = !(ehHE && (j.trat === 'PAGAMENTO HE' || j.trat === 'BANCO DE HORAS'));
+      modal.querySelector('[data-campo="chamado"]').hidden = !ehHE;
+      modal.querySelector('[data-campo="horario"]').hidden = j.trat !== 'AJUSTAR PONTO';
+      const r = itens.map(i => calcularStatus(j, i.hePerm, i.tipo));
+      const ruim = r.find(x => x[1] !== 'Justificado' && x[1] !== 'Concluído');
+      $('#bh-prev').innerHTML = ruim
+        ? `<span style="color:${COR_SIT[ruim[1]]}">● ${esc(ruim[0])}</span>`
+        : `<span style="color:${VERDE}">● ${esc(r[0][0])}</span>`;
+      return { j, ok: !ruim };
+    };
+    modal.querySelectorAll('[data-c]').forEach(e => e.addEventListener(e.tagName === 'SELECT' ? 'change' : 'input', mostrar));
+    mostrar();
+    const fechar = () => modal.remove();
+    modal.querySelector('.bh-x').onclick = fechar;
+    modal.querySelector('[data-a="cancelar"]').onclick = fechar;
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+
+    const linha = (i, j) => {
+      const [auto, status] = calcularStatus(j, i.hePerm, i.tipo);
+      return { ID: i.id, Matricula: i.m, Colaborador: i.n, Data: i.d, Pendencia: i.tipo, Supervisor: String(i.sup || '').trim(),
+        Pagamento_HE_Permitido: i.hePerm, Justificativa_Obrigatoria: 'SIM', Tratativa_Gestor: j.trat,
+        Tarefa_HE: j.trat === 'PAGAMENTO HE' || j.trat === 'BANCO DE HORAS' ? j.tarefa : '', Chamado: j.chamado, Local_Atendimento: j.local,
+        Horario_Ajuste_Marcacoes: j.trat === 'AJUSTAR PONTO' ? j.horario : '', Justificativa_Gestor: j.texto, Respondido_Por: j.por,
+        Data_Resposta_Gestor: agoraBr(), Status_RH: '', Observacao_RH: '', Data_Ajuste_RH: '', Status_Automatico: auto, 'Status Pendência': status };
+    };
+
+    modal.querySelector('[data-a="copiar"]').onclick = async () => {
+      const { j } = mostrar();
+      const tsv = itens.map(i => { const l = linha(i, j); return COLS_J.map(c => String(l[c] == null ? '' : l[c]).replace(/[\t\n\r]+/g, ' ')).join('\t'); }).join('\n');
+      try { await navigator.clipboard.writeText(tsv); $('#bh-prev').insertAdjacentHTML('beforeend', ' · <b>copiado!</b> cole na primeira linha vazia da aba Justificativas'); }
+      catch (e) { window.prompt('Copie (Ctrl+C):', tsv); }
+    };
+
+    const btEnv = modal.querySelector('[data-a="enviar"]');
+    btEnv.onclick = async () => {
+      const { j, ok } = mostrar();
+      if (!j.trat) { $('#bh-prev').innerHTML = `<span style="color:${VERMELHO}">● Escolha a tratativa.</span>`; return; }
+      if (!ok) return;   // a mensagem do problema já está na tela
+      if (!FLUXO_JUSTIFICATIVA) { $('#bh-prev').innerHTML = `<span style="color:${VERMELHO}">● O envio ainda não está configurado. Use "Copiar para Excel".</span>`; return; }
+      btEnv.disabled = true; btEnv.textContent = 'Enviando…';
+      try {
+        const corpo = { itens: itens.map(i => linha(i, j)) };
+        const r = await fetch(FLUXO_JUSTIFICATIVA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(corpo) });
+        const txt = await r.text();
+        let resp = null; try { resp = JSON.parse(txt); } catch (e) { }
+        if (!r.ok || (resp && resp.ok === false)) throw new Error((resp && resp.erro) || ('o fluxo respondeu ' + r.status));
+        const l = locais(), em = new Date().toISOString();
+        corpo.itens.forEach(x => {
+          l[x.ID] = { em, j: { trat: x.Tratativa_Gestor, tarefa: x.Tarefa_HE, chamado: x.Chamado, local: x.Local_Atendimento, horario: x.Horario_Ajuste_Marcacoes,
+            texto: x.Justificativa_Gestor, por: x.Respondido_Por, dataResp: x.Data_Resposta_Gestor, auto: x.Status_Automatico, status: x['Status Pendência'] } };
+        });
+        salvarLocais(l);
+        ids.forEach(id => pendSel.delete(id));
+        fechar();
+        renderPend();
+      } catch (e) {
+        btEnv.disabled = false; btEnv.textContent = 'Tentar de novo';
+        $('#bh-prev').innerHTML = `<span style="color:${VERMELHO}">● Não foi possível enviar: ${esc(e.message)}. Se continuar, use "Copiar para Excel".</span>`;
+      }
+    };
+    setTimeout(() => campo('trat').focus(), 50);
+  }
+
   function atualizar() {
     const itens = filtrados();
     const pos = itens.filter(i => i.tp !== 'NEGATIVO');
@@ -915,6 +1268,7 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
     resumo(itens, pos, neg);
     renderFaixas(itens);
     if (hist) renderEvolucao();
+    if (pend) renderPend();
   }
 
   // Lê o JSON mesmo quando o Power Automate grava embrulhado: {"result":"{...}"}, {"body":...} ou texto
@@ -969,6 +1323,7 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
     layout(el);
     atualizar();
     if (!dados.itens.length) diagnostico(el, ARQUIVO, dadosBrutos);
+    carregarPend();
     if (dados.geradoEm) $('#bh-rod').textContent = 'Atualizado em ' + new Date(dados.geradoEm).toLocaleString('pt-BR');
   }
 
