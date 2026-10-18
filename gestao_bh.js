@@ -31,7 +31,7 @@
   // histórico fixo do que já foi tratado na TRATATIVA_GESTORES antes do painel (não muda)
   const ARQ_PEND_HIST = 'historico_pend_bh.json';   // gerado pelo script_pendencias_bh
   // Cole aqui a URL do gatilho "Quando uma solicitação HTTP for recebida" do fluxo "BH - Gravar justificativa"
-  const FLUXO_JUSTIFICATIVA = 'https://defaultc54e138a79f54294aa9bb004cf8d7f.f7.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/c543ddf154d648c79b86fb6191c44377/triggers/manual/paths/invoke?api-version=1';
+  const FLUXO_JUSTIFICATIVA = '';
   // Tratativas que o gestor pode escolher em cada tipo de pendência
   // Tratativas que o gestor pode escolher (as mesmas da fórmula do Status_Automatico)
   const TRATATIVAS = {
@@ -1030,7 +1030,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   const ehATratar = s => s === 'Pendente Operação' || s === 'Erro na Justificativa';
   const fechadaRH = (i, j) => (j.auto || calcularStatus(j, i.hePerm, i.tipo)[0]) === 'CONCLUÍDO';   // RH marcou AJUSTADO
 
-  let pend = null, pendErro = '', pendGerado = '', pendFonte = '';
+  let pend = null, pendErro = '', pendGerado = '', pendFonte = '', pendHistInfo = '';
   const pendSel = new Set();
   const pendFiltro = { tipo: '', sit: 'tratar' };
 
@@ -1084,14 +1084,17 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       // junta o histórico da TRATATIVA_GESTORES: mesma pendência = matrícula (6 dígitos) | data | tipo
       const chaveP = i => String(i.m || '').replace(/\D/g, '').padStart(6, '0').slice(-6) + '|' + String(i.d || '').slice(0, 10) + '|' + String(i.tipo || '').trim().toUpperCase();
       const hItens = h ? (Array.isArray(h) ? h : (h.itens || [])) : [];
+      pendHistInfo = h ? `histórico: ${nf(hItens.length)} pendências` : 'histórico: arquivo ' + ARQ_PEND_HIST + ' não encontrado';
       if (hItens.length) {
+        let aplicadas = 0, soHist = 0;
         const porChave = {};
         pend.forEach(i => { porChave[chaveP(i)] = i; });
         hItens.forEach(x => {
           const atual = porChave[chaveP(x)];
-          if (atual) { if (!(atual.just && atual.just.trat) && x.just && x.just.trat) atual.just = x.just; }
-          else { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; }
+          if (atual) { if (!(atual.just && atual.just.trat) && x.just && x.just.trat) { atual.just = x.just; aplicadas++; } }
+          else { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; soHist++; }
         });
+        pendHistInfo += ` (${nf(aplicadas)} respostas aplicadas na base atual, ${nf(soHist)} só no histórico)`;
       }
       pendGerado = (d && d.geradoEm) || '';
       pendFonte = d && d.arquivo ? `arquivo ${d.arquivo} · base ${d.base} · ${d.historico} respostas no histórico` : '';
@@ -1121,7 +1124,6 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     if (!pend) { $('#bh-pd-sub').textContent = 'Carregando pendências…'; return; }
     const avisos = [];
     if (pendErro) avisos.push(pendErro);
-    if (!FLUXO_JUSTIFICATIVA) avisos.push('O envio das justificativas ainda não está ligado (falta a URL do fluxo do Power Automate em FLUXO_JUSTIFICATIVA). Enquanto isso, use "Copiar para Excel" no formulário e cole no fim da aba JUSTIFICATIVAS_PAINEL.');
     msg.innerHTML = avisos.map(a => `<div class="bh-aviso">⚠ ${esc(a)}</div>`).join('');
 
     const base = pendFiltrados();
@@ -1155,7 +1157,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }).sort((a, b) => ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (b.dias || 0) - (a.dias || 0) || String(a.n).localeCompare(String(b.n), 'pt-BR'));
     [...pendSel].forEach(id => { if (!lista.some(i => i.id === id)) pendSel.delete(id); });
 
-    $('#bh-pd-sub').textContent = `${nf(lista.length)} pendências na lista · marque várias do mesmo tipo para justificar de uma vez` + (pendGerado ? ' · gerado em ' + new Date(pendGerado).toLocaleString('pt-BR') : '') + (pendFonte ? ' · ' + pendFonte : '');
+    $('#bh-pd-sub').textContent = `${nf(lista.length)} pendências na lista · marque várias do mesmo tipo para justificar de uma vez` + (pendGerado ? ' · gerado em ' + new Date(pendGerado).toLocaleString('pt-BR') : '') + (pendFonte ? ' · ' + pendFonte : '') + (pendHistInfo ? ' · ' + pendHistInfo : '');
 
     $('#bh-pd-head').innerHTML = `<tr><th style="width:26px"><input type="checkbox" id="bh-pd-todos" title="Marcar todas"></th><th>Situação</th><th>Pendência</th><th>Colaborador</th><th>Data</th><th>Detalhe / o que verificar</th><th>Supervisor</th><th class="num">Saldo BH</th><th class="num">Horas</th><th>Justificativa</th><th></th></tr>`;
     const MAX = 600;
@@ -1227,10 +1229,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       </div>
       <div class="bh-prev" id="bh-prev"></div>
       <div class="bh-modal-pe">
-        <button type="button" class="bh-pd-btn" data-a="copiar" title="Copia a linha completa no formato da aba JUSTIFICATIVAS_PAINEL">📋 Copiar para Excel</button>
+        ${FLUXO_JUSTIFICATIVA ? '' : '<span style="font-size:12px;color:#64748b;flex-basis:100%">Copie e cole no fim da aba JUSTIFICATIVAS_PAINEL da planilha — aparece aqui na próxima atualização.</span>'}
+        <button type="button" class="bh-pd-btn${FLUXO_JUSTIFICATIVA ? '' : ' on'}" data-a="copiar" title="Copia a linha completa no formato da aba JUSTIFICATIVAS_PAINEL">📋 Copiar para Excel</button>
         <span style="flex:1"></span>
         <button type="button" class="bh-pd-btn" data-a="cancelar">Cancelar</button>
-        <button type="button" class="bh-pd-btn on" data-a="enviar">Enviar justificativa${itens.length > 1 ? ' (' + itens.length + ')' : ''}</button>
+        ${FLUXO_JUSTIFICATIVA ? `<button type="button" class="bh-pd-btn on" data-a="enviar">Enviar justificativa${itens.length > 1 ? ' (' + itens.length + ')' : ''}</button>` : ''}
       </div>
     </div>`;
     document.getElementById(CONTAINER).appendChild(modal);
@@ -1270,14 +1273,16 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     };
 
     modal.querySelector('[data-a="copiar"]').onclick = async () => {
-      const { j } = mostrar();
+      const { j, ok } = mostrar();
+      if (!j.trat) { $('#bh-prev').innerHTML = `<span style="color:${VERMELHO}">● Escolha a tratativa.</span>`; return; }
+      if (!ok) return;
       const tsv = itens.map(i => { const l = linha(i, j); l.Data_Resposta_Gestor = dataBr(l.Data_Resposta_Gestor); l.Data = dataBr(l.Data); return COLS_J.map(c => String(l[c] == null ? '' : l[c]).replace(/[\t\n\r]+/g, ' ')).join('\t'); }).join('\n');
       try { await navigator.clipboard.writeText(tsv); $('#bh-prev').insertAdjacentHTML('beforeend', ' · <b>copiado!</b> cole na primeira linha vazia da aba JUSTIFICATIVAS_PAINEL (coluna A)'); }
       catch (e) { window.prompt('Copie (Ctrl+C):', tsv); }
     };
 
     const btEnv = modal.querySelector('[data-a="enviar"]');
-    btEnv.onclick = async () => {
+    if (btEnv) btEnv.onclick = async () => {
       const { j, ok } = mostrar();
       if (!j.trat) { $('#bh-prev').innerHTML = `<span style="color:${VERMELHO}">● Escolha a tratativa.</span>`; return; }
       if (!ok) return;   // a mensagem do problema já está na tela
