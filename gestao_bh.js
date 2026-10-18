@@ -10,19 +10,24 @@
      📊 Visão geral            — o painel de antes
      ⏳ Por faixa de tempo      — colaboradores por idade das horas no banco
      📈 Evolução por supervisor — saldo mês a mês (ou semana a semana) e quem
-        aumentou/diminuiu. O histórico vem das versões antigas do dados_bh.json
-        guardadas no GitHub (cada atualização do fluxo é uma versão), então não
-        precisa mudar o Office Script.
+        aumentou/diminuiu.
+        · Mês a mês: historico_bh.json (gerado da planilha de histórico, coluna
+          "Saldo atual" de cada folha de 15 a 14) + a folha em andamento, que é
+          a foto atual do dados_bh.json. O supervisor vem do dados_bh.json atual
+          (cruzando pela matrícula; se não achar, pelo nome).
+        · Semana a semana: versões antigas do dados_bh.json guardadas no GitHub.
    ========================================================================= */
 (function () {
   'use strict';
 
   const ARQUIVO = 'dados_bh.json';
+  const ARQ_HIST = 'historico_bh.json';   // folhas fechadas (15 a 14)
+  const SEM_SUP = '(fora do BH atual)';   // quem está no histórico mas não no dados_bh.json de hoje
   const CONTAINER = 'sec-bh';
 
   // Repositório do GitHub (dono/nome). Vazio = descobre pelo endereço do painel.
   const REPO_GITHUB = '';
-  const MAX_PERIODOS = 12;   // quantos meses/semanas mostrar na evolução
+  const MAX_PERIODOS = 13;   // quantos meses/semanas mostrar na evolução
 
   // ----- faixas -----
   // Positivo: idade das horas no banco (dias). Os índices batem com o array bh[] do JSON.
@@ -88,7 +93,7 @@
   const normalizarStatus = v => {
     const s = String(v || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
     if (!s) return 'Não informado';
-    if (['ATIVO', 'ATIVA'].includes(s)) return 'Ativo';
+    if (['ATIVO', 'ATIVA', 'NORMAL'].includes(s)) return 'Ativo';
     if (['DEMITIDO', 'DEMITIDA', 'DESLIGADO', 'DESLIGADA'].includes(s)) return 'Demitido';
     if (s === 'FERIAS') return 'Férias';
     if (['AFASTADO', 'AFASTADA'].includes(s)) return 'Afastado';
@@ -633,8 +638,9 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
     const seg = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)); // segunda-feira
     return seg.getFullYear() + '-' + pad2(seg.getMonth() + 1) + '-' + pad2(seg.getDate());
   }
+  const PARCIAIS = new Set();   // períodos ainda em andamento
   function rotPer(p) {
-    if (p.length === 7) return MESES[+p.slice(5, 7) - 1] + '/' + p.slice(2, 4);
+    if (p.length === 7) return MESES[+p.slice(5, 7) - 1] + '/' + p.slice(2, 4) + (PARCIAIS.has(p) ? ' (parcial)' : '');
     return 'sem ' + p.slice(8, 10) + '/' + p.slice(5, 7);
   }
 
@@ -667,8 +673,41 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
     try { sessionStorage.setItem(CH, JSON.stringify(it)); } catch (e) { }
     return (snapCache[sha] = it);
   }
+  // ---- mês a mês: folhas fechadas do historico_bh.json + folha em andamento (dados_bh.json)
+  const chaveMat = m => String(m || '').split('-').pop().replace(/\D/g, '').replace(/^0+/, '');
+  const chaveNome = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const isoBr = iso => String(iso || '').split('-').reverse().join('/');
+  let histArquivo = null;
+  async function carregarFolhas() {
+    if (!histArquivo) histArquivo = await lerJson(ARQ_HIST);
+    const porMat = {}, porNome = {};
+    dados.itens.forEach(i => { porMat[chaveMat(i.m)] = i; porNome[chaveNome(i.n)] = i; });
+    const achar = x => porMat[chaveMat(x.m)] || porNome[chaveNome(x.n)];
+    const folhas = (histArquivo.periodos || []).map(p => ({
+      per: p.comp,
+      tit: 'Folha ' + isoBr(p.ini) + ' a ' + isoBr(p.fim) + ' · saldo atual no fechamento',
+      itens: (p.itens || []).map(x => {
+        const a = achar(x);
+        return { m: x.m, n: x.n, sup: a ? (a.sup || '') : SEM_SUP, co: a ? (a.co || '') : '', st: normalizarStatus(x.st), h: +x.h || 0 };
+      })
+    }));
+    // folha em andamento (15 deste mês a 14 do próximo) = saldo de hoje
+    const hoje = new Date();
+    const fim = new Date(hoje.getFullYear(), hoje.getMonth() + (hoje.getDate() >= 15 ? 1 : 0), 14);
+    const comp = fim.getFullYear() + '-' + pad2(fim.getMonth() + 1);
+    PARCIAIS.clear();
+    if (!folhas.some(f => f.per === comp)) {
+      const ini = new Date(fim.getFullYear(), fim.getMonth() - 1, 15);
+      PARCIAIS.add(comp);
+      folhas.push({ per: comp, tit: 'Folha ' + pad2(ini.getDate()) + '/' + pad2(ini.getMonth() + 1) + ' a 14/' + pad2(fim.getMonth() + 1) + ' em andamento · saldo de hoje', itens: dados.itens });
+    }
+    hist = folhas.sort((a, b) => a.per.localeCompare(b.per)).slice(-MAX_PERIODOS);
+  }
+
   async function carregarHistorico() {
     histErro = '';
+    if (gran === 'mes') return carregarFolhas();
+    PARCIAIS.clear();
     const repo = repoAtual();
     if (!repo) {
       histErro = 'O histórico só funciona no painel publicado (endereço github.io). Aqui aparece só a foto atual.';
@@ -692,7 +731,7 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
     renderEvolucao();
     carregarHistorico()
       .catch(e => {
-        histErro = 'Não consegui ler o histórico: ' + e.message + '. Mostrando só a foto atual.';
+        histErro = 'Não consegui ler o histórico' + (gran === 'mes' ? ' (' + ARQ_HIST + ')' : '') + ': ' + e.message + '. Mostrando só a foto atual.';
         hist = [{ per: chavePer(new Date().toISOString()), itens: dados.itens }];
       })
       .finally(() => { carregandoHist = false; renderEvolucao(); });
@@ -726,7 +765,7 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
     const sups = Object.keys(tab);
     const delta = s => (n >= 2 && tab[s][n - 1] != null && tab[s][n - 2] != null) ? tab[s][n - 1] - tab[s][n - 2] : null;
 
-    $('#bh-ev-sub').textContent = `${nomeMet} · ${n} ${gran === 'mes' ? (n === 1 ? 'mês' : 'meses') : (n === 1 ? 'semana' : 'semanas')} de histórico (${rotPer(pers[0])}${n > 1 ? ' a ' + rotPer(pers[n - 1]) : ''}) · filtros de tipo e criticidade não se aplicam aqui`;
+    $('#bh-ev-sub').textContent = `${nomeMet} · ${n} ${gran === 'mes' ? (n === 1 ? 'mês' : 'meses') : (n === 1 ? 'semana' : 'semanas')} de histórico (${rotPer(pers[0])}${n > 1 ? ' a ' + rotPer(pers[n - 1]) : ''}) ${gran === 'mes' ? ' · folhas de 15 a 14, saldo no fechamento' : ''} · filtros de tipo e criticidade não se aplicam aqui${tab[SEM_SUP] ? ' · "' + SEM_SUP + '" = quem saiu e não está mais no BH de hoje' : ''}`;
     const avisos = [];
     if (histErro) avisos.push(histErro);
     if (n < 2 && !histErro) avisos.push(`O histórico está começando: só existe ${rotPer(pers[0])}. A comparação aparece quando houver ${gran === 'mes' ? 'o próximo mês' : 'a próxima semana'} — enquanto isso, experimente "Semana a semana".`);
@@ -806,7 +845,7 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
       if (Math.round(d) === 0) return '<td class="num">= estável</td>';
       return `<td class="num" style="color:${d > 0 ? LARANJA : VERDE};font-weight:700">${d > 0 ? '▲ +' : '▼ −'}${nf(Math.abs(Math.round(d)))} h</td>`;
     };
-    $('#bh-ev-head').innerHTML = `<tr><th>Supervisor</th>${pers.map(p => `<th class="num">${rotPer(p)}</th>`).join('')}<th class="num">No período</th></tr>`;
+    $('#bh-ev-head').innerHTML = `<tr><th>Supervisor</th>${hist.map(h => `<th class="num" title="${esc(h.tit || '')}">${rotPer(h.per)}</th>`).join('')}<th class="num">No período</th></tr>`;
     const linhas = sups.slice().sort((a, c) => (delta(c) ?? -1e9) - (delta(a) ?? -1e9) || Math.abs(ultimo(c)) - Math.abs(ultimo(a)));
     $('#bh-ev-body').innerHTML = (sups.length > 1 ? `<tr class="tot"><td>Total</td>${pers.map((_, k) => celula(total, k)).join('')}${tendencia(total)}</tr>` : '') +
       linhas.map(s => `<tr><td class="nm" title="${esc(s)}">${esc(s)}</td>${pers.map((_, k) => celula(tab[s], k)).join('')}${tendencia(tab[s])}</tr>`).join('') ||
