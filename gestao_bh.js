@@ -264,9 +264,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     <div class="bh-filtros">
       <select data-f="co"><option value="">Coordenador: todos</option></select>
       <select data-f="sup"><option value="">Supervisor: todos</option></select>
-      <select data-f="tp"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
-      <select data-f="cr"><option value="">Criticidade: todas</option></select>
-      <select data-f="st"><option value="">Status: todos</option></select>
+      <select data-f="tp" data-nao="pend andamento"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
+      <select data-f="cr" data-nao="pend andamento"><option value="">Criticidade: todas</option></select>
+      <select data-f="st" data-nao="pend andamento"><option value="">Status: todos</option></select>
+      <select data-pf="tipo" data-so="pend andamento" hidden><option value="">Pendência: todas</option></select>
+      <select data-pf="sit" data-so="pend" hidden></select>
       <input data-f="busca" type="search" placeholder="Buscar nome ou matrícula">
       <button type="button" class="bh-limpar">Limpar filtros</button>
     </div>
@@ -355,8 +357,6 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
             <p class="sub" id="bh-pd-sub" style="margin:0">Carregando pendências…</p>
           </div>
           <div class="ctl">
-            <select id="bh-pd-tipo" class="bh-sel"></select>
-            <div class="bh-seg" id="bh-pd-sit"></div>
           </div>
         </div>
         <div class="bh-pd-lote" id="bh-pd-lote" hidden></div>
@@ -374,7 +374,6 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
               <h3>Andamento das pendências por supervisor</h3>
               <p class="sub" id="bh-an-sub" style="margin:0">Carregando…</p>
             </div>
-            <select id="bh-an-tipo" class="bh-sel"></select>
           </div>
           <div class="bh-box b" id="bh-box-an" style="margin-top:10px"><canvas id="bh-g-an"></canvas></div>
         </div>
@@ -453,10 +452,15 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       filtro[c.dataset.f] = c.value.trim();
       atualizar();
     }));
+    el.querySelectorAll('[data-pf]').forEach(c => c.addEventListener('change', () => {
+      pendFiltro[c.dataset.pf] = c.value; pendSel.clear();
+      if (pend) { renderPend(); renderAndamento(); }
+    }));
     $('.bh-limpar', el).addEventListener('click', () => {
       Object.keys(filtro).forEach(k => filtro[k] = '');
       filtro.st = statusPadrao();
       faixaSel = ''; tipoSel = '';
+      pendFiltro.tipo = ''; pendFiltro.sit = 'tratar'; pendSel.clear();
       el.querySelectorAll('[data-f]').forEach(c => c.value = c.dataset.f === 'st' ? filtro.st : '');
       atualizar();
     });
@@ -482,6 +486,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     aba = nome;
     el.querySelectorAll('.bh-nav button').forEach(x => x.classList.toggle('on', x.dataset.aba === nome));
     el.querySelectorAll('.bh-aba').forEach(p => { p.hidden = p.dataset.p !== nome; });
+    el.querySelectorAll('.bh-filtros [data-so]').forEach(c => { c.hidden = !c.dataset.so.split(' ').includes(nome); });
+    el.querySelectorAll('.bh-filtros [data-nao]').forEach(c => { c.hidden = c.dataset.nao.split(' ').includes(nome); });
     if (nome === 'evol' && !hist && !carregandoHist) abrirHistorico();
     setTimeout(() => window.bhResize(), 30);
     window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 10);
@@ -1136,12 +1142,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
     // tipo de pendência
     const tipos = {}; base.forEach(i => tipos[i.tipo] = (tipos[i.tipo] || 0) + 1);
-    const sTipo = $('#bh-pd-tipo');
-    sTipo.innerHTML = `<option value="">Tipo: todos (${nf(base.length)})</option>` + Object.keys(tipos).sort().map(t => `<option value="${esc(t)}"${pendFiltro.tipo === t ? ' selected' : ''}>${esc(t)} (${nf(tipos[t])})</option>`).join('');
-    sTipo.onchange = () => { pendFiltro.tipo = sTipo.value; pendSel.clear(); renderPend(); };
-    const seg = $('#bh-pd-sit');
-    seg.innerHTML = SITS.map(([v, r]) => `<button type="button" data-s="${esc(v)}" class="${pendFiltro.sit === v ? 'on' : ''}">${r}</button>`).join('');
-    seg.querySelectorAll('button').forEach(b => b.onclick = () => { pendFiltro.sit = b.dataset.s; pendSel.clear(); renderPend(); });
+    const raiz = document.getElementById(CONTAINER);
+    const sTipo = raiz.querySelector('[data-pf="tipo"]');
+    sTipo.innerHTML = `<option value="">Pendência: todas (${nf(base.length)})</option>` + Object.keys(tipos).sort().map(t => `<option value="${esc(t)}"${pendFiltro.tipo === t ? ' selected' : ''}>${esc(t)} (${nf(tipos[t])})</option>`).join('');
+    const sSit = raiz.querySelector('[data-pf="sit"]');
+    sSit.innerHTML = SITS.map(([v, r]) => `<option value="${esc(v)}"${pendFiltro.sit === v ? ' selected' : ''}>Situação: ${r}</option>`).join('');
 
     const lista = base.filter(i => {
       const s = sitDe(i);
@@ -1304,16 +1309,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   // =====================================================================
   // ABA: ANDAMENTO POR SUPERVISOR (mesma base das Pendências)
   // =====================================================================
-  let anTipo = '';
   function renderAndamento() {
     if (!$('#bh-an-kpis')) return;
     if (!pend) { $('#bh-an-sub').textContent = 'Carregando…'; return; }
     const base0 = pendFiltrados();
-    const tipos = {}; base0.forEach(i => tipos[i.tipo] = (tipos[i.tipo] || 0) + 1);
-    const sTipo = $('#bh-an-tipo');
-    sTipo.innerHTML = `<option value="">Tipo: todos (${nf(base0.length)})</option>` + Object.keys(tipos).sort().map(t => `<option value="${esc(t)}"${anTipo === t ? ' selected' : ''}>${esc(t)} (${nf(tipos[t])})</option>`).join('');
-    sTipo.onchange = () => { anTipo = sTipo.value; renderAndamento(); };
-    const base = base0.filter(i => !anTipo || i.tipo === anTipo);
+    const base = base0.filter(i => !pendFiltro.tipo || i.tipo === pendFiltro.tipo);
 
     const g = {};
     base.forEach(i => {
@@ -1395,7 +1395,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     if (sel && !opt) { sel.insertAdjacentHTML('beforeend', `<option value="${esc(sup)}">${esc(sup)}</option>`); opt = sel.options[sel.options.length - 1]; }
     filtro.sup = opt ? opt.value : sup;
     if (sel) sel.value = filtro.sup;
-    pendFiltro.sit = 'tratar'; pendFiltro.tipo = anTipo; pendSel.clear();
+    pendFiltro.sit = 'tratar'; pendSel.clear();
     atualizar();
     irAba('pend');
   }
