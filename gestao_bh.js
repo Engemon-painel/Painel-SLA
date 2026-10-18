@@ -62,6 +62,8 @@
   let metrica = 'liq';          // liq | pos | neg
   let gran = 'mes';             // mes | sem
   let hist = null, histErro = '', carregandoHist = false;
+  let cmpDe = '', cmpAte = '';   // períodos comparados no gráfico de variação
+  let excluidos = new Set();     // matrículas fora da evolução (demitidos e Cirion do histórico)
 
   // ----- util -----
   const $ = (s, r) => (r || document).querySelector(s);
@@ -177,6 +179,8 @@ ${C} .bh-aviso{padding:10px 12px;border-radius:10px;background:#fef3c7;color:#92
 ${C} .bh-vazio{padding:30px 10px;text-align:center;color:#64748b;font-size:13px}
 ${C} .bh-d{display:block;font-size:10px;font-weight:700}
 ${C} .bh-d.up{color:${LARANJA}}${C} .bh-d.dn{color:${VERDE}}
+${C} .bh-cmp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:#475569;margin:0 0 10px}
+${C} .bh-cmp select{padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:12px;background:#fff}
 ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;border-top:2px solid #94a3b8}
 @media (max-width:1100px){${C} .bh-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}${C} .bh-g>*{grid-column:1/-1!important}}
 @media (max-width:600px){${C} .bh-kpis{grid-template-columns:1fr}}`;
@@ -305,6 +309,7 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
       <div class="bh-c s5">
         <h3 id="bh-var-tit">Quem aumentou ou diminuiu</h3>
         <p class="sub" id="bh-var-sub"></p>
+        <div class="bh-cmp">Comparar <select id="bh-cmp-de"></select> com <select id="bh-cmp-ate"></select></div>
         <div class="bh-box b" id="bh-box-var"><canvas id="bh-g-var"></canvas></div>
         <div class="bh-vazio" id="bh-var-vazio" hidden></div>
       </div>
@@ -687,6 +692,7 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
   // só centro de custo da Claro (Descricao C.C); se o item não tiver C.C., mantém
   const ehClaro = cc => !cc || /CLARO/i.test(String(cc));
   const ccDe = i => i.cc || i.ccd || i.descCC || i.centroCusto || '';
+  const foraDaEvolucao = i => chavesMat(i.m).some(k => excluidos.has(k));
   async function carregarFolhas() {
     if (!histArquivo) histArquivo = await lerJson(ARQ_HIST);
     const porMat = {}, porNome = {}, porCurto = {};
@@ -700,14 +706,18 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
       return porNome[chaveNome(x.n)] || porCurto[chaveNomeCurta(x.n)] || null;
     };
     const naoAchados = new Map();
+    // quem teve DEMITIDO em qualquer folha ou C.C. Cirion no histórico não entra (nem na folha atual)
+    excluidos = new Set();
+    const ex = histArquivo.excluir || {};
+    [].concat(ex.demitidos || [], ex.cirion || []).forEach(m => chavesMat(m).forEach(k => excluidos.add(k)));
     const folhas = (histArquivo.periodos || []).map(p => ({
       per: p.comp,
       tit: 'Folha ' + isoBr(p.ini) + ' a ' + isoBr(p.fim) + ' · saldo atual no fechamento',
-      itens: (p.itens || []).filter(x => ehClaro(x.cc)).map(x => {
+      itens: (p.itens || []).filter(x => ehClaro(x.cc) && x.st !== 'DEMITIDO' && !foraDaEvolucao(x)).map(x => {
         const a = achar(x);
-        if (!a && x.st !== 'DEMITIDO') naoAchados.set(x.m, x.n);
-        return { m: x.m, n: x.n, sup: a ? (a.sup || '') : SEM_SUP, co: a ? (a.co || '') : '', st: normalizarStatus(x.st), h: +x.h || 0 };
-      })
+        if (!a) { naoAchados.set(x.m, x.n); return null; }   // não está no BH de hoje: sem supervisor, não entra
+        return { m: x.m, n: x.n, sup: a.sup || '', co: a.co || '', st: normalizarStatus(x.st), h: +x.h || 0 };
+      }).filter(Boolean)
     }));
     // folha em andamento (15 deste mês a 14 do próximo) = saldo de hoje
     const hoje = new Date();
@@ -720,11 +730,10 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
       folhas.push({ per: comp, tit: 'Folha ' + pad2(ini.getDate()) + '/' + pad2(ini.getMonth() + 1) + ' a 14/' + pad2(fim.getMonth() + 1) + ' em andamento · saldo de hoje', itens: dados.itens });
     }
     hist = folhas.sort((a, b) => a.per.localeCompare(b.per)).slice(-MAX_PERIODOS);
-    const ex = dados.itens.slice(0, 3).map(i => i.m).join(', ');
     cruzamento = naoAchados.size
-      ? `${naoAchados.size} funcionários ativos do histórico não foram encontrados no BH de hoje e ficaram em "${SEM_SUP}". ` +
-        `Exemplos do histórico: ${[...naoAchados].slice(0, 3).map(([m, n]) => m + ' ' + n).join(' · ')}. Matrículas no BH de hoje: ${ex}.`
+      ? `${naoAchados.size} funcionários do histórico não estão no BH de hoje e não entram na evolução (ex.: ${[...naoAchados].slice(0, 3).map(([m, n]) => m + ' ' + n).join(' · ')}).`
       : '';
+    cmpDe = ''; cmpAte = '';
   }
 
   async function carregarHistorico() {
@@ -775,7 +784,7 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
     const fmt = v => metrica === 'neg' ? nf(Math.round(v)) + ' h' : hTot(v);
     const b = filtro.busca.toLowerCase();
     // demitidos (coluna Situação) ficam sempre fora da evolução
-    const passa = i => i.st !== 'Demitido' && ehClaro(ccDe(i)) && (!filtro.co || i.co === filtro.co) && (!filtro.sup || i.sup === filtro.sup) &&
+    const passa = i => i.st !== 'Demitido' && ehClaro(ccDe(i)) && !foraDaEvolucao(i) && (!filtro.co || i.co === filtro.co) && (!filtro.sup || i.sup === filtro.sup) &&
       (!filtro.st || i.st === filtro.st) && (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b));
 
     // tabela supervisor x período
@@ -787,24 +796,34 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
       total[k] += val(i);
     }));
     const sups = Object.keys(tab);
-    const delta = s => (n >= 2 && tab[s][n - 1] != null && tab[s][n - 2] != null) ? tab[s][n - 1] - tab[s][n - 2] : null;
+    // períodos comparados: padrão = folha em andamento x a folha fechada antes da última (ex.: set/26 → nov/26 parcial)
+    let iB = pers.indexOf(cmpAte), iA = pers.indexOf(cmpDe);
+    if (iB < 0) iB = n - 1;
+    if (iA < 0 || iA >= iB) iA = Math.max(0, PARCIAIS.has(pers[n - 1]) && n >= 3 ? n - 3 : n - 2);
+    cmpDe = pers[iA]; cmpAte = pers[iB];
+    const opcoes = sel => pers.map((p, k) => `<option value="${p}"${k === sel ? ' selected' : ''}>${rotPer(p)}</option>`).join('');
+    const sDe = $('#bh-cmp-de'), sAte = $('#bh-cmp-ate');
+    sDe.innerHTML = opcoes(iA); sAte.innerHTML = opcoes(iB);
+    sDe.onchange = () => { cmpDe = sDe.value; renderEvolucao(); };
+    sAte.onchange = () => { cmpAte = sAte.value; if (pers.indexOf(cmpDe) >= pers.indexOf(cmpAte)) cmpDe = ''; renderEvolucao(); };
+    const delta = s => (n >= 2 && iA !== iB && tab[s][iB] != null && tab[s][iA] != null) ? tab[s][iB] - tab[s][iA] : null;
 
-    $('#bh-ev-sub').textContent = `${nomeMet} · ${n} ${gran === 'mes' ? (n === 1 ? 'mês' : 'meses') : (n === 1 ? 'semana' : 'semanas')} de histórico (${rotPer(pers[0])}${n > 1 ? ' a ' + rotPer(pers[n - 1]) : ''}) ${gran === 'mes' ? ' · folhas de 15 a 14, saldo no fechamento' : ''} · só C.C. Claro · demitidos não entram · filtros de tipo e criticidade não se aplicam aqui${tab[SEM_SUP] ? ' · "' + SEM_SUP + '" = funcionários do histórico que não estão mais no BH de hoje (geralmente desligados), sem supervisor conhecido' : ''}`;
+    $('#bh-ev-sub').textContent = `${nomeMet} · ${n} ${gran === 'mes' ? (n === 1 ? 'mês' : 'meses') : (n === 1 ? 'semana' : 'semanas')} de histórico (${rotPer(pers[0])}${n > 1 ? ' a ' + rotPer(pers[n - 1]) : ''}) ${gran === 'mes' ? ' · folhas de 15 a 14, saldo no fechamento' : ''} · só C.C. Claro · sem demitidos e sem Cirion · filtros de tipo e criticidade não se aplicam aqui${tab[SEM_SUP] ? ' · "' + SEM_SUP + '" = funcionários do histórico que não estão mais no BH de hoje (geralmente desligados), sem supervisor conhecido' : ''}`;
     const avisos = [];
     if (histErro) avisos.push(histErro);
-    if (gran === 'mes' && cruzamento && tab[SEM_SUP]) avisos.push(cruzamento);
+    if (gran === 'mes' && cruzamento) avisos.push(cruzamento);
     if (n < 2 && !histErro) avisos.push(`O histórico está começando: só existe ${rotPer(pers[0])}. A comparação aparece quando houver ${gran === 'mes' ? 'o próximo mês' : 'a próxima semana'} — enquanto isso, experimente "Semana a semana".`);
     msg.innerHTML = avisos.map(a => `<div class="bh-aviso">⚠ ${esc(a)}</div>`).join('');
 
     // ---- gráfico: variação no último período ----
     const comDelta = sups.filter(s => delta(s) != null && Math.round(delta(s)) !== 0).sort((a, c) => delta(c) - delta(a));
     const box = $('#bh-box-var'), vazio = $('#bh-var-vazio');
-    $('#bh-var-tit').textContent = n >= 2 ? `Quem aumentou ou diminuiu · ${rotPer(pers[n - 2])} → ${rotPer(pers[n - 1])}` : 'Quem aumentou ou diminuiu';
-    $('#bh-var-sub').innerHTML = `Variação do ${nomeMet} no último período · <span style="color:${LARANJA};font-weight:700">laranja = cresceu</span> · <span style="color:${VERDE};font-weight:700">verde = diminuiu</span>`;
+    $('#bh-var-tit').textContent = n >= 2 ? `Quem aumentou ou diminuiu · ${rotPer(pers[iA])} → ${rotPer(pers[iB])}` : 'Quem aumentou ou diminuiu';
+    $('#bh-var-sub').innerHTML = `Variação do ${nomeMet} entre os dois períodos escolhidos · <span style="color:${LARANJA};font-weight:700">laranja = cresceu</span> · <span style="color:${VERDE};font-weight:700">verde = diminuiu</span>`;
     if (!comDelta.length) {
       if (graficos['bh-g-var']) { graficos['bh-g-var'].destroy(); delete graficos['bh-g-var']; }
       box.hidden = true; vazio.hidden = false;
-      vazio.textContent = n < 2 ? 'Precisa de pelo menos dois períodos para comparar.' : 'Nenhum supervisor mudou de saldo no último período.';
+      vazio.textContent = n < 2 ? 'Precisa de pelo menos dois períodos para comparar.' : 'Nenhum supervisor mudou de saldo entre esses dois períodos — escolha outra folha em "De".';
     } else {
       box.hidden = false; vazio.hidden = true;
       box.style.height = Math.max(220, comDelta.length * 28 + 50) + 'px';
@@ -820,13 +839,14 @@ ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;borde
             tooltip: {
               callbacks: {
                 label: c => `${ds[c.dataIndex] > 0 ? '▲ aumentou' : '▼ diminuiu'} ${nf(Math.abs(Math.round(ds[c.dataIndex])))} h`,
-                footer: its => { const s = comDelta[its[0].dataIndex]; return `${rotPer(pers[n - 2])}: ${fmt(tab[s][n - 2])} → ${rotPer(pers[n - 1])}: ${fmt(tab[s][n - 1])}`; }
+                footer: its => { const s = comDelta[its[0].dataIndex]; return `${rotPer(pers[iA])}: ${fmt(tab[s][iA])} → ${rotPer(pers[iB])}: ${fmt(tab[s][iB])}`; }
               }
             },
             datalabels: { anchor: 'end', align: c => ds[c.dataIndex] > 0 ? 'end' : 'start', font: { weight: '700', size: 11 }, color: c => ds[c.dataIndex] > 0 ? LARANJA : VERDE, formatter: v => (v > 0 ? '▲ +' : '▼ −') + nf(Math.abs(v)) + ' h' }
           }
         }
       });
+      setTimeout(() => graficos['bh-g-var'] && graficos['bh-g-var'].resize(), 30);
     }
 
     // ---- gráfico: linha por supervisor ----
