@@ -27,7 +27,9 @@
   const ARQUIVO = 'dados_bh.json';
   const ARQ_HIST = 'historico_bh.json';   // folhas fechadas (15 a 14)
   // ----- Pendências (justificativa do gestor) -----
-  const ARQ_PEND = 'dados_pend_bh.json';   // gerado pelo script_pendencias_bh
+  const ARQ_PEND = 'dados_pend_bh.json';
+  // histórico fixo do que já foi tratado na TRATATIVA_GESTORES antes do painel (não muda)
+  const ARQ_PEND_HIST = 'historico_pend_bh.json';   // gerado pelo script_pendencias_bh
   // Cole aqui a URL do gatilho "Quando uma solicitação HTTP for recebida" do fluxo "BH - Gravar justificativa"
   const FLUXO_JUSTIFICATIVA = '';
   // Tratativas que o gestor pode escolher em cada tipo de pendência
@@ -1022,7 +1024,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   const ehATratar = s => s === 'Pendente Operação' || s === 'Erro na Justificativa';
   const fechadaRH = (i, j) => (j.auto || calcularStatus(j, i.hePerm, i.tipo)[0]) === 'CONCLUÍDO';   // RH marcou AJUSTADO
 
-  let pend = null, pendErro = '', pendGerado = '';
+  let pend = null, pendErro = '', pendGerado = '', pendFonte = '';
   const pendSel = new Set();
   const pendFiltro = { tipo: '', sit: 'tratar' };
 
@@ -1071,9 +1073,22 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
   async function carregarPend() {
     try {
-      const d = await lerJson(ARQ_PEND);
+      const [d, h] = await Promise.all([lerJson(ARQ_PEND), lerJson(ARQ_PEND_HIST).catch(() => null)]);
       pend = Array.isArray(d) ? d : (d.itens || []);
+      // junta o histórico da TRATATIVA_GESTORES: mesma pendência = matrícula (6 dígitos) | data | tipo
+      const chaveP = i => String(i.m || '').replace(/\D/g, '').padStart(6, '0').slice(-6) + '|' + String(i.d || '').slice(0, 10) + '|' + String(i.tipo || '').trim().toUpperCase();
+      const hItens = h ? (Array.isArray(h) ? h : (h.itens || [])) : [];
+      if (hItens.length) {
+        const porChave = {};
+        pend.forEach(i => { porChave[chaveP(i)] = i; });
+        hItens.forEach(x => {
+          const atual = porChave[chaveP(x)];
+          if (atual) { if (!(atual.just && atual.just.trat) && x.just && x.just.trat) atual.just = x.just; }
+          else { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; }
+        });
+      }
       pendGerado = (d && d.geradoEm) || '';
+      pendFonte = d && d.arquivo ? `arquivo ${d.arquivo} · base ${d.base} · ${d.historico} respostas no histórico` : '';
       // limpa o que já voltou no JSON
       const l = locais(); let mudou = false;
       Object.keys(l).forEach(id => { if (pendGerado && new Date(pendGerado) >= new Date(l[id].em)) { delete l[id]; mudou = true; } });
@@ -1135,7 +1150,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }).sort((a, b) => ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (b.dias || 0) - (a.dias || 0) || String(a.n).localeCompare(String(b.n), 'pt-BR'));
     [...pendSel].forEach(id => { if (!lista.some(i => i.id === id)) pendSel.delete(id); });
 
-    $('#bh-pd-sub').textContent = `${nf(lista.length)} pendências na lista · marque várias do mesmo tipo para justificar de uma vez` + (pendGerado ? ' · base de ' + new Date(pendGerado).toLocaleString('pt-BR') : '');
+    $('#bh-pd-sub').textContent = `${nf(lista.length)} pendências na lista · marque várias do mesmo tipo para justificar de uma vez` + (pendGerado ? ' · gerado em ' + new Date(pendGerado).toLocaleString('pt-BR') : '') + (pendFonte ? ' · ' + pendFonte : '');
 
     $('#bh-pd-head').innerHTML = `<tr><th style="width:26px"><input type="checkbox" id="bh-pd-todos" title="Marcar todas"></th><th>Situação</th><th>Pendência</th><th>Colaborador</th><th>Data</th><th>Detalhe / o que verificar</th><th>Supervisor</th><th class="num">Saldo BH</th><th class="num">Horas</th><th>Justificativa</th><th></th></tr>`;
     const MAX = 600;
