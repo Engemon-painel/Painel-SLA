@@ -22,7 +22,7 @@
 
   const ARQUIVO = 'dados_bh.json';
   const ARQ_HIST = 'historico_bh.json';   // folhas fechadas (15 a 14)
-  const SEM_SUP = '(fora do BH atual)';   // quem está no histórico mas não no dados_bh.json de hoje
+  const SEM_SUP = 'Sem supervisor (saiu do BH)';   // está no histórico mas não no dados_bh.json de hoje, então não dá para saber o supervisor
   const CONTAINER = 'sec-bh';
 
   // Repositório do GitHub (dono/nome). Vazio = descobre pelo endereço do painel.
@@ -177,7 +177,7 @@ ${C} .bh-aviso{padding:10px 12px;border-radius:10px;background:#fef3c7;color:#92
 ${C} .bh-vazio{padding:30px 10px;text-align:center;color:#64748b;font-size:13px}
 ${C} .bh-d{display:block;font-size:10px;font-weight:700}
 ${C} .bh-d.up{color:${LARANJA}}${C} .bh-d.dn{color:${VERDE}}
-${C} tr.tot td{font-weight:700;background:#f8fafc}
+${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;border-top:2px solid #94a3b8}
 @media (max-width:1100px){${C} .bh-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}${C} .bh-g>*{grid-column:1/-1!important}}
 @media (max-width:600px){${C} .bh-kpis{grid-template-columns:1fr}}`;
     document.head.appendChild(s);
@@ -678,6 +678,9 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
   const chaveNome = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
   const isoBr = iso => String(iso || '').split('-').reverse().join('/');
   let histArquivo = null;
+  // só centro de custo da Claro (Descricao C.C); se o item não tiver C.C., mantém
+  const ehClaro = cc => !cc || /CLARO/i.test(String(cc));
+  const ccDe = i => i.cc || i.ccd || i.descCC || i.centroCusto || '';
   async function carregarFolhas() {
     if (!histArquivo) histArquivo = await lerJson(ARQ_HIST);
     const porMat = {}, porNome = {};
@@ -686,7 +689,7 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
     const folhas = (histArquivo.periodos || []).map(p => ({
       per: p.comp,
       tit: 'Folha ' + isoBr(p.ini) + ' a ' + isoBr(p.fim) + ' · saldo atual no fechamento',
-      itens: (p.itens || []).map(x => {
+      itens: (p.itens || []).filter(x => ehClaro(x.cc)).map(x => {
         const a = achar(x);
         return { m: x.m, n: x.n, sup: a ? (a.sup || '') : SEM_SUP, co: a ? (a.co || '') : '', st: normalizarStatus(x.st), h: +x.h || 0 };
       })
@@ -751,7 +754,8 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
     const val = i => metrica === 'pos' ? Math.max(i.h, 0) : metrica === 'neg' ? Math.max(-i.h, 0) : i.h;
     const fmt = v => metrica === 'neg' ? nf(Math.round(v)) + ' h' : hTot(v);
     const b = filtro.busca.toLowerCase();
-    const passa = i => (!filtro.co || i.co === filtro.co) && (!filtro.sup || i.sup === filtro.sup) &&
+    // demitidos (coluna Situação) ficam sempre fora da evolução
+    const passa = i => i.st !== 'Demitido' && ehClaro(ccDe(i)) && (!filtro.co || i.co === filtro.co) && (!filtro.sup || i.sup === filtro.sup) &&
       (!filtro.st || i.st === filtro.st) && (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b));
 
     // tabela supervisor x período
@@ -765,7 +769,7 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
     const sups = Object.keys(tab);
     const delta = s => (n >= 2 && tab[s][n - 1] != null && tab[s][n - 2] != null) ? tab[s][n - 1] - tab[s][n - 2] : null;
 
-    $('#bh-ev-sub').textContent = `${nomeMet} · ${n} ${gran === 'mes' ? (n === 1 ? 'mês' : 'meses') : (n === 1 ? 'semana' : 'semanas')} de histórico (${rotPer(pers[0])}${n > 1 ? ' a ' + rotPer(pers[n - 1]) : ''}) ${gran === 'mes' ? ' · folhas de 15 a 14, saldo no fechamento' : ''} · filtros de tipo e criticidade não se aplicam aqui${tab[SEM_SUP] ? ' · "' + SEM_SUP + '" = quem saiu e não está mais no BH de hoje' : ''}`;
+    $('#bh-ev-sub').textContent = `${nomeMet} · ${n} ${gran === 'mes' ? (n === 1 ? 'mês' : 'meses') : (n === 1 ? 'semana' : 'semanas')} de histórico (${rotPer(pers[0])}${n > 1 ? ' a ' + rotPer(pers[n - 1]) : ''}) ${gran === 'mes' ? ' · folhas de 15 a 14, saldo no fechamento' : ''} · só C.C. Claro · demitidos não entram · filtros de tipo e criticidade não se aplicam aqui${tab[SEM_SUP] ? ' · "' + SEM_SUP + '" = funcionários do histórico que não estão mais no BH de hoje (geralmente desligados), sem supervisor conhecido' : ''}`;
     const avisos = [];
     if (histErro) avisos.push(histErro);
     if (n < 2 && !histErro) avisos.push(`O histórico está começando: só existe ${rotPer(pers[0])}. A comparação aparece quando houver ${gran === 'mes' ? 'o próximo mês' : 'a próxima semana'} — enquanto isso, experimente "Semana a semana".`);
@@ -847,9 +851,11 @@ ${C} tr.tot td{font-weight:700;background:#f8fafc}
     };
     $('#bh-ev-head').innerHTML = `<tr><th>Supervisor</th>${hist.map(h => `<th class="num" title="${esc(h.tit || '')}">${rotPer(h.per)}</th>`).join('')}<th class="num">No período</th></tr>`;
     const linhas = sups.slice().sort((a, c) => (delta(c) ?? -1e9) - (delta(a) ?? -1e9) || Math.abs(ultimo(c)) - Math.abs(ultimo(a)));
-    $('#bh-ev-body').innerHTML = (sups.length > 1 ? `<tr class="tot"><td>Total</td>${pers.map((_, k) => celula(total, k)).join('')}${tendencia(total)}</tr>` : '') +
-      linhas.map(s => `<tr><td class="nm" title="${esc(s)}">${esc(s)}</td>${pers.map((_, k) => celula(tab[s], k)).join('')}${tendencia(tab[s])}</tr>`).join('') ||
-      `<tr><td colspan="${n + 2}">Nenhum dado no filtro</td></tr>`;
+    // "sem supervisor" vai para o fim da lista e o Total fica na última linha
+    linhas.sort((a, c) => (a === SEM_SUP) - (c === SEM_SUP));
+    $('#bh-ev-body').innerHTML = (linhas.map(s => `<tr${s === SEM_SUP ? ' style="color:#64748b;font-style:italic"' : ''}><td class="nm" title="${esc(s === SEM_SUP ? 'Funcionários do histórico que não estão mais no Banco de Horas de hoje (geralmente desligados) — por isso não dá para saber o supervisor' : s)}">${esc(s)}</td>${pers.map((_, k) => celula(tab[s], k)).join('')}${tendencia(tab[s])}</tr>`).join('') ||
+      `<tr><td colspan="${n + 2}">Nenhum dado no filtro</td></tr>`) +
+      (sups.length > 1 ? `<tr class="tot"><td>Total</td>${pers.map((_, k) => celula(total, k)).join('')}${tendencia(total)}</tr>` : '');
   }
 
   function atualizar() {
