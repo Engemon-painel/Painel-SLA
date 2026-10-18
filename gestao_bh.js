@@ -31,7 +31,7 @@
   // histórico fixo do que já foi tratado na TRATATIVA_GESTORES antes do painel (não muda)
   const ARQ_PEND_HIST = 'historico_pend_bh.json';   // gerado pelo script_pendencias_bh
   // Cole aqui a URL do gatilho "Quando uma solicitação HTTP for recebida" do fluxo "BH - Gravar justificativa"
-  const FLUXO_JUSTIFICATIVA = '';
+  const FLUXO_JUSTIFICATIVA = 'https://defaultc54e138a79f54294aa9bb004cf8d7f.f7.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/c543ddf154d648c79b86fb6191c44377/triggers/manual/paths/invoke?api-version=1';
   // Tratativas que o gestor pode escolher em cada tipo de pendência
   // Tratativas que o gestor pode escolher (as mesmas da fórmula do Status_Automatico)
   const TRATATIVAS = {
