@@ -327,8 +327,8 @@
     // O JSON deve conter executadoBacklog e executadoEntrante por mês.
     // "programado" é mantido como alternativa para a meta do Backlog.
     const prog = dados.metaBacklog || dados.programado || {};
-    const back = dados.executadoBacklog || {};
-    const ent = dados.executadoEntrante || {};
+    const back = dados.execBacklog || dados.executadoBacklog || {};
+    const ent = dados.execEntrante || dados.executadoEntrante || {};
     const mesAtual = new Date().toLocaleDateString('sv-SE').slice(0, 7);
     const meses = [...new Set([
       ...Object.keys(prog), ...Object.keys(back), ...Object.keys(ent)
