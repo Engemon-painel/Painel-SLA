@@ -132,6 +132,11 @@
     #${CONTAINER} .afz-cls-b .det{font-size:11px;color:#64748b;margin:2px 0 6px}
     #${CONTAINER} .afz-cls-b .ps{display:flex;flex-wrap:wrap;gap:4px}
     #${CONTAINER} .afz-aviso{padding:10px 14px;margin-bottom:12px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:13px}
+    #${CONTAINER} .afz-sem-res{display:flex;flex-wrap:wrap;gap:8px 22px;margin:4px 0 8px;font-size:12px;color:#64748b}
+    #${CONTAINER} .afz-sem-res b{font-size:16px;color:#0f172a;margin-right:4px}
+    #${CONTAINER} .afz-sem-res i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+    #${CONTAINER} .afz-sem-res .ruim{color:#dc2626;font-weight:600}
+    #${CONTAINER} .afz-sem-res .bom{color:#16a34a;font-weight:600}
     #${CONTAINER} .afz-st-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
     #${CONTAINER} .afz-st-chips button{display:inline-flex;align-items:baseline;gap:6px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;font:inherit;font-size:12px;color:#475569;cursor:pointer}
     #${CONTAINER} .afz-st-chips button b{font-size:13px;color:#0f172a}
@@ -195,6 +200,12 @@
           <div class="afz-st-chips" id="afz-prog-st"></div>
           <p class="sub" id="afz-prog-sub">Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês</p>
           <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
+        </div>
+        <div class="afz-card full">
+          <h3>Visão semanal · Backlog x Entrantes</h3>
+          <p class="sub" id="afz-sem-sub">Semana de segunda a domingo · executados contados a partir da W26</p>
+          <div class="afz-sem-res" id="afz-sem-res"></div>
+          <div class="afz-box alto"><canvas id="afz-g-sem"></canvas></div>
         </div>
         <div class="afz-card full">
           <h3>AFAZ pendentes</h3>
@@ -562,6 +573,101 @@
       entrante: entT[mesAtual] || 0 };
   }
 
+  // 6. Visão semanal (semana ISO: segunda a domingo), a partir da W26
+  //   Backlog planejado restante = Backlog em aberto no início da W26 − meta mensal (aba Programação) distribuída por dia
+  //   Backlog real restante      = Backlog em aberto no início da W26 − Backlog executado desde a W26
+  //   Entrantes em esteira       = Entrantes abertos desde a W26 − Entrantes executados desde a W26 (acumulado)
+  const SEM_INICIAL = 26;
+  const COR_PLAN = '#38bdf8', COR_REAL = '#1e3a8a', COR_ESTEIRA = '#7e22ce';
+  const isoD = d => d.toISOString().slice(0, 10);
+  function inicioSemanaIso(ano, sem) {        // segunda-feira da semana ISO
+    const j4 = new Date(Date.UTC(ano, 0, 4));
+    const seg = new Date(j4); seg.setUTCDate(j4.getUTCDate() - ((j4.getUTCDay() + 6) % 7) + (sem - 1) * 7);
+    return seg;
+  }
+  const semanasNoAno = ano => { const d = new Date(Date.UTC(ano, 11, 28)); const t = new Date(d); t.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7)); const j1 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - j1) / 86400000 + 1) / 7); };
+
+  function gSemanal() {
+    const S = dados.semanal;
+    if (!S) {
+      $('#afz-sem-res').innerHTML = '<div class="afz-aviso">Para ver a visão semanal, atualize o Office Script do fluxo (gerar_dados_afaz.ts novo) e rode o fluxo de novo.</div>';
+      return;
+    }
+    const ano = Number((Object.keys(dados.programado || {}).sort()[0] || String(new Date().getFullYear())).slice(0, 4));
+    const ini = inicioSemanaIso(ano, SEM_INICIAL), iniIso = isoD(ini);
+    const ultSem = semanasNoAno(ano);
+    const hojeIso = new Date().toLocaleDateString('sv-SE');
+    const somaAte = (o, ate, de) => Object.keys(o || {}).reduce((t, d) => t + ((!de || d >= de) && d <= ate ? Number(o[d]) : 0), 0);
+    // Backlog em aberto no começo da W26
+    const inicio = S.bTotal - (S.bSemData || 0) - Object.keys(S.bx || {}).reduce((t, d) => t + (d < iniIso ? Number(S.bx[d]) : 0), 0);
+    const prog = dados.programado || {};
+    const diasMes = (a, m) => new Date(Date.UTC(a, m, 0)).getUTCDate();
+    const metaDia = d => { const k = isoD(d).slice(0, 7); const v = Number(prog[k] || 0); return v ? v / diasMes(d.getUTCFullYear(), d.getUTCMonth() + 1) : 0; };
+
+    const sem = [];
+    let plan = inicio;
+    for (let w = SEM_INICIAL; w <= ultSem; w++) {
+      const s = inicioSemanaIso(ano, w), f = new Date(s); f.setUTCDate(s.getUTCDate() + 6);
+      for (let i = 0; i < 7; i++) { const d = new Date(s); d.setUTCDate(s.getUTCDate() + i); plan -= metaDia(d); }
+      const sIso = isoD(s), fIso = isoD(f), passou = sIso <= hojeIso;
+      const bxW = somaAte(S.bx, fIso, sIso), eaW = somaAte(S.ea, fIso, sIso), exW = somaAte(S.ex, fIso, sIso);
+      sem.push({
+        w, sIso, fIso, plan: Math.max(0, Math.round(plan)),
+        real: passou ? inicio - somaAte(S.bx, fIso, iniIso) : null,
+        esteira: passou ? somaAte(S.ea, fIso, iniIso) - somaAte(S.ex, fIso, iniIso) : null,
+        bxW, eaW, exW, atual: sIso <= hojeIso && hojeIso <= fIso
+      });
+    }
+    const cur = sem.find(x => x.atual) || sem.filter(x => x.real != null).slice(-1)[0];
+    const ddmm = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+    if (cur) {
+      const dif = cur.real - cur.plan;
+      $('#afz-sem-res').innerHTML = `
+        <span><i style="background:${COR_REAL}"></i><b>${nf(cur.real)}</b>Backlog real restante (W${cur.w})</span>
+        <span><i style="background:${COR_PLAN}"></i><b>${nf(cur.plan)}</b>planejado</span>
+        <span class="${dif > 0 ? 'ruim' : 'bom'}">${dif > 0 ? nf(dif) + ' acima do planejado' : nf(-dif) + ' abaixo do planejado'}</span>
+        <span><i style="background:${COR_ESTEIRA}"></i><b>${nf(cur.esteira)}</b>entrantes em esteira</span>
+        <span>Na W${cur.w}: ${nf(cur.bxW)} Backlog executados · ${nf(cur.eaW)} entrantes entraram · ${nf(cur.exW)} executados</span>`;
+    }
+    $('#afz-sem-sub').textContent = `Semana de segunda a domingo · W${SEM_INICIAL} começa em ${ddmm(iniIso)}/${ano} · ` +
+      `Backlog em aberto no início da W${SEM_INICIAL}: ${nf(inicio)} · planejado = meta mensal da aba Programação distribuída pelos dias`;
+
+    const rot = (cor, pos) => ({
+      display: 'auto', color: cor, align: pos, anchor: 'center', offset: 4, clamp: true,
+      font: { size: 10, weight: '600' }, formatter: v => v == null ? '' : nf(v)
+    });
+    desenhar('afz-g-sem', {
+      type: 'line',
+      data: {
+        labels: sem.map(x => ['W' + x.w, ddmm(x.sIso)]),
+        datasets: [
+          { label: 'Backlog planejado restante', data: sem.map(x => x.plan), borderColor: COR_PLAN, backgroundColor: COR_PLAN,
+            borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4, tension: 0, datalabels: rot('#0284c7', 'bottom') },
+          { label: 'Backlog real restante', data: sem.map(x => x.real), borderColor: COR_REAL, backgroundColor: COR_REAL,
+            borderWidth: 3, pointRadius: 3, pointHoverRadius: 5, tension: 0.25, datalabels: rot(COR_REAL, 'top') },
+          { label: 'Entrantes em esteira (acumulado)', data: sem.map(x => x.esteira), borderColor: COR_ESTEIRA, backgroundColor: COR_ESTEIRA,
+            borderWidth: 3, pointRadius: 3, pointHoverRadius: 5, tension: 0.25, datalabels: rot(COR_ESTEIRA, 'bottom') }
+        ]
+      },
+      options: {
+        layout: { padding: { top: 18, right: 12 } },
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { grid: { display: false }, border: { display: false }, ticks: { maxRotation: 0, autoSkip: false, color: '#475569', font: { size: 10 } } },
+          y: { beginAtZero: true, grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { color: '#94a3b8' } }
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 16 } },
+          tooltip: { callbacks: {
+            title: its => { const x = sem[its[0].dataIndex]; return `W${x.w} · ${ddmm(x.sIso)} a ${ddmm(x.fIso)}`; },
+            footer: its => { const x = sem[its[0].dataIndex]; return x.real == null ? 'Semana futura: só o planejado' :
+              `Na semana: ${nf(x.bxW)} Backlog executados\nEntrantes: ${nf(x.eaW)} entraram · ${nf(x.exW)} executados`; }
+          } }
+        }
+      }
+    });
+  }
+
   // ---------------------------------------------------------------- KPIs / tabela
   function kpis(itens, pm) {
     const n = t => itens.filter(i => i.tp === t).length;
@@ -754,6 +860,7 @@
     gDias(itens);
     gPrio(itens);
     const pm = gProg();
+    gSemanal();
     kpis(itens, pm);
     tabela(itens);
     abaPrio(filtrados(true)); // a aba Prioridades usa só a PRIORIDADE do site
