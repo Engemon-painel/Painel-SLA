@@ -485,6 +485,7 @@
     }
     $('#afz-prog-sub').textContent = (stF && !semDetalhe ? `Somente status ${stF} · ` : '') +
       'Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês' +
+      (/logs/i.test(dados.origemExec || '') ? ' · executado pela aba Logs: conta cada status de fechamento por onde o AFAZ passou, uma vez por mês' : '') +
       (semDetalhe ? ' · ⚠ filtro de status não aplicado: atualize o Office Script (gerar_dados_afaz.ts) para ter o executado por status' : '');
     chipsStatus(eps, stF);
     const mesAtual = new Date().toLocaleDateString('sv-SE').slice(0, 7);
