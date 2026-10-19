@@ -1086,15 +1086,21 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const hItens = h ? (Array.isArray(h) ? h : (h.itens || [])) : [];
       pendHistInfo = h ? `histórico: ${nf(hItens.length)} pendências` : 'histórico: arquivo ' + ARQ_PEND_HIST + ' não encontrado';
       if (hItens.length) {
-        let aplicadas = 0, soHist = 0;
+        let aplicadas = 0, soHist = 0, ignoradas = 0;
         const porChave = {};
         pend.forEach(i => { porChave[chaveP(i)] = i; });
         hItens.forEach(x => {
           const atual = porChave[chaveP(x)];
           if (atual) { if (!(atual.just && atual.just.trat) && x.just && x.just.trat) { atual.just = x.just; aplicadas++; } }
-          else { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; soHist++; }
+          else {
+            // não está mais na base atual: só conta se já tinha sido justificada (o que sumiu sem justificativa
+            // foi resolvido no ponto e não é mais pendência)
+            const st = x.just && COR_SIT[x.just.status] ? x.just.status : calcularStatus(x.just || {}, x.hePerm, x.tipo)[1];
+            if (st === 'Justificado') { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; soHist++; }
+            else ignoradas++;
+          }
         });
-        pendHistInfo += ` (${nf(aplicadas)} respostas aplicadas na base atual, ${nf(soHist)} só no histórico)`;
+        pendHistInfo += ` (${nf(aplicadas)} respostas aplicadas na base atual, ${nf(soHist)} justificadas que saíram da base${ignoradas ? ', ' + nf(ignoradas) + ' sem justificativa que saíram da base (ignoradas)' : ''})`;
       }
       pendGerado = (d && d.geradoEm) || '';
       pendFonte = d && d.arquivo ? `arquivo ${d.arquivo} · base ${d.base} · ${d.historico} respostas no histórico` : '';
