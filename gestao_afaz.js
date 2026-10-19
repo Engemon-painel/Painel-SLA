@@ -39,7 +39,7 @@
   // vazio: "Fora da lista" se o site não está na aba Prioridades; "Em branco" se está, mas a coluna não foi preenchida
   const valAt = (i, k) => String(i[k] == null ? '' : i[k]).trim() || (psDe(i) === 'sem' ? 'Fora da lista' : 'Em branco');
   const COR_PR_AFAZ = { P0: '#1e3a8a', P1: '#2563eb', P2: '#60a5fa', P3: '#bfdbfe' };
-  const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8', COR_ENTRANTE = '#f97316', COR_TOTAL = '#0f172a';
+  const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8', COR_ENTRANTE = '#f97316';
   // status fechados (= executados): não aparecem nas pendências, só no gráfico Meta x Executado
   const FECHADOS = ['finalizado', 'resolvido', 'pendencia claro'];
   const normSt = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
@@ -186,7 +186,7 @@
         </div>
         <div class="afz-card c4">
           <h3>Meta Backlog x Executado Backlog x Executado Entrante</h3>
-          <p class="sub" id="afz-prog-sub">Execuções por tipo no mês · linha = total executado (Backlog + Entrante) · % da meta de Backlog abaixo de cada mês</p>
+          <p class="sub" id="afz-prog-sub">Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês</p>
           <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
         </div>
         <div class="afz-card full">
@@ -447,7 +447,7 @@
       else semDetalhe = true;   // JSON antigo, sem o detalhe por status
     }
     $('#afz-prog-sub').textContent = (stF && !semDetalhe ? `Somente status ${stF} · ` : '') +
-      'Execuções por tipo no mês · linha = total executado (Backlog + Entrante) · % da meta de Backlog abaixo de cada mês' +
+      'Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês' +
       (semDetalhe ? ' · ⚠ filtro de status não aplicado: atualize o Office Script (gerar_dados_afaz.ts) para ter o executado por status' : '');
     const mesAtual = new Date().toLocaleDateString('sv-SE').slice(0, 7);
     const meses = [...new Set([
@@ -459,40 +459,65 @@
     const vTot = meses.map((m, k) => vBack[k] == null ? null : vBack[k] + vEnt[k]);
     const pct = meses.map((m, k) => vProg[k] > 0 && vBack[k] != null
       ? Math.round(vBack[k] / vProg[k] * 100) : null);
-    const rotulo = {
-      anchor: 'end', align: 'end', offset: 2,
-      font: { size: 10, weight: '600' },
-      formatter: v => v == null ? '' : nf(v)
+    // rótulo dentro da parte da coluna empilhada, só se couber
+    const dentro = cor => ({
+      color: cor, font: { size: 10, weight: '600' }, anchor: 'center', align: 'center',
+      formatter: v => v ? nf(v) : '',
+      display: c => {
+        const v = c.dataset.data[c.dataIndex];
+        if (!v) return false;
+        const y = c.chart.scales.y;
+        return Math.abs(y.getPixelForValue(0) - y.getPixelForValue(v)) >= 15;
+      }
+    });
+    // total (Backlog + Entrante) escrito em cima da coluna do executado
+    const totalExec = {
+      id: 'totalExec',
+      afterDatasetsDraw(chart) {
+        const iB = chart.data.datasets.findIndex(d => d.stack === 'exec' && d.label.includes('Backlog'));
+        const iE = chart.data.datasets.findIndex(d => d.stack === 'exec' && d.label.includes('Entrante'));
+        const mB = chart.getDatasetMeta(iB), mE = chart.getDatasetMeta(iE);
+        const { ctx } = chart;
+        ctx.save();
+        ctx.font = '700 11px sans-serif'; ctx.fillStyle = '#0f172a';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        vTot.forEach((t, k) => {
+          if (t == null || !t) return;
+          const els = [!mB.hidden && mB.data[k], !mE.hidden && mE.data[k]].filter(Boolean);
+          if (!els.length) return;
+          const topo = Math.min(...els.map(e => e.y));
+          ctx.fillText(nf(t), els[0].x, topo - 4);
+        });
+        ctx.restore();
+      }
     };
     desenhar('afz-g-prog', {
       type: 'bar',
       data: {
         labels: meses.map((m, k) => [rotMes(m), pct[k] == null ? '—' : pct[k] + '%']),
         datasets: [
-          { label: 'Meta Backlog', data: vProg, backgroundColor: COR_PROG,
-            datalabels: { ...rotulo, color: '#475569' } },
-          { label: 'Executado Backlog', data: vBack, backgroundColor: COR_EXEC,
-            datalabels: { ...rotulo, color: COR_EXEC } },
-          { label: 'Executado Entrante', data: vEnt, backgroundColor: COR_ENTRANTE,
-            datalabels: { ...rotulo, color: COR_ENTRANTE } },
-          // total executado = Backlog + Entrante
-          { type: 'line', label: 'Total executado (Backlog + Entrante)', data: vTot, order: -1,
-            borderColor: COR_TOTAL, backgroundColor: COR_TOTAL, borderWidth: 2, borderDash: [5, 4],
-            pointRadius: 4, pointHoverRadius: 6, spanGaps: false,
-            datalabels: { anchor: 'end', align: 'top', offset: 4, color: '#fff', backgroundColor: COR_TOTAL,
-              borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 }, font: { size: 10, weight: '700' },
-              formatter: v => v == null ? '' : 'Total ' + nf(v) } }
+          { label: 'Meta Backlog', data: vProg, stack: 'meta', backgroundColor: COR_PROG, borderRadius: 4,
+            datalabels: { anchor: 'end', align: 'end', offset: 2, color: '#64748b', font: { size: 10, weight: '600' },
+              formatter: v => v == null ? '' : nf(v) } },
+          { label: 'Executado Backlog', data: vBack, stack: 'exec', backgroundColor: COR_EXEC,
+            datalabels: dentro('#fff') },
+          { label: 'Executado Entrante', data: vEnt, stack: 'exec', backgroundColor: COR_ENTRANTE,
+            borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: false,
+            datalabels: dentro('#fff') }
         ]
       },
+      plugins: [totalExec],
       options: {
-        layout: { padding: { top: 34 } },
+        layout: { padding: { top: 22 } },
+        datasets: { bar: { categoryPercentage: 0.62, barPercentage: 0.92 } },
         scales: {
-          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: false } },
-          y: { beginAtZero: true, grid: { color: '#f1f5f9' },
-            title: { display: true, text: 'Qtde AFAZ' } }
+          x: { stacked: true, grid: { display: false }, border: { display: false },
+            ticks: { maxRotation: 0, autoSkip: false, color: '#475569' } },
+          y: { stacked: true, beginAtZero: true, grid: { display: false }, border: { display: false },
+            ticks: { color: '#94a3b8' }, title: { display: true, text: 'Qtde AFAZ', color: '#94a3b8' } }
         },
         plugins: {
-          legend: { position: 'bottom' },
+          legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, boxHeight: 10, padding: 16 } },
           tooltip: { callbacks: {
             title: its => rotMes(meses[its[0].dataIndex]),
             footer: its => {
