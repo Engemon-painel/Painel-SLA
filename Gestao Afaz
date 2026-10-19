@@ -29,7 +29,7 @@
   // prioridade do site (aba Prioridades da planilha): 0 = mais crítico
   const NIVEIS_PS = ['0', '1', '2', '3', '4', 'sem'];
   const COR_PS = { '0': '#b91c1c', '1': '#ea580c', '2': '#ca8a04', '3': '#2563eb', '4': '#64748b', sem: '#cbd5e1' };
-  const rotPS = k => k === 'sem' ? 'Fora da lista' : 'Prioridade ' + k;
+  const rotPS = k => k === 'sem' ? 'Fora da lista' : 'PRIORIDADE ' + k;
   const psDe = i => (i.ps === null || i.ps === undefined || i.ps === '') ? 'sem' : String(i.ps);
   // demais colunas da aba Prioridades
   const ATRIB = [
@@ -38,6 +38,7 @@
   ];
   // vazio: "Fora da lista" se o site não está na aba Prioridades; "Em branco" se está, mas a coluna não foi preenchida
   const valAt = (i, k) => String(i[k] == null ? '' : i[k]).trim() || (psDe(i) === 'sem' ? 'Fora da lista' : 'Em branco');
+  const COR_PR_AFAZ = { P0: '#1e3a8a', P1: '#2563eb', P2: '#60a5fa', P3: '#bfdbfe' };
   const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8', COR_ENTRANTE = '#f97316';
   const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -96,12 +97,25 @@
     #${CONTAINER} .afz-abas button.on{color:#1d4ed8;border-bottom-color:#1d4ed8}
     #${CONTAINER} .afz-abas button span{display:inline-block;margin-left:6px;padding:0 7px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:11px}
     #${CONTAINER} .afz-kpi.ps{border-left:5px solid}
-    #${CONTAINER} table.afz-mx{font-size:13px}
-    #${CONTAINER} table.afz-mx td,#${CONTAINER} table.afz-mx th{text-align:center}
-    #${CONTAINER} table.afz-mx td:first-child,#${CONTAINER} table.afz-mx th:first-child{text-align:left}
-    #${CONTAINER} table.afz-mx td.cel{cursor:pointer;font-weight:600}
-    #${CONTAINER} table.afz-mx td.cel:hover{outline:2px solid #1d4ed8;outline-offset:-2px}
-    #${CONTAINER} table.afz-mx tr.tot td{font-weight:700;background:#f8fafc}
+    #${CONTAINER} .afz-mx-leg{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:11px;color:#64748b;margin:0 0 8px}
+    #${CONTAINER} .afz-mx-leg span{display:inline-flex;align-items:center;gap:4px;color:#0f172a;font-weight:600}
+    #${CONTAINER} .afz-mx-leg i{width:10px;height:10px;border-radius:2px;display:inline-block}
+    #${CONTAINER} .afz-mx .lin{display:grid;grid-template-columns:96px 52px minmax(0,1fr) 62px;gap:8px;align-items:center;padding:7px 6px;border-radius:8px;cursor:pointer}
+    #${CONTAINER} .afz-mx .lin:hover{background:#f8fafc}
+    #${CONTAINER} .afz-mx .lin.on{background:#eff6ff;outline:1px solid #93c5fd}
+    #${CONTAINER} .afz-mx .rot b{display:block;font-size:12px;color:#0f172a}
+    #${CONTAINER} .afz-mx .rot small{font-size:10px;color:#b91c1c}
+    #${CONTAINER} .afz-mx .tot{font-size:16px;font-weight:700;color:#0f172a;text-align:right}
+    #${CONTAINER} .afz-mx .trilha{background:#f1f5f9;border-radius:4px;height:22px;overflow:hidden}
+    #${CONTAINER} .afz-mx .barra{display:flex;height:100%}
+    #${CONTAINER} .afz-mx .seg{height:100%;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;border-right:1px solid #fff}
+    #${CONTAINER} .afz-mx .seg:hover{filter:brightness(1.15)}
+    #${CONTAINER} .afz-mx .txt{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:#475569;margin-top:3px}
+    #${CONTAINER} .afz-mx .txt span{display:inline-flex;align-items:center;gap:3px}
+    #${CONTAINER} .afz-mx .txt span.zero{opacity:.4}
+    #${CONTAINER} .afz-mx .txt i{width:8px;height:8px;border-radius:2px;display:inline-block}
+    #${CONTAINER} .afz-mx .txt b{color:#0f172a}
+    #${CONTAINER} .afz-mx .atr{font-size:11px;color:#dc2626;text-align:right}
     #${CONTAINER} .afz-cls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
     #${CONTAINER} .afz-cls-b{border:1px solid #e2e8f0;border-left:5px solid #16a34a;border-radius:10px;padding:10px 12px;min-width:0;cursor:pointer;background:#fff}
     #${CONTAINER} .afz-cls-b:hover{background:#f0fdf4}
@@ -131,7 +145,7 @@
       <div class="afz-filtros">
         <select data-f="tp"><option value="">Tipo: todos</option></select>
         <select data-f="pr"><option value="">Prioridade AFAZ: todas</option></select>
-        <select data-f="ps"><option value="">Prioridade do site: todas</option></select>
+        <select data-f="ps"><option value="">PRIORIDADE (site): todas</option></select>
         <select data-f="st"><option value="">Status: todos</option></select>
         <select data-f="ar"><option value="">Área/Sistema: todas</option></select>
         <input data-f="busca" type="search" placeholder="Buscar site, título, responsável...">
@@ -189,13 +203,14 @@
             <p class="sub">Colunas da aba Prioridades · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela</p>
             <div class="afz-cls" id="afz-cls"></div>
           </div>
-          <div class="afz-card c2">
-            <h3>Prioridade do site x Prioridade do AFAZ</h3>
-            <p class="sub">Pendências em aberto · clique numa célula para filtrar</p>
-            <div class="afz-tab" style="max-height:none"><table class="afz-mx" id="afz-mx"></table></div>
+          <div class="afz-card">
+            <h3>AFAZ abertos por PRIORIDADE</h3>
+            <p class="sub">Coluna PRIORIDADE da aba Prioridades (0 = mais crítico) · clique na linha para filtrar</p>
+            <div class="afz-mx-leg" id="afz-mx-leg"></div>
+            <div class="afz-mx" id="afz-mx"></div>
           </div>
-          <div class="afz-card c4">
-            <h3>Tempo parado, por prioridade do site</h3>
+          <div class="afz-card">
+            <h3>Tempo parado, por PRIORIDADE</h3>
             <p class="sub">Pendências em aberto por faixa de dias no status atual · média de dias ao lado da barra</p>
             <div class="afz-box"><canvas id="afz-g-ps"></canvas></div>
           </div>
@@ -203,7 +218,7 @@
             <h3>Prioridades em aberto</h3>
             <p class="sub" id="afz-ps-sub"></p>
             <div class="afz-tab"><table>
-              <thead><tr><th>AFAZ</th><th>Site</th><th>PRIORIDADE</th><th>Concentrador</th><th>Estratégico</th><th>Isola Móvel</th><th>Isola GPON</th><th>GPON</th><th>Prio. AFAZ</th><th>Tipo</th><th>Status</th><th>Dias no status</th><th>Previsão</th><th>Situação</th><th>Título</th><th>Responsável</th></tr></thead>
+              <thead><tr><th>AFAZ</th><th>Site</th><th>PRIORIDADE</th><th>Concentrador</th><th>Estratégico</th><th>Isola Móvel</th><th>Isola GPON</th><th>GPON</th><th>Tipo</th><th>Status</th><th>Dias no status</th><th>Previsão</th><th>Situação</th><th>Título</th><th>Responsável</th></tr></thead>
               <tbody id="afz-ps-tbody"></tbody>
             </table></div>
           </div>
@@ -222,7 +237,7 @@
     preencher('tp', ORDEM_TIPO.filter(t => it.some(i => i.tp === t)));
     preencher('pr', ORDEM_PR.filter(p => it.some(i => i.pr === p)), 'AFAZ: ');
     NIVEIS_PS.filter(k => it.some(i => psDe(i) === k)).forEach(k =>
-      $('select[data-f="ps"]', el).insertAdjacentHTML('beforeend', `<option value="${k}">Site: ${esc(rotPS(k))}</option>`));
+      $('select[data-f="ps"]', el).insertAdjacentHTML('beforeend', `<option value="${k}">PRIORIDADE ${k === 'sem' ? 'fora da lista' : k}</option>`));
     preencher('st', unicos(it, 'st'));
     preencher('ar', unicos(it, 'ar'));
 
@@ -238,11 +253,11 @@
   }
 
   // ---------------------------------------------------------------- filtro
-  function filtrados() {
+  function filtrados(semPrAfaz) {
     const b = filtro.busca.toLowerCase();
     return dados.itens.filter(i =>
       (!filtro.tp || i.tp === filtro.tp) &&
-      (!filtro.pr || i.pr === filtro.pr) &&
+      (semPrAfaz || !filtro.pr || i.pr === filtro.pr) &&
       (!filtro.ps || psDe(i) === filtro.ps) &&
       (!filtro.st || i.st === filtro.st) &&
       (!filtro.ar || i.ar === filtro.ar) &&
@@ -508,27 +523,28 @@
       const g = itens.filter(i => psDe(i) === k);
       const sites = new Set(g.map(i => i.s)).size;
       const atr = g.filter(i => situacao(i) === 'Atrasado').length;
-      return `<div class="afz-kpi ps" style="border-left-color:${COR_PS[k]}"><small>Sites ${esc(rotPS(k).toLowerCase())}</small>
-        <b>${nf(g.length)}</b><span>${nf(sites)} sites · ${nf(atr)} atrasados</span></div>`;
+      return `<div class="afz-kpi ps" style="border-left-color:${COR_PS[k]}"><small>${esc(rotPS(k))}</small>
+        <b>${nf(g.length)}</b><span>AFAZ abertos · ${nf(sites)} sites · ${nf(atr)} atrasados</span></div>`;
     }).join('');
 
-    // matriz prioridade do site x prioridade do AFAZ
-    const prs = ORDEM_PR.filter(p => itens.some(i => i.pr === p));
-    const cont = (k, p) => itens.filter(i => psDe(i) === k && (!p || i.pr === p)).length;
-    const max = Math.max(1, ...niveis.flatMap(k => prs.map(p => cont(k, p))));
-    const cel = (k, p) => {
-      const v = cont(k, p);
-      const a = v ? 0.12 + 0.78 * v / max : 0;
-      return `<td class="cel" data-ps="${k}" data-pr="${p}" style="background:rgba(29,78,216,${a.toFixed(2)});color:${a > 0.5 ? '#fff' : '#0f172a'}">${v ? nf(v) : '·'}</td>`;
-    };
-    $('#afz-mx').innerHTML =
-      `<thead><tr><th>Site \\ AFAZ</th>${prs.map(p => `<th>${p}</th>`).join('')}<th>Total</th></tr></thead><tbody>` +
-      niveis.map(k => `<tr><td><span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}">${esc(rotPS(k))}</span></td>
-        ${prs.map(p => cel(k, p)).join('')}<td class="cel" data-ps="${k}" data-pr="">${nf(cont(k))}</td></tr>`).join('') +
-      `<tr class="tot"><td>Total</td>${prs.map(p => `<td>${nf(itens.filter(i => i.pr === p).length)}</td>`).join('')}<td>${nf(itens.length)}</td></tr></tbody>`;
-    $('#afz-mx').querySelectorAll('td.cel').forEach(td => td.addEventListener('click', () => {
-      filtro.ps = td.dataset.ps; filtro.pr = td.dataset.pr;
-      $(`select[data-f="ps"]`).value = filtro.ps; $(`select[data-f="pr"]`).value = filtro.pr;
+    // por PRIORIDADE (aba Prioridades): total de AFAZ abertos, sites e atrasados
+    const maxLinha = Math.max(1, ...niveis.map(k => itens.filter(i => psDe(i) === k).length));
+    $('#afz-mx-leg').innerHTML = '';
+    $('#afz-mx').innerHTML = niveis.map(k => {
+      const g = itens.filter(i => psDe(i) === k);
+      const atr = g.filter(i => situacao(i) === 'Atrasado').length;
+      const sites = new Set(g.map(i => i.s)).size;
+      const pct = itens.length ? Math.round(g.length / itens.length * 100) : 0;
+      return `<div class="lin${filtro.ps === k ? ' on' : ''}" data-ps="${k}">
+        <div class="rot"><b>${k === 'sem' ? 'Fora da lista' : 'PRIORIDADE ' + k}</b>${k === '0' ? '<small>mais crítico</small>' : ''}</div>
+        <div class="tot">${nf(g.length)}</div>
+        <div><div class="trilha"><div class="barra" style="width:${Math.max(g.length / maxLinha * 100, 2)}%;background:${COR_PS[k]}"></div></div>
+          <div class="txt"><span>${nf(sites)} sites</span><span>${pct}% dos AFAZ abertos</span></div></div>
+        <div class="atr">${nf(atr)} atras.</div></div>`;
+    }).join('');
+    $('#afz-mx').querySelectorAll('.lin').forEach(l => l.addEventListener('click', () => {
+      filtro.ps = filtro.ps === l.dataset.ps ? '' : l.dataset.ps;
+      $(`select[data-f="ps"]`).value = filtro.ps;
       atualizar();
     }));
 
@@ -564,20 +580,20 @@
 
     // tabela: site mais crítico primeiro, depois prioridade do AFAZ, depois o mais parado
     const lista = itens.slice().sort((a, b) =>
-      (rankPs(psDe(a)) - rankPs(psDe(b))) || (rankPr(a.pr) - rankPr(b.pr)) || ((b.dst || 0) - (a.dst || 0)));
+      (rankPs(psDe(a)) - rankPs(psDe(b))) || ((b.dst || 0) - (a.dst || 0)));
     const LIM = 500;
     $('#afz-ps-tbody').innerHTML = lista.slice(0, LIM).map(i => {
       const k = psDe(i), f = FAIXAS[faixaDe(i.dst || 0)], sit = situacao(i);
       return `<tr><td>${esc(i.id)}</td><td>${esc(i.s)}</td>
         <td><span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}">${k === 'sem' ? '—' : k}</span></td>
-        ${ATRIB.map(a => celAt(i[a.k])).join('')}<td>${esc(i.pr)}</td>
+        ${ATRIB.map(a => celAt(i[a.k])).join('')}
         <td><span class="afz-tag" style="background:${COR_TIPO[i.tp] || '#94a3b8'}">${esc(i.tp)}</span></td>
         <td>${esc(i.st)}</td><td><span class="afz-tag" style="background:${f.cor};color:${f.max === 30 || f.max === 60 ? '#0f172a' : '#fff'}">${nf(i.dst)} d</span></td>
         <td>${dataBR(i.prev)}</td><td><span class="afz-tag" style="background:${COR_SIT[sit]}">${sit}</span></td>
         <td class="ti">${esc(i.ti)}</td><td>${esc(i.resp)}</td></tr>`;
     }).join('');
     const atr = lista.filter(i => situacao(i) === 'Atrasado').length;
-    $('#afz-ps-sub').textContent = `${nf(lista.length)} AFAZ em aberto · ${nf(atr)} com previsão vencida · ordenado por prioridade do site, prioridade do AFAZ e dias parado` +
+    $('#afz-ps-sub').textContent = `${nf(lista.length)} AFAZ em aberto · ${nf(atr)} com previsão vencida · ordenado pela PRIORIDADE do site e pelos dias parado` +
       (lista.length > LIM ? ` · mostrando os ${LIM} primeiros (use os filtros)` : '');
 
     // contador na aba: pendências em sites prioridade 0 e 1
@@ -627,6 +643,7 @@
     document.querySelectorAll(`#${CONTAINER} .afz-abas button`).forEach(b => b.classList.toggle('on', b.dataset.aba === aba));
     $('#afz-v-geral').hidden = aba !== 'geral';
     $('#afz-v-prio').hidden = aba !== 'prio';
+    $('select[data-f="pr"]').hidden = aba === 'prio'; // P0..P3 não se aplica nesta aba
     window.afazResize();
   }
 
@@ -648,7 +665,7 @@
     const pm = gProg();
     kpis(itens, pm);
     tabela(itens);
-    abaPrio(itens);
+    abaPrio(filtrados(true)); // a aba Prioridades usa só a PRIORIDADE do site
   }
 
   // Aceita o JSON novo ({itens, tratados, programado, executado}) e também o formato antigo
