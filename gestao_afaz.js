@@ -102,15 +102,17 @@
     #${CONTAINER} table.afz-mx td.cel{cursor:pointer;font-weight:600}
     #${CONTAINER} table.afz-mx td.cel:hover{outline:2px solid #1d4ed8;outline-offset:-2px}
     #${CONTAINER} table.afz-mx tr.tot td{font-weight:700;background:#f8fafc}
-    #${CONTAINER} .afz-cls{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
-    #${CONTAINER} .afz-cls-b{border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;min-width:0}
-    #${CONTAINER} .afz-cls-b h4{margin:0 0 6px;font-size:13px;color:#0f172a}
-    #${CONTAINER} .afz-cls-b td,#${CONTAINER} .afz-cls-b th{padding:4px 6px}
-    #${CONTAINER} .afz-cls-b th{background:#f8fafc;position:static}
-    #${CONTAINER} .afz-cls-b td:not(:first-child),#${CONTAINER} .afz-cls-b th:not(:first-child){text-align:right}
-    #${CONTAINER} .afz-cls-b tr.cls-l{cursor:pointer}
-    #${CONTAINER} .afz-cls-b tr.cls-l:hover td{background:#eff6ff}
-    #${CONTAINER} .afz-cls-b tr.cls-l.on td{background:#dbeafe}
+    #${CONTAINER} .afz-cls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+    #${CONTAINER} .afz-cls-b{border:1px solid #e2e8f0;border-left:5px solid #16a34a;border-radius:10px;padding:10px 12px;min-width:0;cursor:pointer;background:#fff}
+    #${CONTAINER} .afz-cls-b:hover{background:#f0fdf4}
+    #${CONTAINER} .afz-cls-b.on{background:#dcfce7;outline:2px solid #16a34a}
+    #${CONTAINER} .afz-cls-b.tot{border-left-color:#1d4ed8}
+    #${CONTAINER} .afz-cls-b.tot.on{background:#dbeafe;outline-color:#1d4ed8}
+    #${CONTAINER} .afz-cls-b h4{margin:0 0 4px;font-size:12px;color:#64748b;font-weight:600}
+    #${CONTAINER} .afz-cls-b b.n{font-size:26px;line-height:1.1;color:#0f172a;margin-right:6px}
+    #${CONTAINER} .afz-cls-b small{font-size:11px;color:#64748b}
+    #${CONTAINER} .afz-cls-b .det{font-size:11px;color:#64748b;margin:2px 0 6px}
+    #${CONTAINER} .afz-cls-b .ps{display:flex;flex-wrap:wrap;gap:4px}
     #${CONTAINER} .afz-aviso{padding:10px 14px;margin-bottom:12px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:13px}
     @media (max-width:900px){#${CONTAINER} .afz-grid,#${CONTAINER} .afz-tipo{grid-template-columns:1fr}#${CONTAINER} .afz-card{grid-column:1/-1!important}}`;
     const st = document.createElement('style');
@@ -183,8 +185,8 @@
         <div class="afz-kpis" id="afz-kpis-ps"></div>
         <div class="afz-grid">
           <div class="afz-card full">
-            <h3>AFAZ abertos por classificação do site</h3>
-            <p class="sub">Colunas da aba Prioridades · AFAZ em aberto, sites e atrasados por valor · clique numa linha para filtrar</p>
+            <h3>AFAZ abertos em sites marcados como "Sim"</h3>
+            <p class="sub">Colunas da aba Prioridades · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela</p>
             <div class="afz-cls" id="afz-cls"></div>
           </div>
           <div class="afz-card c2">
@@ -245,7 +247,8 @@
       (!filtro.st || i.st === filtro.st) &&
       (!filtro.ar || i.ar === filtro.ar) &&
       (!filtro.site || i.s === filtro.site) &&
-      (!filtro.cls || valAt(i, filtro.cls.split('|')[0]) === filtro.cls.split('|').slice(1).join('|')) &&
+      (!filtro.cls || (filtro.cls === 'any|Sim' ? algumSim(i)
+        : valAt(i, filtro.cls.split('|')[0]) === filtro.cls.split('|').slice(1).join('|'))) &&
       (!b || [i.s, i.ti, i.resp, i.ar, i.id].some(v => String(v || '').toLowerCase().includes(b))));
   }
 
@@ -593,38 +596,28 @@
     return `<td>${esc(t)}</td>`;
   }
 
-  // quadro: para cada coluna da aba Prioridades, quantos AFAZ abertos por valor
+  // quadro: para cada coluna da aba Prioridades, quantos AFAZ abertos com "Sim"
+  const ehSim = v => /^sim$/i.test(String(v == null ? '' : v).trim());
+  const algumSim = i => ATRIB.some(a => ehSim(i[a.k]));
   function quadroClassificacao(itens) {
-    const fim = v => v === 'Fora da lista' ? 2 : v === 'Em branco' ? 1 : 0;
-    const ordemVal = (a, b) => fim(a) - fim(b) ||
-      (/^sim$/i.test(b) - /^sim$/i.test(a)) || 0;
-    const bloco = (titulo, linhas) => `<div class="afz-cls-b"><h4>${esc(titulo)}</h4><table>
-      <thead><tr><th>Valor</th><th>AFAZ</th><th>Sites</th><th>Atras.</th></tr></thead><tbody>${linhas}</tbody></table></div>`;
-    const linha = (rot, g, attrs, ativo) => `<tr class="cls-l${ativo ? ' on' : ''}" ${attrs}>
-      <td>${rot}</td><td><b>${nf(g.length)}</b></td><td>${nf(new Set(g.map(i => i.s)).size)}</td>
-      <td>${nf(g.filter(i => situacao(i) === 'Atrasado').length)}</td></tr>`;
+    const cards = ATRIB.map(a => ({ chave: a.k + '|Sim', nome: a.nome, g: itens.filter(i => ehSim(i[a.k])) }));
+    cards.push({ chave: 'any|Sim', nome: 'Pelo menos um Sim', g: itens.filter(algumSim), total: true });
 
-    // PRIORIDADE
-    let html = bloco('PRIORIDADE', NIVEIS_PS.filter(k => itens.some(i => psDe(i) === k)).map(k =>
-      linha(`<span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}">${esc(k === 'sem' ? 'Fora da lista' : k)}</span>`,
-        itens.filter(i => psDe(i) === k), `data-ps="${k}"`, filtro.ps === k)).join(''));
+    $('#afz-cls').innerHTML = cards.map(c => {
+      const sites = new Set(c.g.map(i => i.s)).size;
+      const atr = c.g.filter(i => situacao(i) === 'Atrasado').length;
+      // quebra pela PRIORIDADE do site
+      const porPs = NIVEIS_PS.filter(k => c.g.some(i => psDe(i) === k)).map(k =>
+        `<span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}" title="${esc(rotPS(k))}">${k === 'sem' ? '—' : k}: ${nf(c.g.filter(i => psDe(i) === k).length)}</span>`).join(' ');
+      return `<div class="afz-cls-b${c.total ? ' tot' : ''}${filtro.cls === c.chave ? ' on' : ''}" data-cls="${c.chave}">
+        <h4>${c.total ? 'Pelo menos uma coluna = Sim' : esc(c.nome) + ' = Sim'}</h4>
+        <b class="n">${nf(c.g.length)}</b><small>AFAZ abertos</small>
+        <div class="det">${nf(sites)} sites · ${nf(atr)} atrasados</div>
+        <div class="ps">${porPs || '<span class="det">nenhum</span>'}</div></div>`;
+    }).join('');
 
-    // concentrador, estrategico, Isola Movel, Isola Gpon, gpon
-    ATRIB.forEach(a => {
-      const cont = {};
-      itens.forEach(i => { const v = valAt(i, a.k); (cont[v] = cont[v] || []).push(i); });
-      const vals = Object.keys(cont).sort((x, y) => ordemVal(x, y) || cont[y].length - cont[x].length);
-      html += bloco(a.nome, vals.map(v => linha(esc(v), cont[v], `data-cls="${esc(a.k + '|' + v)}"`, filtro.cls === a.k + '|' + v)).join(''));
-    });
-    $('#afz-cls').innerHTML = html;
-
-    $('#afz-cls').querySelectorAll('tr.cls-l').forEach(tr => tr.addEventListener('click', () => {
-      if (tr.dataset.ps !== undefined) {
-        filtro.ps = filtro.ps === tr.dataset.ps ? '' : tr.dataset.ps;
-        $(`select[data-f="ps"]`).value = filtro.ps;
-      } else {
-        filtro.cls = filtro.cls === tr.dataset.cls ? '' : tr.dataset.cls;
-      }
+    $('#afz-cls').querySelectorAll('.afz-cls-b').forEach(cd => cd.addEventListener('click', () => {
+      filtro.cls = filtro.cls === cd.dataset.cls ? '' : cd.dataset.cls;
       atualizar();
     }));
   }
@@ -644,7 +637,7 @@
     const chip = $('#afz-chip-site .afz-chip');
     if (chip) chip.onclick = () => { filtro.site = ''; atualizar(); };
     const [ck, ...cv] = filtro.cls.split('|');
-    const cn = (ATRIB.find(a => a.k === ck) || {}).nome;
+    const cn = ck === 'any' ? 'Pelo menos um' : (ATRIB.find(a => a.k === ck) || {}).nome;
     $('#afz-chip-cls').innerHTML = filtro.cls ? `<span class="afz-chip" title="Remover">${esc(cn)}: ${esc(cv.join('|'))} ✕</span>` : '';
     const chip2 = $('#afz-chip-cls .afz-chip');
     if (chip2) chip2.onclick = () => { filtro.cls = ''; atualizar(); };
