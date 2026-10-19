@@ -132,6 +132,13 @@
     #${CONTAINER} .afz-cls-b .det{font-size:11px;color:#64748b;margin:2px 0 6px}
     #${CONTAINER} .afz-cls-b .ps{display:flex;flex-wrap:wrap;gap:4px}
     #${CONTAINER} .afz-aviso{padding:10px 14px;margin-bottom:12px;border-radius:10px;background:#fef3c7;color:#92400e;font-size:13px}
+    #${CONTAINER} .afz-st-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+    #${CONTAINER} .afz-st-chips button{display:inline-flex;align-items:baseline;gap:6px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;font:inherit;font-size:12px;color:#475569;cursor:pointer}
+    #${CONTAINER} .afz-st-chips button b{font-size:13px;color:#0f172a}
+    #${CONTAINER} .afz-st-chips button small{font-size:11px;color:#94a3b8}
+    #${CONTAINER} .afz-st-chips button:hover{border-color:#93c5fd}
+    #${CONTAINER} .afz-st-chips button.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+    #${CONTAINER} .afz-st-chips button.on b,#${CONTAINER} .afz-st-chips button.on small{color:#fff}
     @media (max-width:900px){#${CONTAINER} .afz-grid,#${CONTAINER} .afz-tipo{grid-template-columns:1fr}#${CONTAINER} .afz-card{grid-column:1/-1!important}}`;
     const st = document.createElement('style');
     st.id = 'afz-css';
@@ -158,7 +165,6 @@
         <button class="afz-limpar" type="button">Limpar filtros</button>
       </div>
       <div id="afz-v-geral">
-      <div id="afz-aviso-st"></div>
       <div class="afz-kpis" id="afz-kpis"></div>
       <div class="afz-grid">
         <div class="afz-card">
@@ -186,6 +192,7 @@
         </div>
         <div class="afz-card c4">
           <h3>Meta Backlog x Executado Backlog x Executado Entrante</h3>
+          <div class="afz-st-chips" id="afz-prog-st"></div>
           <p class="sub" id="afz-prog-sub">Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês</p>
           <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
         </div>
@@ -271,7 +278,7 @@
       (!filtro.tp || i.tp === filtro.tp) &&
       (semPrAfaz || !filtro.pr || i.pr === filtro.pr) &&
       (!filtro.ps || psDe(i) === filtro.ps) &&
-      (!filtro.st || i.st === filtro.st) &&
+      (!filtro.st || ehFechado(filtro.st) || i.st === filtro.st) &&   // status fechado só muda o gráfico Meta x Executado
       (!filtro.ar || i.ar === filtro.ar) &&
       (!filtro.site || i.s === filtro.site) &&
       (!filtro.cls || (filtro.cls === 'any|Sim' ? algumSim(i)
@@ -429,6 +436,25 @@
     });
   }
 
+  // quantos executados de cada status fechado (total da base) — clique filtra só este gráfico
+  function chipsStatus(eps, stF) {
+    const box = $('#afz-prog-st');
+    if (!box) return;
+    if (!eps) { box.innerHTML = ''; return; }
+    const soma = o => Object.values(o || {}).reduce((a, b) => a + Number(b || 0), 0);
+    const nomes = Object.keys(eps).filter(ehFechado).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const lin = nomes.map(n => ({ n, b: soma(eps[n].b), e: soma(eps[n].e) }));
+    const tb = lin.reduce((s, l) => s + l.b, 0), te = lin.reduce((s, l) => s + l.e, 0);
+    const chip = (rot, b, e, val, on) => `<button type="button" class="${on ? 'on' : ''}" data-st="${esc(val)}"
+      title="Backlog ${nf(b)} + Entrante ${nf(e)}">${esc(rot)} <b>${nf(b + e)}</b><small>${nf(b)} + ${nf(e)}</small></button>`;
+    box.innerHTML = chip('Todos executados', tb, te, '', !stF) + lin.map(l => chip(l.n, l.b, l.e, l.n, normSt(l.n) === normSt(stF))).join('');
+    box.querySelectorAll('button').forEach(bt => bt.addEventListener('click', () => {
+      filtro.st = bt.dataset.st;
+      $('select[data-f="st"]').value = filtro.st;
+      atualizar();
+    }));
+  }
+
   // 5. Meta Backlog x Executado Backlog x Executado Entrante
   function gProg() {
     // O JSON deve conter executadoBacklog e executadoEntrante por mês.
@@ -449,6 +475,7 @@
     $('#afz-prog-sub').textContent = (stF && !semDetalhe ? `Somente status ${stF} · ` : '') +
       'Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês' +
       (semDetalhe ? ' · ⚠ filtro de status não aplicado: atualize o Office Script (gerar_dados_afaz.ts) para ter o executado por status' : '');
+    chipsStatus(eps, stF);
     const mesAtual = new Date().toLocaleDateString('sv-SE').slice(0, 7);
     const meses = [...new Set([
       ...Object.keys(prog), ...Object.keys(back), ...Object.keys(ent)
@@ -529,8 +556,10 @@
         }
       }
     });
-    return { mesAtual, prog: prog[mesAtual], exe: back[mesAtual] || 0,
-      entrante: ent[mesAtual] || 0 };
+    // KPIs do topo usam sempre o executado total (o filtro de status fechado muda só o gráfico)
+    const backT = dados.execBacklog || dados.executadoBacklog || {}, entT = dados.execEntrante || dados.executadoEntrante || {};
+    return { mesAtual, prog: prog[mesAtual], exe: backT[mesAtual] || 0,
+      entrante: entT[mesAtual] || 0 };
   }
 
   // ---------------------------------------------------------------- KPIs / tabela
@@ -720,9 +749,6 @@
     $('#afz-chip-cls').innerHTML = filtro.cls ? `<span class="afz-chip" title="Remover">${esc(cn)}: ${esc(cv.join('|'))} ✕</span>` : '';
     const chip2 = $('#afz-chip-cls .afz-chip');
     if (chip2) chip2.onclick = () => { filtro.cls = ''; atualizar(); };
-    $('#afz-aviso-st').innerHTML = ehFechado(filtro.st)
-      ? `<div class="afz-aviso">Status <b>${esc(filtro.st)}</b> é executado (fechado): esses AFAZ não aparecem nas pendências. ` +
-        `Veja quanto foi executado em cada mês no gráfico <b>Meta Backlog x Executado</b>, logo abaixo.</div>` : '';
     gSites(itens);
     gTipo(itens);
     gDias(itens);
