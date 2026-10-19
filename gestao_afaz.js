@@ -26,7 +26,7 @@
     { nome: '61 a 90 dias', max: 90, cor: '#f97316' },
     { nome: 'Mais de 90 dias', max: Infinity, cor: '#dc2626' }
   ];
-  const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8';
+  const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8', COR_ENTRANTE = '#f97316';
   const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
   let dados = null, dadosBrutos = null;
@@ -123,8 +123,8 @@
           <div class="afz-box"><canvas id="afz-g-prio"></canvas></div>
         </div>
         <div class="afz-card c4">
-          <h3>Programado x Executado · mês a mês</h3>
-          <p class="sub">Executado = mudanças para Finalizado, Resolvido ou Pendência Claro no mês (Logs) · % executado abaixo do mês</p>
+          <h3>Meta Backlog x Executado Backlog x Executado Entrante</h3>
+          <p class="sub">Execuções por tipo no mês · % da meta de Backlog abaixo de cada mês</p>
           <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
         </div>
         <div class="afz-card full">
@@ -322,42 +322,59 @@
     });
   }
 
-  // 5. Programado x Executado
+  // 5. Meta Backlog x Executado Backlog x Executado Entrante
   function gProg() {
-    const prog = dados.programado || {}, exe = dados.executado || {};
-    const mesAtual = new Date().toISOString().slice(0, 7);
-    const meses = [...new Set([...Object.keys(prog), ...Object.keys(exe)])].sort();
-    const vProg = meses.map(m => prog[m] != null ? prog[m] : null);
-    const vExe = meses.map(m => m <= mesAtual ? (exe[m] || 0) : null);
-    const pct = meses.map((m, k) => vProg[k] && vExe[k] != null ? Math.round(vExe[k] / vProg[k] * 100) : null);
-    const corPct = v => v == null ? '#64748b' : v >= 100 ? '#16a34a' : v >= 80 ? '#ca8a04' : '#dc2626';
-    const rotulo = { anchor: 'end', align: 'end', offset: 2, font: { size: 10, weight: '600' }, formatter: v => v == null ? '' : nf(v) };
+    // O JSON deve conter executadoBacklog e executadoEntrante por mês.
+    // "programado" é mantido como alternativa para a meta do Backlog.
+    const prog = dados.metaBacklog || dados.programado || {};
+    const back = dados.executadoBacklog || {};
+    const ent = dados.executadoEntrante || {};
+    const mesAtual = new Date().toLocaleDateString('sv-SE').slice(0, 7);
+    const meses = [...new Set([
+      ...Object.keys(prog), ...Object.keys(back), ...Object.keys(ent)
+    ])].sort();
+    const vProg = meses.map(m => prog[m] != null ? Number(prog[m]) : null);
+    const vBack = meses.map(m => m <= mesAtual ? Number(back[m] || 0) : null);
+    const vEnt = meses.map(m => m <= mesAtual ? Number(ent[m] || 0) : null);
+    const pct = meses.map((m, k) => vProg[k] > 0 && vBack[k] != null
+      ? Math.round(vBack[k] / vProg[k] * 100) : null);
+    const rotulo = {
+      anchor: 'end', align: 'end', offset: 2,
+      font: { size: 10, weight: '600' },
+      formatter: v => v == null ? '' : nf(v)
+    };
     desenhar('afz-g-prog', {
       type: 'bar',
       data: {
-        // cada rótulo do eixo X tem duas linhas: mês e % executado
-        labels: meses.map((m, k) => [rotMes(m), pct[k] == null ? '' : pct[k] + '%']),
+        labels: meses.map((m, k) => [rotMes(m), pct[k] == null ? '—' : pct[k] + '%']),
         datasets: [
-          { label: 'Programado', data: vProg, backgroundColor: COR_PROG, datalabels: Object.assign({ color: '#475569' }, rotulo) },
-          { label: 'Executado', data: vExe, backgroundColor: COR_EXEC, datalabels: Object.assign({ color: COR_EXEC }, rotulo) }
+          { label: 'Meta Backlog', data: vProg, backgroundColor: COR_PROG,
+            datalabels: { ...rotulo, color: '#475569' } },
+          { label: 'Executado Backlog', data: vBack, backgroundColor: COR_EXEC,
+            datalabels: { ...rotulo, color: COR_EXEC } },
+          { label: 'Executado Entrante', data: vEnt, backgroundColor: COR_ENTRANTE,
+            datalabels: { ...rotulo, color: COR_ENTRANTE } }
         ]
       },
       options: {
-        layout: { padding: { top: 20 } },
+        layout: { padding: { top: 24 } },
         scales: {
-          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: false,
-               color: c => c.tick && c.tick.label && c.tick.label[1] ? corPct(pct[c.index]) : '#475569' } },
-          y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Qtde AFAZ' } }
+          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: false } },
+          y: { beginAtZero: true, grid: { color: '#f1f5f9' },
+            title: { display: true, text: 'Qtde AFAZ' } }
         },
         plugins: {
           legend: { position: 'bottom' },
           tooltip: { callbacks: {
             title: its => rotMes(meses[its[0].dataIndex]),
-            footer: its => pct[its[0].dataIndex] == null ? '' : `Executado: ${pct[its[0].dataIndex]}% do programado` } }
+            footer: its => pct[its[0].dataIndex] == null ? 'Meta não informada' :
+              `Atingimento da meta Backlog: ${pct[its[0].dataIndex]}%`
+          } }
         }
       }
     });
-    return { mesAtual, prog: prog[mesAtual], exe: exe[mesAtual] || 0 };
+    return { mesAtual, prog: prog[mesAtual], exe: back[mesAtual] || 0,
+      entrante: ent[mesAtual] || 0 };
   }
 
   // ---------------------------------------------------------------- KPIs / tabela
@@ -372,7 +389,7 @@
       ['Entrante pendente', nf(n('Entrante')), ''],
       ['P0 pendentes', nf(itens.filter(i => i.pr === 'P0').length), ''],
       ['Total tratado', nf(trat), 'Finalizado, Resolvido, Pendência Claro'],
-      [`Executado ${rotMes(pm.mesAtual)}`, nf(pm.exe), pm.prog ? `de ${nf(pm.prog)} programados · ${ader}` : 'sem programação no mês']
+      [`Executado Backlog ${rotMes(pm.mesAtual)}`, nf(pm.exe), pm.prog ? `de ${nf(pm.prog)} de meta · ${ader}` : 'sem meta no mês']
     ];
     $('#afz-kpis').innerHTML = cards.map(c => `<div class="afz-kpi"><small>${c[0]}</small><b>${c[1]}</b><span>${c[2]}</span></div>`).join('');
   }
@@ -436,6 +453,9 @@
     d.tratados = d.tratados || tratados;
     d.programado = d.programado || {};
     d.executado = d.executado || {};
+    d.metaBacklog = d.metaBacklog || d.programado;
+    d.executadoBacklog = d.executadoBacklog || {};
+    d.executadoEntrante = d.executadoEntrante || {};
     d.geradoEm = d.geradoEm || d.gerado_em || d.atualizado_em || null;
     return lista.length > 0;
   }
