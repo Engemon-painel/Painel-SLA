@@ -39,7 +39,11 @@
   // vazio: "Fora da lista" se o site não está na aba Prioridades; "Em branco" se está, mas a coluna não foi preenchida
   const valAt = (i, k) => String(i[k] == null ? '' : i[k]).trim() || (psDe(i) === 'sem' ? 'Fora da lista' : 'Em branco');
   const COR_PR_AFAZ = { P0: '#1e3a8a', P1: '#2563eb', P2: '#60a5fa', P3: '#bfdbfe' };
-  const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8', COR_ENTRANTE = '#f97316';
+  const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8', COR_ENTRANTE = '#f97316', COR_TOTAL = '#0f172a';
+  // status fechados (= executados): não aparecem nas pendências, só no gráfico Meta x Executado
+  const FECHADOS = ['finalizado', 'resolvido', 'pendencia claro'];
+  const normSt = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  const ehFechado = s => FECHADOS.includes(normSt(s));
   const MES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
   let dados = null, dadosBrutos = null;
@@ -154,6 +158,7 @@
         <button class="afz-limpar" type="button">Limpar filtros</button>
       </div>
       <div id="afz-v-geral">
+      <div id="afz-aviso-st"></div>
       <div class="afz-kpis" id="afz-kpis"></div>
       <div class="afz-grid">
         <div class="afz-card">
@@ -181,7 +186,7 @@
         </div>
         <div class="afz-card c4">
           <h3>Meta Backlog x Executado Backlog x Executado Entrante</h3>
-          <p class="sub">Execuções por tipo no mês · % da meta de Backlog abaixo de cada mês</p>
+          <p class="sub" id="afz-prog-sub">Execuções por tipo no mês · linha = total executado (Backlog + Entrante) · % da meta de Backlog abaixo de cada mês</p>
           <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
         </div>
         <div class="afz-card full">
@@ -238,7 +243,14 @@
     preencher('pr', ORDEM_PR.filter(p => it.some(i => i.pr === p)), 'AFAZ: ');
     NIVEIS_PS.filter(k => it.some(i => psDe(i) === k)).forEach(k =>
       $('select[data-f="ps"]', el).insertAdjacentHTML('beforeend', `<option value="${k}">PRIORIDADE ${k === 'sem' ? 'fora da lista' : k}</option>`));
-    preencher('st', unicos(it, 'st'));
+    // Status: os em aberto (pendências) e os fechados (executados, vêm do execPorStatus do JSON)
+    const selSt = $('select[data-f="st"]', el);
+    const abertos = unicos(it, 'st').filter(v => !ehFechado(v));
+    const fechados = Object.keys(dados.execPorStatus || {}).filter(ehFechado).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    if (!fechados.length) fechados.push('Finalizado', 'Pendência Claro', 'Resolvido');
+    selSt.insertAdjacentHTML('beforeend',
+      `<optgroup label="Em aberto (pendências)">${abertos.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}</optgroup>` +
+      `<optgroup label="Executados (fechados)">${fechados.map(v => `<option value="${esc(v)}">${esc(v)} · executado</option>`).join('')}</optgroup>`);
     preencher('ar', unicos(it, 'ar'));
 
     el.querySelectorAll('[data-f]').forEach(c => c.addEventListener(c.tagName === 'INPUT' ? 'input' : 'change', () => {
@@ -422,8 +434,21 @@
     // O JSON deve conter executadoBacklog e executadoEntrante por mês.
     // "programado" é mantido como alternativa para a meta do Backlog.
     const prog = dados.metaBacklog || dados.programado || {};
-    const back = dados.execBacklog || dados.executadoBacklog || {};
-    const ent = dados.execEntrante || dados.executadoEntrante || {};
+    let back = dados.execBacklog || dados.executadoBacklog || {};
+    let ent = dados.execEntrante || dados.executadoEntrante || {};
+    // filtro de Status num status fechado: mostra só o executado com aquele status
+    const stF = ehFechado(filtro.st) ? filtro.st : '';
+    const eps = dados.execPorStatus || null;
+    let semDetalhe = false;
+    if (stF) {
+      const k = eps ? Object.keys(eps).find(x => normSt(x) === normSt(stF)) : null;
+      if (k) { back = eps[k].b || {}; ent = eps[k].e || {}; }
+      else if (eps) { back = {}; ent = {}; }
+      else semDetalhe = true;   // JSON antigo, sem o detalhe por status
+    }
+    $('#afz-prog-sub').textContent = (stF && !semDetalhe ? `Somente status ${stF} · ` : '') +
+      'Execuções por tipo no mês · linha = total executado (Backlog + Entrante) · % da meta de Backlog abaixo de cada mês' +
+      (semDetalhe ? ' · ⚠ filtro de status não aplicado: atualize o Office Script (gerar_dados_afaz.ts) para ter o executado por status' : '');
     const mesAtual = new Date().toLocaleDateString('sv-SE').slice(0, 7);
     const meses = [...new Set([
       ...Object.keys(prog), ...Object.keys(back), ...Object.keys(ent)
@@ -431,6 +456,7 @@
     const vProg = meses.map(m => prog[m] != null ? Number(prog[m]) : null);
     const vBack = meses.map(m => m <= mesAtual ? Number(back[m] || 0) : null);
     const vEnt = meses.map(m => m <= mesAtual ? Number(ent[m] || 0) : null);
+    const vTot = meses.map((m, k) => vBack[k] == null ? null : vBack[k] + vEnt[k]);
     const pct = meses.map((m, k) => vProg[k] > 0 && vBack[k] != null
       ? Math.round(vBack[k] / vProg[k] * 100) : null);
     const rotulo = {
@@ -448,11 +474,18 @@
           { label: 'Executado Backlog', data: vBack, backgroundColor: COR_EXEC,
             datalabels: { ...rotulo, color: COR_EXEC } },
           { label: 'Executado Entrante', data: vEnt, backgroundColor: COR_ENTRANTE,
-            datalabels: { ...rotulo, color: COR_ENTRANTE } }
+            datalabels: { ...rotulo, color: COR_ENTRANTE } },
+          // total executado = Backlog + Entrante
+          { type: 'line', label: 'Total executado (Backlog + Entrante)', data: vTot, order: -1,
+            borderColor: COR_TOTAL, backgroundColor: COR_TOTAL, borderWidth: 2, borderDash: [5, 4],
+            pointRadius: 4, pointHoverRadius: 6, spanGaps: false,
+            datalabels: { anchor: 'end', align: 'top', offset: 4, color: '#fff', backgroundColor: COR_TOTAL,
+              borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 }, font: { size: 10, weight: '700' },
+              formatter: v => v == null ? '' : 'Total ' + nf(v) } }
         ]
       },
       options: {
-        layout: { padding: { top: 24 } },
+        layout: { padding: { top: 34 } },
         scales: {
           x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: false } },
           y: { beginAtZero: true, grid: { color: '#f1f5f9' },
@@ -462,8 +495,11 @@
           legend: { position: 'bottom' },
           tooltip: { callbacks: {
             title: its => rotMes(meses[its[0].dataIndex]),
-            footer: its => pct[its[0].dataIndex] == null ? 'Meta não informada' :
-              `Atingimento da meta Backlog: ${pct[its[0].dataIndex]}%`
+            footer: its => {
+              const k = its[0].dataIndex;
+              const tot = vTot[k] == null ? '' : `Total executado: ${nf(vTot[k])} (Backlog ${nf(vBack[k])} + Entrante ${nf(vEnt[k])})\n`;
+              return tot + (pct[k] == null ? 'Meta não informada' : `Atingimento da meta Backlog: ${pct[k]}%`);
+            }
           } }
         }
       }
@@ -484,7 +520,8 @@
       ['Entrante pendente', nf(n('Entrante')), ''],
       ['P0 pendentes', nf(itens.filter(i => i.pr === 'P0').length), ''],
       ['Total tratado', nf(trat), 'Finalizado, Resolvido, Pendência Claro'],
-      [`Executado Backlog ${rotMes(pm.mesAtual)}`, nf(pm.exe), pm.prog ? `de ${nf(pm.prog)} de meta · ${ader}` : 'sem meta no mês']
+      [`Executado Backlog ${rotMes(pm.mesAtual)}`, nf(pm.exe), pm.prog ? `de ${nf(pm.prog)} de meta · ${ader}` : 'sem meta no mês'],
+      [`Executado total ${rotMes(pm.mesAtual)}`, nf(pm.exe + pm.entrante), `Backlog ${nf(pm.exe)} + Entrante ${nf(pm.entrante)}`]
     ];
     $('#afz-kpis').innerHTML = cards.map(c => `<div class="afz-kpi"><small>${c[0]}</small><b>${c[1]}</b><span>${c[2]}</span></div>`).join('');
   }
@@ -658,6 +695,9 @@
     $('#afz-chip-cls').innerHTML = filtro.cls ? `<span class="afz-chip" title="Remover">${esc(cn)}: ${esc(cv.join('|'))} ✕</span>` : '';
     const chip2 = $('#afz-chip-cls .afz-chip');
     if (chip2) chip2.onclick = () => { filtro.cls = ''; atualizar(); };
+    $('#afz-aviso-st').innerHTML = ehFechado(filtro.st)
+      ? `<div class="afz-aviso">Status <b>${esc(filtro.st)}</b> é executado (fechado): esses AFAZ não aparecem nas pendências. ` +
+        `Veja quanto foi executado em cada mês no gráfico <b>Meta Backlog x Executado</b>, logo abaixo.</div>` : '';
     gSites(itens);
     gTipo(itens);
     gDias(itens);
