@@ -1030,7 +1030,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   const ehATratar = s => s === 'Pendente Operação' || s === 'Erro na Justificativa';
   const fechadaRH = (i, j) => (j.auto || calcularStatus(j, i.hePerm, i.tipo)[0]) === 'CONCLUÍDO';   // RH marcou AJUSTADO
 
-  let pend = null, pendErro = '', pendGerado = '', pendFonte = '', pendHistInfo = '';
+  let pend = null, pendErro = '', pendGerado = '', pendFonte = '', pendHistInfo = '', pendFimBase = '';
   const pendSel = new Set();
   const pendFiltro = { tipo: '', sit: 'tratar' };
 
@@ -1086,21 +1086,38 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const hItens = h ? (Array.isArray(h) ? h : (h.itens || [])) : [];
       pendHistInfo = h ? `histórico: ${nf(hItens.length)} pendências` : 'histórico: arquivo ' + ARQ_PEND_HIST + ' não encontrado';
       if (hItens.length) {
-        let aplicadas = 0, soHist = 0, ignoradas = 0;
+        let aplicadas = 0, soHist = 0, foraPeriodo = 0, ignoradas = 0;
         const porChave = {};
         pend.forEach(i => { porChave[chaveP(i)] = i; });
+        // ALTERADO (19/10/2026): última data coberta pela base de pendências atual. Pendência do histórico
+        // com data DEPOIS disso não "sumiu da base" — a base é que ainda não chegou nela — então entra
+        // mesmo sem justificativa (ex.: 13 e 14/10 do fechamento, que estão só na TRATATIVA_GESTORES).
+        const fimBase = pend.filter(i => !i.hist).reduce((m, i) => String(i.d || '') > m ? String(i.d || '') : m, '');
+        pendFimBase = fimBase;
+        // força da resposta: Justificado > Erro na Justificativa > Pendente Operação
+        const peso = (j, i) => { const s = j && COR_SIT[j.status] ? j.status : calcularStatus(j || {}, i.hePerm, i.tipo)[1]; return s === 'Justificado' ? 2 : s === 'Erro na Justificativa' ? 1 : 0; };
         hItens.forEach(x => {
           const atual = porChave[chaveP(x)];
-          if (atual) { if (!(atual.just && atual.just.trat) && x.just && x.just.trat) { atual.just = x.just; aplicadas++; } }
-          else {
-            // não está mais na base atual: só conta se já tinha sido justificada (o que sumiu sem justificativa
-            // foi resolvido no ponto e não é mais pendência)
+          if (atual) {
+            // ALTERADO (19/10/2026): usa a resposta do histórico quando o painel não tem resposta, ou quando a do
+            // histórico é melhor (ex.: erro corrigido) — a não ser que o gestor tenha respondido pelo painel depois.
+            const ja = atual.just || {}, jh = x.just || {};
+            if (!jh.trat) return;
+            const painelDepois = ja.dataResp && (!jh.dataResp || ja.dataResp > jh.dataResp);
+            if (!ja.trat || (!painelDepois && (peso(jh, x) > peso(ja, atual) || (peso(jh, x) === peso(ja, atual) && jh.dataResp && jh.dataResp > (ja.dataResp || ''))))) {
+              atual.just = jh; aplicadas++;
+            }
+          } else {
             const st = x.just && COR_SIT[x.just.status] ? x.just.status : calcularStatus(x.just || {}, x.hePerm, x.tipo)[1];
             if (st === 'Justificado') { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; soHist++; }
+            else if (!fimBase || String(x.d || '') > fimBase) { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; foraPeriodo++; }
+            // dentro do período da base e sem justificativa: sumiu da base = resolvido no ponto
             else ignoradas++;
           }
         });
-        pendHistInfo += ` (${nf(aplicadas)} respostas aplicadas na base atual, ${nf(soHist)} justificadas que saíram da base${ignoradas ? ', ' + nf(ignoradas) + ' sem justificativa que saíram da base (ignoradas)' : ''})`;
+        pendHistInfo += ` (${nf(aplicadas)} respostas aplicadas na base atual, ${nf(soHist)} justificadas que saíram da base` +
+          (foraPeriodo ? `, ${nf(foraPeriodo)} a tratar com data depois da base atual${fimBase ? ' (' + dataBr(fimBase) + ')' : ''}` : '') +
+          (ignoradas ? ', ' + nf(ignoradas) + ' sem justificativa que saíram da base (ignoradas)' : '') + ')';
       }
       pendGerado = (d && d.geradoEm) || '';
       pendFonte = d && d.arquivo ? `arquivo ${d.arquivo} · base ${d.base} · ${d.historico} respostas no histórico` : '';
@@ -1173,7 +1190,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       return `<tr data-id="${esc(i.id)}">
         <td>${fechado ? '' : `<input type="checkbox" class="bh-pd-ck"${pendSel.has(i.id) ? ' checked' : ''}>`}</td>
         <td>${tag(s, COR_SIT[s] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}${s === 'Erro na Justificativa' ? `<small class="bh-pd-err">${esc(auto)}</small>` : ''}</td>
-        <td><b>${esc(i.tipo)}</b>${i.hist ? '<small style="display:block;color:#64748b">fora da base atual</small>' : ''}</td>
+        <td><b>${esc(i.tipo)}</b>${i.hist ? `<small style="display:block;color:#64748b">${pendFimBase && String(i.d || '') > pendFimBase ? 'só no histórico (TRATATIVA_GESTORES)' : 'fora da base atual'}</small>` : ''}</td>
         <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)} · ${esc(i.area || '')}</small></td>
         <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
         <td class="bh-pd-det" title="${esc(i.det)}">${esc(i.det)}</td>
