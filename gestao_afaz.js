@@ -201,12 +201,12 @@
           <p class="sub" id="afz-prog-sub">Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês</p>
           <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
         </div>
-        <div class="afz-card full">
+        <div class="afz-card c2">
           <h3>Por status e carteira</h3>
-          <p class="sub" id="afz-stc-sub">AFAZ tratados (status atual na aba Afaz) por status de fechamento, separados em Backlog e Entrante · clique numa barra para ver esse status no gráfico Meta x Executado</p>
-          <div class="afz-box" style="height:220px"><canvas id="afz-g-stc"></canvas></div>
+          <p class="sub" id="afz-stc-sub">Tratados (status atual na aba Afaz) em Backlog e Entrante · clique na barra para ver o status no Meta x Executado</p>
+          <div class="afz-box alto"><canvas id="afz-g-stc"></canvas></div>
         </div>
-        <div class="afz-card full">
+        <div class="afz-card c4">
           <h3>Visão semanal · Backlog x Entrantes</h3>
           <p class="sub" id="afz-sem-sub">Semana de segunda a domingo · executados contados a partir da W26</p>
           <div class="afz-sem-res" id="afz-sem-res"></div>
