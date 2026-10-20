@@ -672,17 +672,27 @@
   // ---------------------------------------------------------------- KPIs / tabela
   function kpis(itens, pm) {
     const n = t => itens.filter(i => i.tp === t).length;
-    const trat = Object.values(dados.tratados || {}).reduce((a, b) => a + b, 0);
+    const tr = dados.tratados || {};
+    const trat = Object.values(tr).reduce((a, b) => a + b, 0);
     const medDias = itens.length ? Math.round(itens.reduce((s, i) => s + (i.dst || 0), 0) / itens.length) : 0;
     const ader = pm.prog ? Math.round(pm.exe / pm.prog * 100) + '%' : '—';
+    const mes = rotMes(pm.mesAtual);
+    const tp = filtro.tp;   // filtro de Tipo: os cartões de tratado/executado mostram só esse tipo
+    const cardTratado = tp
+      ? [`${tp} tratado`, nf(tr[tp] || 0), `de ${nf(trat)} no total · Finalizado, Resolvido, Pendência Claro`]
+      : ['Total tratado', nf(trat), `Backlog ${nf(tr.Backlog || 0)} · Entrante ${nf(tr.Entrante || 0)}${tr['Sem tipo'] ? ' · Sem tipo ' + nf(tr['Sem tipo']) : ''}`];
+    const cardsExec =
+      tp === 'Backlog' ? [[`Executado Backlog ${mes}`, nf(pm.exe), pm.prog ? `de ${nf(pm.prog)} de meta · ${ader}` : 'sem meta no mês']] :
+      tp === 'Entrante' ? [[`Executado Entrante ${mes}`, nf(pm.entrante), `de ${nf(pm.exe + pm.entrante)} executados no mês`]] :
+      [[`Executado Backlog ${mes}`, nf(pm.exe), pm.prog ? `de ${nf(pm.prog)} de meta · ${ader}` : 'sem meta no mês'],
+       [`Executado total ${mes}`, nf(pm.exe + pm.entrante), `Backlog ${nf(pm.exe)} + Entrante ${nf(pm.entrante)}`]];
     const cards = [
       ['AFAZ pendentes', nf(itens.length), `média de ${medDias} dias no status`],
       ['Backlog pendente', nf(n('Backlog')), ''],
       ['Entrante pendente', nf(n('Entrante')), ''],
       ['P0 pendentes', nf(itens.filter(i => i.pr === 'P0').length), ''],
-      ['Total tratado', nf(trat), 'Finalizado, Resolvido, Pendência Claro'],
-      [`Executado Backlog ${rotMes(pm.mesAtual)}`, nf(pm.exe), pm.prog ? `de ${nf(pm.prog)} de meta · ${ader}` : 'sem meta no mês'],
-      [`Executado total ${rotMes(pm.mesAtual)}`, nf(pm.exe + pm.entrante), `Backlog ${nf(pm.exe)} + Entrante ${nf(pm.entrante)}`]
+      cardTratado,
+      ...cardsExec
     ];
     $('#afz-kpis').innerHTML = cards.map(c => `<div class="afz-kpi"><small>${c[0]}</small><b>${c[1]}</b><span>${c[2]}</span></div>`).join('');
   }
