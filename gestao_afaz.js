@@ -212,6 +212,17 @@
           <div class="afz-sem-res" id="afz-sem-res"></div>
           <div class="afz-box alto"><canvas id="afz-g-sem"></canvas></div>
         </div>
+        <div class="afz-card c2">
+          <h3>Alarmes em aberto</h3>
+          <p class="sub">Área/Sistema com "alarme" · só AFAZ em aberto (não conta os executados)</p>
+          <div class="afz-box" style="height:230px"><canvas id="afz-g-alarme"></canvas></div>
+          <div class="afz-leg" id="afz-leg-alarme" style="margin-top:8px"></div>
+        </div>
+        <div class="afz-card c4">
+          <h3>Alarmes em aberto por mês de abertura</h3>
+          <p class="sub" id="afz-alm-sub">Mês da coluna Abertura · Backlog e Entrante empilhados com o total em cima</p>
+          <div class="afz-box alto"><canvas id="afz-g-alarme-mes"></canvas></div>
+        </div>
         <div class="afz-card full">
           <h3>AFAZ pendentes</h3>
           <p class="sub" id="afz-tab-sub"></p>
@@ -409,6 +420,94 @@
     }).join('');
     $('#afz-leg-tipo').innerHTML = leg +
       '<div style="border-color:#cbd5e1">Backlog = carteira que já estava em aberto · Entrante = demanda nova que entrou na carteira</div>';
+  }
+
+  // 2b. Alarmes em aberto: Área/Sistema que contém "alarme" (Alarme, ALARMES...), Backlog x Entrante
+  const ehAlarme = i => /alarm/i.test(String(i.ar || '').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  function gAlarme(itens) {
+    const al = itens.filter(ehAlarme);
+    const tipos = ORDEM_TIPO.filter(t => al.some(i => i.tp === t));
+    const qt = tipos.map(t => al.filter(i => i.tp === t).length);
+    const tot = al.length;
+    const pctAbertos = itens.length ? Math.round(tot / itens.length * 100) : 0;
+    desenhar('afz-g-alarme', {
+      type: 'doughnut',
+      data: { labels: tipos, datasets: [{ data: qt, backgroundColor: tipos.map(t => COR_TIPO[t]), borderWidth: 2, borderColor: '#fff' }] },
+      plugins: [{
+        id: 'centroAlarme',
+        afterDraw(ch) {
+          const m = ch.getDatasetMeta(0).data[0];
+          if (!m) return;
+          const { ctx } = ch; ctx.save();
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#0f172a'; ctx.font = '700 22px sans-serif'; ctx.fillText(nf(tot), m.x, m.y - 8);
+          ctx.fillStyle = '#64748b'; ctx.font = '11px sans-serif'; ctx.fillText('alarmes em aberto', m.x, m.y + 12);
+          ctx.restore();
+        }
+      }],
+      options: {
+        cutout: '62%',
+        plugins: {
+          legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8 } },
+          datalabels: { color: '#fff', font: { weight: '700', size: 12 }, textAlign: 'center',
+            formatter: v => tot && v ? `${nf(v)}\n${Math.round(v / tot * 100)}%` : '' },
+          tooltip: { callbacks: { label: c => `${c.label}: ${nf(c.raw)} (${tot ? Math.round(c.raw / tot * 100) : 0}% dos alarmes)` } }
+        }
+      }
+    });
+    const linhas = tipos.map((t, k) => {
+      const doTipo = itens.filter(i => i.tp === t).length;
+      return `<div style="border-color:${COR_TIPO[t]}"><b>${esc(t)}</b> · ${nf(qt[k])} alarmes · ${tot ? Math.round(qt[k] / tot * 100) : 0}% dos alarmes<br>` +
+        `${doTipo ? Math.round(qt[k] / doTipo * 100) : 0}% de todo o ${esc(t)} em aberto (${nf(doTipo)})</div>`;
+    }).join('');
+    $('#afz-leg-alarme').innerHTML = tot
+      ? linhas + `<div style="border-color:#cbd5e1">Alarmes = <b>${pctAbertos}%</b> dos ${nf(itens.length)} AFAZ em aberto</div>`
+      : '<div style="border-color:#cbd5e1">Nenhum AFAZ de alarme em aberto com os filtros atuais</div>';
+  }
+
+  // 2c. Alarmes em aberto por mês de Abertura (últimos 12 meses; o que é mais antigo vira uma coluna "Até ...")
+  function gAlarmeMes(itens) {
+    const al = itens.filter(ehAlarme);
+    const MESES_VISIVEIS = 12;
+    const mesAb = i => String(i.ab || '').slice(0, 7);
+    const hojeMes = new Date().toLocaleDateString('sv-SE').slice(0, 7);
+    const ultimo = [hojeMes, ...al.map(mesAb).filter(Boolean)].sort().slice(-1)[0];
+    const [ua, um] = ultimo.split('-').map(Number);
+    const meses = [];
+    for (let k = MESES_VISIVEIS - 1; k >= 0; k--) {
+      const d = new Date(Date.UTC(ua, um - 1 - k, 1));
+      meses.push(d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0'));
+    }
+    const corte = meses[0];
+    const antigos = al.filter(i => mesAb(i) && mesAb(i) < corte);
+    const semData = al.filter(i => !mesAb(i));
+    const ant = new Date(Date.UTC(+corte.slice(0, 4), +corte.slice(5, 7) - 2, 1));
+    const rotAnt = 'Até ' + rotMes(ant.getUTCFullYear() + '-' + String(ant.getUTCMonth() + 1).padStart(2, '0'));
+    const cols = (antigos.length ? [{ rot: rotAnt, f: i => mesAb(i) && mesAb(i) < corte }] : [])
+      .concat(meses.map(m => ({ rot: rotMes(m), f: i => mesAb(i) === m })));
+    const tipos = ORDEM_TIPO.filter(t => al.some(i => i.tp === t));
+    desenhar('afz-g-alarme-mes', {
+      type: 'bar',
+      data: {
+        labels: cols.map(c => c.rot),
+        datasets: tipos.map(t => ({
+          label: t, data: cols.map(c => al.filter(i => i.tp === t && c.f(i)).length), backgroundColor: COR_TIPO[t], stack: 'a',
+          datalabels: Object.assign({}, dlDentro, { color: '#fff' })
+        }))
+      },
+      plugins: [totalNoFim()],
+      options: {
+        layout: { padding: { top: 18 } },
+        scales: {
+          x: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { maxRotation: 0, autoSkip: false, color: '#475569', font: { size: 10 } } },
+          y: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' }, border: { display: false }, ticks: { color: '#94a3b8' } }
+        },
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8 } } }
+      }
+    });
+    $('#afz-alm-sub').textContent = `${nf(al.length)} alarmes em aberto pelo mês da coluna Abertura · Backlog e Entrante empilhados com o total em cima` +
+      (antigos.length ? ` · "${rotAnt}" junta os ${nf(antigos.length)} abertos antes de ${rotMes(corte)}` : '') +
+      (semData.length ? ` · ${nf(semData.length)} sem data de abertura (fora do gráfico)` : '');
   }
 
   // 3. Dias no status por status
@@ -924,6 +1023,8 @@
     if (chip2) chip2.onclick = () => { filtro.cls = ''; atualizar(); };
     gSites(itens);
     gTipo(itens);
+    gAlarme(itens);
+    gAlarmeMes(itens);
     gDias(itens);
     gPrio(itens);
     const pm = gProg();
