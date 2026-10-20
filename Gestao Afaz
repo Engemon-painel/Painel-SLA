@@ -202,6 +202,11 @@
           <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
         </div>
         <div class="afz-card full">
+          <h3>Por status e carteira</h3>
+          <p class="sub" id="afz-stc-sub">AFAZ tratados (status atual na aba Afaz) por status de fechamento, separados em Backlog e Entrante · clique numa barra para ver esse status no gráfico Meta x Executado</p>
+          <div class="afz-box" style="height:220px"><canvas id="afz-g-stc"></canvas></div>
+        </div>
+        <div class="afz-card full">
           <h3>Visão semanal · Backlog x Entrantes</h3>
           <p class="sub" id="afz-sem-sub">Semana de segunda a domingo · executados contados a partir da W26</p>
           <div class="afz-sem-res" id="afz-sem-res"></div>
@@ -574,6 +579,57 @@
       entrante: entT[mesAtual] || 0 };
   }
 
+  // 5b. Por status e carteira: tratados (status atual) por status de fechamento, empilhado Backlog + Entrante
+  function gStatusCarteira() {
+    const T = dados.tratadosPorStatus;
+    if (!T) {
+      $('#afz-stc-sub').textContent = '⚠ Para ver este gráfico, atualize o Office Script do fluxo (gerar_dados_afaz.ts novo) e rode o fluxo de novo.';
+      return;
+    }
+    // junta variações de escrita do mesmo status (ex.: "Pendencia Claro" e "Pendência Claro")
+    const porSt = {};
+    Object.keys(T).forEach(st => {
+      const k = Object.keys(porSt).find(x => normSt(x) === normSt(st)) || st;
+      porSt[k] = porSt[k] || {};
+      Object.keys(T[st]).forEach(tp => { porSt[k][tp] = (porSt[k][tp] || 0) + Number(T[st][tp] || 0); });
+    });
+    const tipos = ['Backlog', 'Entrante'].filter(t => !filtro.tp || filtro.tp === t);
+    const total = st => tipos.reduce((s, t) => s + (porSt[st][t] || 0), 0);
+    const status = Object.keys(porSt).sort((a, b) => total(b) - total(a));
+    desenhar('afz-g-stc', {
+      type: 'bar',
+      data: {
+        labels: status,
+        datasets: tipos.map(t => ({
+          label: t, data: status.map(st => porSt[st][t] || 0), backgroundColor: COR_TIPO[t], stack: 's',
+          borderRadius: 3, borderSkipped: false, barPercentage: 0.75, categoryPercentage: 0.85,
+          datalabels: Object.assign({}, dlDentro, { color: '#fff', font: { size: 11, weight: '700' } })
+        }))
+      },
+      plugins: [totalNoFim()],
+      options: {
+        indexAxis: 'y', layout: { padding: { right: 44 } },
+        scales: {
+          x: { stacked: true, beginAtZero: true, display: false, grid: { display: false } },
+          y: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: '#334155', font: { size: 12 } } }
+        },
+        plugins: {
+          legend: { position: 'top', align: 'start', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14 } },
+          tooltip: { callbacks: { footer: its => { const st = status[its[0].dataIndex]; return `Total ${st}: ${nf(total(st))}`; } } }
+        },
+        onClick: (e, els, ch) => {
+          if (!els.length) return;
+          filtro.st = ch.data.labels[els[0].index];
+          const sel = $('select[data-f="st"]');
+          const op = [...sel.options].find(o => normSt(o.value) === normSt(filtro.st));
+          if (op) { filtro.st = op.value; sel.value = op.value; }
+          setTimeout(atualizar, 0);
+        },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
+    });
+  }
+
   // 6. Visão semanal (semana ISO: segunda a domingo), a partir da W26
   //   Backlog planejado restante = Backlog em aberto no início da W26 − meta mensal (aba Programação) distribuída por dia
   //   Backlog real restante      = Backlog em aberto no início da W26 − Backlog executado desde a W26
@@ -871,6 +927,7 @@
     gDias(itens);
     gPrio(itens);
     const pm = gProg();
+    gStatusCarteira();
     gSemanal();
     kpis(itens, pm);
     tabela(itens);
