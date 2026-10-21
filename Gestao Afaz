@@ -190,18 +190,23 @@
       <div id="afz-v-geral">
       <div class="afz-kpis" id="afz-kpis"></div>
       <div class="afz-grid">
-        <div class="afz-card">
+        <div class="afz-card c2">
           <h3>Top 10 sites com mais pendências</h3>
           <p class="sub">Separado por tipo · clique na barra para filtrar o site</p>
           <div class="afz-box alto"><canvas id="afz-g-sites"></canvas></div>
         </div>
-        <div class="afz-card">
+        <div class="afz-card c2">
           <h3>Tipo: Backlog x Entrante</h3>
           <p class="sub">Pendências atuais por tipo de carteira</p>
           <div class="afz-tipo">
-            <div class="afz-box"><canvas id="afz-g-tipo"></canvas></div>
+            <div class="afz-box" style="height:230px"><canvas id="afz-g-tipo"></canvas></div>
             <div class="afz-leg" id="afz-leg-tipo"></div>
           </div>
+        </div>
+        <div class="afz-card c2">
+          <h3>Em aberto por Tipo Site</h3>
+          <p class="sub" id="afz-pi-sub">Coluna Tipo Site · Backlog e Entrante · clique na barra para filtrar</p>
+          <div class="afz-box alto"><canvas id="afz-g-pi"></canvas></div>
         </div>
         <div class="afz-card c4">
           <h3>Dias no status atual, por status</h3>
@@ -327,6 +332,7 @@
     const [ck, ...resto] = filtro.cls.split('|');
     const v = resto.join('|');
     if (ck === 'pi') return piDe(i) === v;
+    if (ck === 'ts') return tsDe(i) === v;
     if (ck === 'piAll') return piDe(i) !== SEM_PI;
     if (ck === 'any') return algumSim(i);
     return valAt(i, ck) === v;
@@ -342,7 +348,7 @@
       (!filtro.ar || i.ar === filtro.ar) &&
       (!filtro.site || i.s === filtro.site) &&
       passaCls(i) &&
-      (!b || [i.s, i.ti, i.resp, i.ar, i.id, i.pi].some(v => String(v || '').toLowerCase().includes(b))));
+      (!b || [i.s, i.ti, i.resp, i.ar, i.id, i.pi, i.tsi].some(v => String(v || '').toLowerCase().includes(b))));
   }
 
   // ---------------------------------------------------------------- charts
@@ -452,6 +458,45 @@
     }).join('');
     $('#afz-leg-tipo').innerHTML = leg +
       '<div style="border-color:#cbd5e1">Backlog = carteira que já estava em aberto · Entrante = demanda nova que entrou na carteira</div>';
+  }
+
+  // 2a. Em aberto por Tipo Site (coluna "Tipo Site" da aba Afaz: Móvel Concentrador, Hub, Móvel Ponta ...)
+  //     Backlog x Entrante empilhados · clique filtra o painel pelo Tipo Site
+  const tsDe = i => String(i.tsi == null ? '' : i.tsi).trim() || 'Sem tipo site';
+  function gTipoSite(itens) {
+    if (!dados.itens.some(i => 'tsi' in i)) {
+      $('#afz-pi-sub').textContent = '⚠ Para ver este gráfico, atualize o Office Script do fluxo (lê a coluna Tipo Site) e rode o fluxo de novo.';
+      return;
+    }
+    const cont = {};
+    itens.forEach(i => { const v = tsDe(i); cont[v] = (cont[v] || 0) + 1; });
+    const rotulos = Object.keys(cont).sort((a, b) =>
+      (a === 'Sem tipo site') - (b === 'Sem tipo site') || cont[b] - cont[a] || a.localeCompare(b, 'pt-BR'));
+    const tipos = ORDEM_TIPO.filter(t => itens.some(i => i.tp === t));
+    $('#afz-pi-sub').textContent = `${nf(itens.length)} AFAZ em aberto · coluna Tipo Site · Backlog e Entrante · clique na barra para filtrar`;
+    desenhar('afz-g-pi', {
+      type: 'bar',
+      data: {
+        labels: rotulos,
+        datasets: tipos.map(t => ({
+          label: t, backgroundColor: COR_TIPO[t], stack: 'p', datalabels: dlDentro,
+          data: rotulos.map(r => itens.filter(i => tsDe(i) === r && i.tp === t).length)
+        }))
+      },
+      plugins: [totalNoFim()],
+      options: {
+        indexAxis: 'y', layout: { padding: { right: 44 } },
+        scales: { x: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' } }, y: { stacked: true, grid: { display: false } } },
+        plugins: { legend: { position: 'bottom' } },
+        onClick: (e, els, ch) => {
+          if (!els.length) return;
+          const r = ch.data.labels[els[0].index];
+          filtro.cls = filtro.cls === 'ts|' + r ? '' : 'ts|' + r;
+          setTimeout(atualizar, 0);
+        },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
+    });
   }
 
   // 2b. Alarmes em aberto: Área/Sistema que contém "alarme" (Alarme, ALARMES...), Backlog x Entrante
@@ -1173,7 +1218,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v29';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v31';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1205,7 +1250,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v29 (modo Tipo Site: valores sem 0 a 4)';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v31 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
@@ -1258,6 +1303,7 @@
     if (!filtro.cls) return '';
     const [ck, ...cv] = filtro.cls.split('|');
     if (ck === 'pi') return 'Tipo Site: ' + cv.join('|');
+    if (ck === 'ts') return 'Tipo Site: ' + cv.join('|');
     if (ck === 'piAll') return 'Tipo Site: todos preenchidos';
     if (ck === 'any') return 'Pelo menos um: Sim';
     return ((ATRIB.find(a => a.k === ck) || {}).nome || ck) + ': ' + cv.join('|');
@@ -1273,6 +1319,7 @@
     if (chip2) chip2.onclick = () => { filtro.cls = ''; atualizar(); };
     gSites(itens);
     gTipo(itens);
+    gTipoSite(itens);
     gAlarme(itens);
     gAlarmeMes(itens);
     gDias(itens);
