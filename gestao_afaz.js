@@ -1113,15 +1113,18 @@
     const linha = t => `${t} ${nf(tr[t] || 0)} de ${nf(totC(t))} (${pc(t)}%)`;
     const totGeral = totC('Backlog') + totC('Entrante');
     const trGeral = (tr.Backlog || 0) + (tr.Entrante || 0);
-    const cardTratado = tp
+    const cardTotal = tp
+      ? [`${tp} tratado`, nf(tr[tp] || 0), `de ${nf(trat)} no total · Finalizado, Resolvido, Pendência Claro`]
+      : ['Total tratado', nf(trat), `Backlog ${nf(tr.Backlog || 0)} · Entrante ${nf(tr.Entrante || 0)}${tr['Sem tipo'] ? ' · Sem tipo ' + nf(tr['Sem tipo']) : ''}`];
+    const cardPct = tp
       ? [`% executado ${tp}`, pc(tp) + '%', `${nf(tr[tp] || 0)} tratados de ${nf(totC(tp))} · Finalizado, Resolvido, Pendência Claro`]
       : ['% executado', (totGeral ? Math.round(trGeral / totGeral * 100) : 0) + '%', `${linha('Backlog')} · ${linha('Entrante')}`];
     const cards = [
       ['AFAZ pendentes', nf(itens.length), `média de ${medDias} dias no status`],
       ['Backlog pendente', nf(n('Backlog')), ''],
       ['Entrante pendente', nf(n('Entrante')), ''],
-      ['P0 pendentes', nf(itens.filter(i => i.pr === 'P0').length), ''],
-      cardTratado
+      cardPct,       // no lugar do antigo "P0 pendentes"
+      cardTotal
     ];
     $('#afz-kpis').innerHTML = cards.map(c => `<div class="afz-kpi"><small>${c[0]}</small><b>${c[1]}</b><span>${c[2]}</span></div>`).join('');
   }
@@ -1280,7 +1283,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v35';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v36';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1312,7 +1315,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v35 (modo Tipo Site: valores sem 0 a 4)';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v36 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
