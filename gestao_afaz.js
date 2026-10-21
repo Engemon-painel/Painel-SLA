@@ -209,7 +209,7 @@
           <div class="afz-box alto"><canvas id="afz-g-dias"></canvas></div>
         </div>
         <div class="afz-card c2">
-          <h3>Entrantes por mês</h3>
+          <h3>Entraram por mês</h3>
           <p class="sub" id="afz-ent-sub">Entrantes pelo mês da Abertura · todos os status</p>
           <div class="afz-box alto"><canvas id="afz-g-ent"></canvas></div>
         </div>
@@ -570,7 +570,7 @@
 
   // 3b. Entrantes por mês da Abertura, todos os status (de janeiro do ano atual até o mês atual)
   //     total = logsMes[mês].Abertura.Entrante (script novo) ou semanal.ea (script anterior)
-  //     em aberto = Entrantes pendentes (dados.itens) abertos no mês · fechados = total − em aberto
+  //     + Backlog aberto a partir da data de corte (início da W26), empilhado (semanal.ba do script)
   function gEntMes() {
     const ano = new Date().getFullYear(), hoje = new Date().toLocaleDateString('sv-SE').slice(0, 7);
     const meses = [];
@@ -584,14 +584,21 @@
       $('#afz-ent-sub').textContent = '⚠ Para ver este gráfico, atualize o Office Script do fluxo e rode o fluxo de novo.';
       return;
     }
-    const soma = meses.reduce((s, m) => s + (tot[m] || 0), 0);
-    $('#afz-ent-sub').textContent = `${nf(soma)} Entrantes abertos em ${ano} · mês da Abertura · todos os status`;
+    // Backlog aberto a partir da data de corte (início da W26) entra junto com os Entrantes
+    const corte = isoD(inicioSemanaIso(ano, SEM_INICIAL));
+    const ba = (dados.semanal || {}).ba;
+    const bkl = {};
+    if (ba) Object.keys(ba).forEach(d => { if (d >= corte) { const m = d.slice(0, 7); bkl[m] = (bkl[m] || 0) + Number(ba[d]); } });
+    const vEnt = meses.map(m => tot[m] || 0), vBkl = meses.map(m => bkl[m] || 0);
+    const sEnt = vEnt.reduce((a, b) => a + b, 0), sBkl = vBkl.reduce((a, b) => a + b, 0);
+    const ddmm = corte.slice(8, 10) + '/' + corte.slice(5, 7);
+    $('#afz-ent-sub').textContent = `${nf(sEnt + sBkl)} entraram em ${ano} · mês da Abertura · todos os status`;
     desenhar('afz-g-ent', {
       type: 'bar',
       data: {
         labels: meses.map(m => MES_ABREV[+m.slice(5, 7) - 1]),
         datasets: [
-          { label: 'Entrante', data: meses.map(m => tot[m] || 0), backgroundColor: COR_TIPO.Entrante,
+          { label: 'Entraram', data: meses.map((m, k) => vEnt[k] + vBkl[k]), backgroundColor: COR_TIPO.Entrante,
             borderRadius: 4, borderSkipped: false,
             datalabels: { anchor: 'end', align: 'end', offset: 2, color: '#0f172a', font: { size: 11, weight: '700' },
               formatter: v => v ? nf(v) : '' } }
@@ -606,8 +613,8 @@
           y: { beginAtZero: true, display: false, grid: { display: false } }
         },
         plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: c => `${nf(c.raw)} Entrantes` } }
+          legend: { display: false, position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8 } },
+          tooltip: { callbacks: { label: c => `${nf(c.raw)} entraram` } }
         }
       }
     });
@@ -1157,7 +1164,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v24';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v27';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1189,7 +1196,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v24 (modo Tipo Site: valores sem 0 a 4)';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v27 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
