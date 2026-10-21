@@ -39,7 +39,8 @@
     'PONTO ABERTO': ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'],
     'SEM MARCACAO': ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'],
     'INTERJORNADA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO'],
-    'FOLGA NAO CUMPRIDA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO', 'AUSENTE']
+    'FOLGA NAO CUMPRIDA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO', 'AUSENTE'],
+    'ATRASO': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO']
   };
   const TRAT_PADRAO = ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'];
   const TAREFAS_HE = [
@@ -258,18 +259,19 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <button type="button" data-aba="faixa"><span class="ic">👥</span>Funcionários por Faixa</button>
       <button type="button" data-aba="evol"><span class="ic">📈</span>Evolução por Supervisor</button>
       <button type="button" data-aba="pend"><span class="ic">📝</span>Pendências<span class="bh-cont" hidden></span></button>
+      <button type="button" data-aba="atraso"><span class="ic">⏰</span>Atrasos<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="andamento"><span class="ic">📋</span>Andamento por Supervisor</button>
     </nav>
     <div class="bh-conteudo">
     <div class="bh-filtros">
       <select data-f="co"><option value="">Coordenador: todos</option></select>
       <select data-f="sup"><option value="">Supervisor: todos</option></select>
-      <select data-f="tp" data-nao="pend andamento"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
-      <select data-f="cr" data-nao="pend andamento"><option value="">Criticidade: todas</option></select>
-      <select data-f="st" data-nao="pend andamento"><option value="">Status: todos</option></select>
+      <select data-f="tp" data-nao="pend andamento atraso"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
+      <select data-f="cr" data-nao="pend andamento atraso"><option value="">Criticidade: todas</option></select>
+      <select data-f="st" data-nao="pend andamento atraso"><option value="">Status: todos</option></select>
       <select data-pf="tipo" data-so="pend andamento" hidden><option value="">Pendência: todas</option></select>
       <select data-pf="sit" data-so="pend" hidden></select>
-      <select data-pf="folha" data-so="pend andamento" hidden title="Folha (dia 15 a 14)"></select>
+      <select data-pf="folha" data-so="pend andamento atraso" hidden title="Folha (dia 15 a 14)"></select>
       <input data-f="busca" type="search" placeholder="Buscar nome ou matrícula">
       <button type="button" class="bh-limpar">Limpar filtros</button>
     </div>
@@ -371,6 +373,21 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     </div>
 
     <!-- ================= ABA: ANDAMENTO POR SUPERVISOR ================= -->
+    <!-- ================= ABA: ATRASOS ================= -->
+    <div class="bh-aba" data-p="atraso" hidden>
+      <div class="bh-pd-kpis" id="bh-at-kpis"></div>
+      <div class="bh-c" style="margin-bottom:12px">
+        <h3>Atrasos por supervisor</h3>
+        <p class="sub" id="bh-at-g-sub" style="margin:0 0 6px"></p>
+        <div style="position:relative;height:260px"><canvas id="bh-g-at"></canvas></div>
+      </div>
+      <div class="bh-c">
+        <h3>Atrasos para o gestor justificar</h3>
+        <p class="sub" id="bh-at-sub" style="margin:0">Carregando…</p>
+        <div class="bh-tab" style="max-height:640px;margin-top:10px"><table><thead id="bh-at-head"></thead><tbody id="bh-at-body"></tbody></table></div>
+      </div>
+    </div>
+
     <div class="bh-aba" data-p="andamento" hidden>
       <div class="bh-pd-kpis" id="bh-an-kpis"></div>
       <div class="bh-g">
@@ -1202,10 +1219,10 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     renderAndamento();
   }
 
-  function pendFiltrados() {
+  function pendFiltrados(soAtraso) {
     const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
     const fo = folhaSel();
-    return (pend || []).filter(i => liberada(i) &&
+    return (pend || []).filter(i => liberada(i) && (soAtraso ? i.tipo === 'ATRASO' : i.tipo !== 'ATRASO') &&
       (!fo || folhaIniDe(i.d) === fo) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!filtro.tp || i.tpSaldo === filtro.tp) &&
@@ -1290,6 +1307,66 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const todos = $('#bh-pd-todos');
     todos.onchange = () => { lista.slice(0, MAX).forEach(i => { if (!fechadaRH(i, justDe(i))) todos.checked ? pendSel.add(i.id) : pendSel.delete(i.id); }); renderPend(); };
     loteBar(lista);
+    renderAtraso();
+  }
+
+  // =====================================================================
+  // ABA: ATRASOS (pendências tipo ATRASO: entrada mais de 5 min depois do início do turno)
+  // =====================================================================
+  const minDet = (det, rot) => { const m = String(det || '').match(new RegExp(rot + ':\\s*(\\d{1,2}:\\d{2})', 'i')); return m ? m[1] : '—'; };
+  function renderAtraso() {
+    if (!$('#bh-at-kpis') || !pend) return;
+    const base = pendFiltrados(true);
+    const cont = {}; ORDEM_SIT.forEach(st => cont[st] = 0);
+    base.forEach(i => { cont[sitDe(i)] = (cont[sitDe(i)] || 0) + 1; });
+    const aTratar = cont['Pendente Operação'] + cont['Erro na Justificativa'];
+    const minTot = base.reduce((t, i) => t + Math.round((+i.horas || 0) * 60), 0);
+    const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="atraso"] .bh-cont');
+    if (nav) { nav.textContent = aTratar; nav.hidden = !aTratar; }
+    const colab = new Set(base.map(i => i.m)).size;
+    const cards = [['A tratar', aTratar, '#b45309', 'pendente operação + com erro'],
+      ['Justificados', cont['Justificado'], COR_SIT['Justificado'], pct(cont['Justificado'], base.length) + '% do total'],
+      ['Atrasos', base.length, '#334155', `${nf(colab)} colaboradores${folhaSel() ? ' · folha ' + rotFolha(folhaSel()) : ''}`],
+      ['Tempo somado', hMin(minTot / 60).replace('+', ''), '#1e3a8a', base.length ? 'média de ' + Math.round(minTot / base.length) + ' min por atraso' : '']];
+    $('#bh-at-kpis').innerHTML = cards.map(c => `<div class="bh-k" style="background:${c[2]};opacity:1;cursor:default"><small>${c[0]}</small><b>${typeof c[1] === 'number' ? nf(c[1]) : c[1]}</b><span>${c[3]}</span></div>`).join('');
+
+    // gráfico por supervisor (a tratar x justificado)
+    const porSup = {};
+    base.forEach(i => { const k = String(i.sup || '—').trim(); const o = porSup[k] = porSup[k] || { t: 0, j: 0 }; sitDe(i) === 'Justificado' ? o.j++ : o.t++; });
+    const sups = Object.keys(porSup).sort((a, b) => (porSup[b].t + porSup[b].j) - (porSup[a].t + porSup[a].j)).slice(0, 12);
+    $('#bh-at-g-sub').textContent = `${nf(base.length)} atrasos · entrada mais de 5 min depois do início do turno · só dias com entrada e saída marcadas`;
+    desenhar('bh-g-at', {
+      type: 'bar',
+      data: { labels: sups, datasets: [
+        { label: 'A tratar', data: sups.map(k => porSup[k].t), backgroundColor: '#f59e0b', stack: 'a', borderRadius: 3 },
+        { label: 'Justificados', data: sups.map(k => porSup[k].j), backgroundColor: COR_SIT['Justificado'], stack: 'a', borderRadius: 3 }] },
+      options: {
+        indexAxis: 'y',
+        scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } }, y: { stacked: true, grid: { display: false } } },
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8 } },
+          datalabels: { color: '#fff', font: { weight: '700', size: 11 }, formatter: v => v || '' } }
+      }
+    });
+
+    // tabela
+    const lista = base.slice().sort((a, b) => ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (+b.horas || 0) - (+a.horas || 0));
+    $('#bh-at-sub').textContent = `${nf(lista.length)} atrasos · tolerância de 5 minutos · aparecem 2 dias úteis depois da data`;
+    $('#bh-at-head').innerHTML = '<tr><th>Situação</th><th>Colaborador</th><th>Data</th><th>Turno</th><th class="num">Início</th><th class="num">Entrada</th><th class="num">Atraso</th><th>Supervisor</th><th>Justificativa</th><th></th></tr>';
+    $('#bh-at-body').innerHTML = lista.map(i => {
+      const j = justDe(i), st = sitDe(i), fechado = fechadaRH(i, j);
+      return `<tr data-id="${esc(i.id)}">
+        <td>${tag(st, COR_SIT[st] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}</td>
+        <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)} · ${esc(i.area || '')}</small></td>
+        <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
+        <td style="white-space:normal;max-width:220px">${esc(i.turno || '')}</td>
+        <td class="num">${minDet(i.det, 'Início do turno')}</td>
+        <td class="num">${minDet(i.det, 'Entrada')}</td>
+        <td class="num neg">${hMin(-(+i.horas || 0))}</td>
+        <td>${esc(i.sup || '—')}</td>
+        <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b><small>${esc(j.texto || '')}</small>${j.dataResp ? `<small>respondido em ${esc(dataBr(j.dataResp))}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
+        <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
+    }).join('') || '<tr><td colspan="10">Nenhum atraso nesse filtro 🎉</td></tr>';
+    $('#bh-at-body').querySelectorAll('tr[data-id] .bh-pd-btn').forEach(bt => bt.onclick = () => abrirForm([bt.closest('tr').dataset.id]));
   }
 
   // ALTERADO (21/10/2026): gráfico por pendência (barras por tipo, empilhadas por situação)
@@ -1448,6 +1525,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         const txt = await r.text();
         let resp = null; try { resp = JSON.parse(txt); } catch (e) { }
         if (!r.ok || (resp && resp.ok === false)) throw new Error((resp && resp.erro) || ('o fluxo respondeu ' + r.status));
+        // ALTERADO (21/10/2026): o script só grava quando recebe o campo "dados"; sem ele, devolve a exportação
+        // (com "itens" e sem "gravadas") e nada é gravado. Confere a resposta antes de dar como enviado.
+        if (resp && !('gravadas' in resp) && ('itens' in resp || 'geradoEm' in resp))
+          throw new Error('o fluxo rodou mas NÃO gravou: no passo "Executar script", o campo "dados" precisa receber o Corpo do gatilho manual');
+        if (resp && 'gravadas' in resp && !resp.gravadas) throw new Error('o fluxo não gravou nenhuma linha');
         const l = locais(), em = new Date().toISOString();
         corpo.itens.forEach(x => {
           l[x.ID] = { em, j: { trat: x.Tratativa_Gestor, tarefa: x.Tarefa_HE, chamado: x.Chamado, local: x.Local_Atendimento, horario: x.Horario_Ajuste_Marcacoes,
