@@ -8,6 +8,9 @@
      3. Dias no Status por Status (faixas de dias)
      4. Pendências por Prioridade (por Tipo)
      5. Programado x Executado mês a mês
+   Aba "Prioridades em aberto": cards por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA
+   da aba Afaz, campo "pi" no JSON). Se o JSON ainda não tiver "pi", usa o quadro antigo
+   (Concentrador / Estratégico / Isola Móvel / Isola GPON / GPON = Sim).
    Requer Chart.js 4 (e, opcional, chartjs-plugin-datalabels) já carregados.
    ========================================================================= */
 (function () {
@@ -31,13 +34,19 @@
   const COR_PS = { '0': '#b91c1c', '1': '#ea580c', '2': '#ca8a04', '3': '#2563eb', '4': '#64748b', sem: '#cbd5e1' };
   const rotPS = k => k === 'sem' ? 'Fora da lista' : 'PRIORIDADE ' + k;
   const psDe = i => (i.ps === null || i.ps === undefined || i.ps === '') ? 'sem' : String(i.ps);
-  // demais colunas da aba Prioridades
+  // demais colunas da aba Prioridades (quadro antigo, usado só se o JSON não tiver "pi")
   const ATRIB = [
     { k: 'cc', nome: 'Concentrador' }, { k: 'es', nome: 'Estratégico' },
     { k: 'im', nome: 'Isola Móvel' }, { k: 'ig', nome: 'Isola GPON' }, { k: 'gp', nome: 'GPON' }
   ];
   // vazio: "Fora da lista" se o site não está na aba Prioridades; "Em branco" se está, mas a coluna não foi preenchida
   const valAt = (i, k) => String(i[k] == null ? '' : i[k]).trim() || (psDe(i) === 'sem' ? 'Fora da lista' : 'Em branco');
+  // Tipo Site = coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (campo "pi")
+  const SEM_PI = 'Sem tipo site';
+  const temPi = () => !!(dados && dados.itens.some(i => 'pi' in i));
+  const piDe = i => String(i.pi == null ? '' : i.pi).trim() || SEM_PI;
+  const PALETA_PI = ['#16a34a', '#0891b2', '#7c3aed', '#db2777', '#ea580c', '#0d9488', '#4f46e5', '#65a30d', '#b45309', '#475569'];
+  let corPi = {};   // cor fixa por Tipo Site (definida na carga, não muda com o filtro)
   const COR_PR_AFAZ = { P0: '#1e3a8a', P1: '#2563eb', P2: '#60a5fa', P3: '#bfdbfe' };
   const COR_PROG = '#94a3b8', COR_EXEC = '#1d4ed8', COR_ENTRANTE = '#f97316';
   // status fechados (= executados): não aparecem nas pendências, só no gráfico Meta x Executado
@@ -238,8 +247,8 @@
         <div class="afz-kpis" id="afz-kpis-ps"></div>
         <div class="afz-grid">
           <div class="afz-card full">
-            <h3>AFAZ abertos em sites marcados como "Sim"</h3>
-            <p class="sub">Colunas da aba Prioridades · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela</p>
+            <h3 id="afz-cls-tit">AFAZ abertos por Tipo Site</h3>
+            <p class="sub" id="afz-cls-sub">Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela</p>
             <div class="afz-cls" id="afz-cls"></div>
           </div>
           <div class="afz-card">
@@ -257,7 +266,7 @@
             <h3>Prioridades em aberto</h3>
             <p class="sub" id="afz-ps-sub"></p>
             <div class="afz-tab"><table>
-              <thead><tr><th>AFAZ</th><th>Site</th><th>PRIORIDADE</th><th>Concentrador</th><th>Estratégico</th><th>Isola Móvel</th><th>Isola GPON</th><th>GPON</th><th>Tipo</th><th>Status</th><th>Dias no status</th><th>Previsão</th><th>Situação</th><th>Título</th><th>Responsável</th></tr></thead>
+              <thead><tr id="afz-ps-head"></tr></thead>
               <tbody id="afz-ps-tbody"></tbody>
             </table></div>
           </div>
@@ -299,6 +308,16 @@
   }
 
   // ---------------------------------------------------------------- filtro
+  function passaCls(i) {
+    if (!filtro.cls) return true;
+    const [ck, ...resto] = filtro.cls.split('|');
+    const v = resto.join('|');
+    if (ck === 'pi') return piDe(i) === v;
+    if (ck === 'piAll') return piDe(i) !== SEM_PI;
+    if (ck === 'any') return algumSim(i);
+    return valAt(i, ck) === v;
+  }
+
   function filtrados(semPrAfaz) {
     const b = filtro.busca.toLowerCase();
     return dados.itens.filter(i =>
@@ -308,9 +327,8 @@
       (!filtro.st || ehFechado(filtro.st) || i.st === filtro.st) &&   // status fechado só muda o gráfico Meta x Executado
       (!filtro.ar || i.ar === filtro.ar) &&
       (!filtro.site || i.s === filtro.site) &&
-      (!filtro.cls || (filtro.cls === 'any|Sim' ? algumSim(i)
-        : valAt(i, filtro.cls.split('|')[0]) === filtro.cls.split('|').slice(1).join('|'))) &&
-      (!b || [i.s, i.ti, i.resp, i.ar, i.id].some(v => String(v || '').toLowerCase().includes(b))));
+      passaCls(i) &&
+      (!b || [i.s, i.ti, i.resp, i.ar, i.id, i.pi].some(v => String(v || '').toLowerCase().includes(b))));
   }
 
   // ---------------------------------------------------------------- charts
@@ -874,9 +892,12 @@
 
   function abaPrio(itens) {
     const temPs = dados.itens.some(i => 'ps' in i);
-    $('#afz-ps-aviso').innerHTML = temPs ? '' :
-      '<div class="afz-aviso">⚠ O dados_afaz.json ainda não traz a prioridade do site. Atualize o Office Script do fluxo ' +
-      '(gerar_dados_afaz.ts novo, que lê a aba Prioridades) e rode o fluxo de novo.</div>';
+    const avisos = [];
+    if (!temPs) avisos.push('⚠ O dados_afaz.json ainda não traz a prioridade do site. Atualize o Office Script do fluxo ' +
+      '(gerar_dados_afaz.ts novo, que lê a aba Prioridades) e rode o fluxo de novo.');
+    if (!temPi()) avisos.push('⚠ O dados_afaz.json ainda não traz a coluna PRIORIDADE INFRAESTRUTURA (Tipo Site). ' +
+      'Troque o Office Script do fluxo pelo novo e rode o fluxo de novo. Enquanto isso, o quadro mostra as colunas antigas da aba Prioridades.');
+    $('#afz-ps-aviso').innerHTML = avisos.map(a => `<div class="afz-aviso">${a}</div>`).join('');
 
     const niveis = NIVEIS_PS.filter(k => itens.some(i => psDe(i) === k));
     quadroClassificacao(itens);
@@ -941,7 +962,11 @@
       }
     });
 
-    // tabela: site mais crítico primeiro, depois prioridade do AFAZ, depois o mais parado
+    // tabela: site mais crítico primeiro, depois o mais parado
+    const comPi = temPi();
+    const colsClasse = comPi ? '<th>Tipo Site</th>' : ATRIB.map(a => `<th>${esc(a.nome)}</th>`).join('');
+    $('#afz-ps-head').innerHTML = `<th>AFAZ</th><th>Site</th><th>PRIORIDADE</th>${colsClasse}<th>Tipo</th><th>Status</th>` +
+      '<th>Dias no status</th><th>Previsão</th><th>Situação</th><th>Título</th><th>Responsável</th>';
     const lista = itens.slice().sort((a, b) =>
       (rankPs(psDe(a)) - rankPs(psDe(b))) || ((b.dst || 0) - (a.dst || 0)));
     const LIM = 500;
@@ -949,7 +974,7 @@
       const k = psDe(i), f = FAIXAS[faixaDe(i.dst || 0)], sit = situacao(i);
       return `<tr><td>${esc(i.id)}</td><td>${esc(i.s)}</td>
         <td><span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}">${k === 'sem' ? '—' : k}</span></td>
-        ${ATRIB.map(a => celAt(i[a.k])).join('')}
+        ${comPi ? celPi(i) : ATRIB.map(a => celAt(i[a.k])).join('')}
         <td><span class="afz-tag" style="background:${COR_TIPO[i.tp] || '#94a3b8'}">${esc(i.tp)}</span></td>
         <td>${esc(i.st)}</td><td><span class="afz-tag" style="background:${f.cor};color:${f.max === 30 || f.max === 60 ? '#0f172a' : '#fff'}">${nf(i.dst)} d</span></td>
         <td>${dataBR(i.prev)}</td><td><span class="afz-tag" style="background:${COR_SIT[sit]}">${sit}</span></td>
@@ -974,22 +999,54 @@
     if (/^n[aã]o$/i.test(t)) return `<td style="color:#94a3b8">${esc(t)}</td>`;
     return `<td>${esc(t)}</td>`;
   }
+  // célula Tipo Site: etiqueta com a mesma cor do card
+  function celPi(i) {
+    const v = piDe(i);
+    if (v === SEM_PI) return '<td style="color:#94a3b8">—</td>';
+    return `<td><span class="afz-tag" style="background:${corPi[v] || '#475569'}">${esc(v)}</span></td>`;
+  }
 
-  // quadro: para cada coluna da aba Prioridades, quantos AFAZ abertos com "Sim"
+  // quadro antigo: colunas da aba Prioridades com "Sim"
   const ehSim = v => /^sim$/i.test(String(v == null ? '' : v).trim());
   const algumSim = i => ATRIB.some(a => ehSim(i[a.k]));
+
+  // quebra pela PRIORIDADE do site (selos 0: 7 · 1: 498 ...)
+  const selosPs = g => NIVEIS_PS.filter(k => g.some(i => psDe(i) === k)).map(k =>
+    `<span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}" title="${esc(rotPS(k))}">${k === 'sem' ? '—' : k}: ${nf(g.filter(i => psDe(i) === k).length)}</span>`).join(' ');
+
   function quadroClassificacao(itens) {
-    const cards = ATRIB.map(a => ({ chave: a.k + '|Sim', nome: a.nome, g: itens.filter(i => ehSim(i[a.k])) }));
-    cards.push({ chave: 'any|Sim', nome: 'Pelo menos um Sim', g: itens.filter(algumSim), total: true });
+    let cards;
+    if (temPi()) {
+      // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
+      $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela';
+      const cont = {};
+      itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
+      // mantém o card filtrado visível mesmo se a combinação de filtros zerar
+      if (filtro.cls.startsWith('pi|')) { const v = filtro.cls.slice(3); if (!(v in cont)) cont[v] = 0; }
+      const tipos = Object.keys(cont).sort((a, b) =>
+        (a === SEM_PI) - (b === SEM_PI) || cont[b] - cont[a] || a.localeCompare(b, 'pt-BR'));
+      cards = tipos.map(v => ({
+        chave: 'pi|' + v, titulo: v, cor: v === SEM_PI ? '#94a3b8' : (corPi[v] || '#475569'),
+        g: itens.filter(i => piDe(i) === v)
+      }));
+      const comTipo = itens.filter(i => piDe(i) !== SEM_PI);
+      if (tipos.filter(v => v !== SEM_PI).length > 1)
+        cards.push({ chave: 'piAll|', titulo: 'Todos com Tipo Site', g: comTipo, total: true });
+    } else {
+      $('#afz-cls-tit').textContent = 'AFAZ abertos em sites marcados como "Sim"';
+      $('#afz-cls-sub').textContent = 'Colunas da aba Prioridades · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela';
+      cards = ATRIB.map(a => ({ chave: a.k + '|Sim', titulo: a.nome + ' = Sim', g: itens.filter(i => ehSim(i[a.k])) }));
+      cards.push({ chave: 'any|Sim', titulo: 'Pelo menos uma coluna = Sim', g: itens.filter(algumSim), total: true });
+    }
 
     $('#afz-cls').innerHTML = cards.map(c => {
       const sites = new Set(c.g.map(i => i.s)).size;
       const atr = c.g.filter(i => situacao(i) === 'Atrasado').length;
-      // quebra pela PRIORIDADE do site
-      const porPs = NIVEIS_PS.filter(k => c.g.some(i => psDe(i) === k)).map(k =>
-        `<span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}" title="${esc(rotPS(k))}">${k === 'sem' ? '—' : k}: ${nf(c.g.filter(i => psDe(i) === k).length)}</span>`).join(' ');
-      return `<div class="afz-cls-b${c.total ? ' tot' : ''}${filtro.cls === c.chave ? ' on' : ''}" data-cls="${c.chave}">
-        <h4>${c.total ? 'Pelo menos uma coluna = Sim' : esc(c.nome) + ' = Sim'}</h4>
+      const porPs = selosPs(c.g);
+      const borda = c.cor && !c.total ? ` style="border-left-color:${c.cor}"` : '';
+      return `<div class="afz-cls-b${c.total ? ' tot' : ''}${filtro.cls === c.chave ? ' on' : ''}" data-cls="${esc(c.chave)}"${borda}>
+        <h4>${esc(c.titulo)}</h4>
         <b class="n">${nf(c.g.length)}</b><small>AFAZ abertos</small>
         <div class="det">${nf(sites)} sites · ${nf(atr)} atrasados</div>
         <div class="ps">${porPs || '<span class="det">nenhum</span>'}</div></div>`;
@@ -1011,14 +1068,21 @@
   }
 
   // ---------------------------------------------------------------- ciclo
+  function rotuloCls() {
+    if (!filtro.cls) return '';
+    const [ck, ...cv] = filtro.cls.split('|');
+    if (ck === 'pi') return 'Tipo Site: ' + cv.join('|');
+    if (ck === 'piAll') return 'Tipo Site: todos preenchidos';
+    if (ck === 'any') return 'Pelo menos um: Sim';
+    return ((ATRIB.find(a => a.k === ck) || {}).nome || ck) + ': ' + cv.join('|');
+  }
+
   function atualizar() {
     const itens = filtrados();
     $('#afz-chip-site').innerHTML = filtro.site ? `<span class="afz-chip" title="Remover">Site: ${esc(filtro.site)} ✕</span>` : '';
     const chip = $('#afz-chip-site .afz-chip');
     if (chip) chip.onclick = () => { filtro.site = ''; atualizar(); };
-    const [ck, ...cv] = filtro.cls.split('|');
-    const cn = ck === 'any' ? 'Pelo menos um' : (ATRIB.find(a => a.k === ck) || {}).nome;
-    $('#afz-chip-cls').innerHTML = filtro.cls ? `<span class="afz-chip" title="Remover">${esc(cn)}: ${esc(cv.join('|'))} ✕</span>` : '';
+    $('#afz-chip-cls').innerHTML = filtro.cls ? `<span class="afz-chip" title="Remover">${esc(rotuloCls())} ✕</span>` : '';
     const chip2 = $('#afz-chip-cls .afz-chip');
     if (chip2) chip2.onclick = () => { filtro.cls = ''; atualizar(); };
     gSites(itens);
@@ -1033,6 +1097,15 @@
     kpis(itens, pm);
     tabela(itens);
     abaPrio(filtrados(true)); // a aba Prioridades usa só a PRIORIDADE do site
+  }
+
+  // cor fixa para cada Tipo Site (o mais frequente pega a primeira cor da paleta)
+  function definirCoresPi() {
+    corPi = {};
+    const cont = {};
+    dados.itens.forEach(i => { const v = piDe(i); if (v !== SEM_PI) cont[v] = (cont[v] || 0) + 1; });
+    Object.keys(cont).sort((a, b) => cont[b] - cont[a] || a.localeCompare(b, 'pt-BR'))
+      .forEach((v, k) => { corPi[v] = PALETA_PI[k % PALETA_PI.length]; });
   }
 
   // Aceita o JSON novo ({itens, tratados, programado, executado}) e também o formato antigo
@@ -1109,6 +1182,7 @@
     }
     if (Array.isArray(dados)) dados = { registros: dados };
     const formatoAntigo = normalizar(dados);
+    definirCoresPi();
     injetarCSS();
     montarLayout(el);
     atualizar();
