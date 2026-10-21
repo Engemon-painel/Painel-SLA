@@ -40,7 +40,7 @@
     'SEM MARCACAO': ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'],
     'INTERJORNADA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO'],
     'FOLGA NAO CUMPRIDA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO', 'AUSENTE'],
-    'ATRASO': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO']
+    'ATRASO': ['BANCO DE HORAS', 'APENAS JUSTIFICAR']   // BANCO DE HORAS só aparece se o colaborador tiver saldo positivo
   };
   const TRAT_PADRAO = ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'];
   const TAREFAS_HE = [
@@ -1133,7 +1133,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       !String(j.texto || '').trim() ? 'INCOMPLETO - FALTA JUSTIFICATIVA' :
       rh === 'NÃO REALIZADO - DEVOLVIDO' ? 'DEVOLVIDO AO GESTOR' :
       trat === 'PAGAMENTO HE' && pend !== 'HORA EXTRA' ? 'INVÁLIDO - PAGAMENTO HE SOMENTE PARA HORA EXTRA' :
-      trat === 'BANCO DE HORAS' && pend !== 'HORA EXTRA' ? 'INVÁLIDO - BANCO DE HORAS SOMENTE PARA HORA EXTRA' :
+      trat === 'BANCO DE HORAS' && pend !== 'HORA EXTRA' && pend !== 'ATRASO' ? 'INVÁLIDO - BANCO DE HORAS SOMENTE PARA HORA EXTRA' :
       trat === 'PAGAMENTO HE' && up(hePerm) === 'NÃO' ? 'INVÁLIDO - BH NEGATIVO NÃO PERMITE PAGAMENTO' :
       trat === 'PAGAMENTO HE' && !String(j.tarefa || '').trim() ? 'INCOMPLETO - FALTA TAREFA HE' :
       trat === 'AJUSTAR PONTO' && (pend === 'PONTO ABERTO' || pend === 'SEM MARCACAO') && !String(j.horario || '').trim() ? 'INCOMPLETO - FALTA HORÁRIO/MARCAÇÃO' :
@@ -1440,7 +1440,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const tipo = itens[0].tipo;
     const permitido = itens.every(i => up(i.hePerm) !== 'NÃO');
     const atual = itens.length === 1 ? justDe(itens[0]) : {};
-    const trats = TRATATIVAS[tipo] || TRAT_PADRAO;
+    // ATRASO: desconta do banco só quando todos os selecionados têm saldo positivo; senão, apenas justificar
+    const temBanco = itens.every(i => (+i.saldo || 0) > 0);
+    const trats = (TRATATIVAS[tipo] || TRAT_PADRAO).filter(t => !(tipo === 'ATRASO' && t === 'BANCO DE HORAS' && !temBanco));
     const ehHE = tipo === 'HORA EXTRA';
 
     const modal = document.createElement('div');
@@ -1449,6 +1451,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <div class="bh-modal-topo"><h3>Justificar · ${esc(tipo)}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
       <div class="bh-modal-lista">${itens.slice(0, 8).map(i => `<div><b>${esc(i.n)}</b> · ${dataBr(i.d)} (${esc(i.dia || '')}) · <span>${esc(i.det)}</span></div>`).join('')}${itens.length > 8 ? `<div>… e mais ${itens.length - 8}</div>` : ''}</div>
       ${ehHE && !permitido ? '<div class="bh-aviso">⚠ BH negativo: a HE não pode ser paga. Use "BANCO DE HORAS" para compensar o débito.</div>' : ''}
+      ${tipo === 'ATRASO' ? (temBanco ? '<div class="bh-aviso" style="background:#ecfdf5;color:#065f46">Colaborador com saldo positivo: o atraso pode ser descontado do banco de horas.</div>' : '<div class="bh-aviso">Sem saldo positivo no banco de horas: o atraso só pode ser justificado.</div>') : ''}
       <div class="bh-form">
 
         <label>Tratativa<select data-c="trat"><option value="">— escolha —</option>${trats.map(t => `<option value="${esc(t)}"${atual.trat === t ? ' selected' : ''}${t === 'PAGAMENTO HE' && !permitido ? ' disabled' : ''}>${esc(t)}${t === 'PAGAMENTO HE' && !permitido ? ' (bloqueado: BH negativo)' : ''}</option>`).join('')}</select></label>
@@ -1476,6 +1479,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const j = ler();
       modal.querySelector('[data-campo="tarefa"]').hidden = !(ehHE && j.trat === 'PAGAMENTO HE');   // BANCO DE HORAS não pede tarefa
       modal.querySelector('[data-campo="chamado"]').hidden = !ehHE;
+      modal.querySelector('[data-campo="local"]').hidden = tipo === 'ATRASO';
       modal.querySelector('[data-campo="horario"]').hidden = j.trat !== 'AJUSTAR PONTO';
       const r = itens.map(i => calcularStatus(j, i.hePerm, i.tipo));
       const ruim = r.find(x => x[1] !== 'Justificado');
