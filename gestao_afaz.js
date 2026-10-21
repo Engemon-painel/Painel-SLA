@@ -828,7 +828,7 @@
   function gLogsMes() {
     const L = dados.logsMes;
     const box = $('#afz-prog-st');
-    $('#afz-prog-tit').textContent = 'Devolvido x Finalizado x Resolvido por mês';
+    $('#afz-prog-tit').textContent = 'Meta x Devolvido x Finalizado x Resolvido por mês';
     if (!L || !Object.keys(L).length) {
       box.innerHTML = '';
       $('#afz-prog-sub').textContent = '⚠ Para ver este gráfico, atualize o Office Script do fluxo (script_afaz.ts novo, que lê a aba Logs) e rode o fluxo de novo.';
@@ -849,18 +849,28 @@
 
     const anos = [...new Set(meses.map(m => m.slice(0, 4)))];
     const total = totalTipo(tpLogs);
+    // Meta do mês (aba Programação) e % = Resolvido / Meta (só o Resolvido conta)
+    const metaObj = dados.metaBacklog || dados.programado || {};
+    const vMeta = meses.map(m => metaObj[m] != null && metaObj[m] !== '' ? Number(metaObj[m]) : null);
+    const vRes = meses.map(m => val(m, 'Resolvido', tpLogs));
+    const pct = meses.map((m, k) => vMeta[k] > 0 ? Math.round(vRes[k] / vMeta[k] * 100) : null);
     $('#afz-prog-sub').textContent = `${tpLogs || 'Backlog + Entrante'} · total no período: ${nf(total)} · ` +
-      'cada mudança de status registrada na aba Logs, no mês da Data';
+      'cada mudança de status registrada na aba Logs, no mês da Data · % abaixo do mês = Resolvido ÷ Meta';
 
     desenhar('afz-g-prog', {
       type: 'bar',
       data: {
-        labels: meses.map(m => MES_ABREV[+m.slice(5, 7) - 1] + (anos.length > 1 ? '/' + m.slice(2, 4) : '')),
-        datasets: ST_LOG.map(st => ({
+        labels: meses.map((m, k) => [MES_ABREV[+m.slice(5, 7) - 1] + (anos.length > 1 ? '/' + m.slice(2, 4) : ''),
+          pct[k] == null ? '—' : pct[k] + '%']),
+        datasets: [{
+          label: 'Meta', backgroundColor: COR_PROG, data: vMeta,
+          datalabels: { anchor: 'end', align: 'end', offset: 2, color: '#64748b', font: { size: 11, weight: '600' },
+            formatter: v => v ? nf(v) : '' }
+        }].concat(ST_LOG.map(st => ({
           label: st.nome, backgroundColor: st.cor, data: meses.map(m => val(m, st.nome, tpLogs)),
           datalabels: { anchor: 'end', align: 'end', offset: 2, color: st.txt, font: { size: 11, weight: '600' },
             formatter: v => v ? nf(v) : '' }
-        }))
+        })))
       },
       options: {
         layout: { padding: { top: 22 } },
@@ -874,10 +884,11 @@
         plugins: {
           legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14 } },
           tooltip: { callbacks: {
+            title: its => rotMes(meses[its[0].dataIndex]),
             footer: its => {
-              const m = meses[its[0].dataIndex];
-              const t = tpLogs ? '' : `\nBacklog ${nf(val(m, its[0].dataset.label, 'Backlog'))} · Entrante ${nf(val(m, its[0].dataset.label, 'Entrante'))}`;
-              return t;
+              const k = its[0].dataIndex, m = meses[k], lab = its[0].dataset.label;
+              const t = (tpLogs || lab === 'Meta') ? '' : `Backlog ${nf(val(m, lab, 'Backlog'))} · Entrante ${nf(val(m, lab, 'Entrante'))}\n`;
+              return t + (pct[k] == null ? 'Meta não informada' : `Resolvido ÷ Meta: ${pct[k]}%`);
             }
           } }
         }
@@ -1162,7 +1173,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v28';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v29';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1194,7 +1205,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v28 (modo Tipo Site: valores sem 0 a 4)';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v29 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
