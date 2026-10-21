@@ -156,6 +156,19 @@
     #${CONTAINER} .afz-sem-res .ruim{color:#dc2626;font-weight:600}
     #${CONTAINER} .afz-sem-res .bom{color:#16a34a;font-weight:600}
     #${CONTAINER} .afz-st-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+    #${CONTAINER} .afz-prog-wrap{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}
+    #${CONTAINER} .afz-pleg{width:240px;font-size:12px;color:#334155}
+    #${CONTAINER} .afz-pleg:empty{display:none}
+    #${CONTAINER} .afz-pleg .bl{border-left:4px solid;padding:8px 10px;margin-bottom:8px;background:#f8fafc;border-radius:0 8px 8px 0}
+    #${CONTAINER} .afz-pleg .bl h5{margin:0 0 4px;font-size:13px;color:#0f172a}
+    #${CONTAINER} .afz-pleg .ln{display:flex;justify-content:space-between;gap:8px;padding:1px 0}
+    #${CONTAINER} .afz-pleg .ln b{color:#0f172a}
+    #${CONTAINER} .afz-pleg .pct{font-size:20px;font-weight:700;line-height:1.1;margin-top:4px}
+    #${CONTAINER} .afz-pleg .pct small{font-size:11px;font-weight:400;color:#64748b;margin-left:4px}
+    #${CONTAINER} .afz-pleg .ruim{color:#dc2626}
+    #${CONTAINER} .afz-pleg .bom{color:#16a34a}
+    #${CONTAINER} .afz-pleg .per{font-size:11px;color:#64748b;margin:0 0 6px}
+    @media (max-width:900px){#${CONTAINER} .afz-prog-wrap{grid-template-columns:1fr}#${CONTAINER} .afz-pleg{width:auto}}
     #${CONTAINER} .afz-st-chips button{display:inline-flex;align-items:baseline;gap:6px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;font:inherit;font-size:12px;color:#475569;cursor:pointer}
     #${CONTAINER} .afz-st-chips button b{font-size:13px;color:#0f172a}
     #${CONTAINER} .afz-st-chips button small{font-size:11px;color:#94a3b8}
@@ -227,7 +240,7 @@
           <h3 id="afz-prog-tit">Meta Backlog x Executado Backlog x Executado Entrante</h3>
           <div class="afz-st-chips" id="afz-prog-st"></div>
           <p class="sub" id="afz-prog-sub">Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês</p>
-          <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
+          <div class="afz-prog-wrap"><div class="afz-box"><canvas id="afz-g-prog"></canvas></div><div class="afz-pleg" id="afz-prog-leg"></div></div>
         </div>
         <div class="afz-card c2">
           <h3>Por status e carteira</h3>
@@ -710,6 +723,7 @@
       const mesAt = new Date().toLocaleDateString('sv-SE').slice(0, 7);
       return { mesAtual: mesAt, prog: prog[mesAt], exe: back[mesAt] || 0, entrante: ent[mesAt] || 0 };
     }
+    if ($('#afz-prog-leg')) $('#afz-prog-leg').innerHTML = '';
     // filtro de Status num status fechado: mostra só o executado com aquele status
     const stF = ehFechado(filtro.st) ? filtro.st : '';
     const eps = dados.execPorStatus || null;
@@ -869,6 +883,53 @@
     { nome: 'Finalizado', cor: '#16a34a', txt: '#475569' },
     { nome: 'Resolvido', cor: '#facc15', txt: '#475569' }
   ];
+  // legenda ao lado do gráfico: Backlog (Resolvido x Meta) e Entrante (Resolvido x o que entrou)
+  // período = meses com meta informada (aba Programação) · só o status Resolvido conta
+  function legendaMeta(meses, metaObj, val) {
+    const box = $('#afz-prog-leg');
+    if (!box) return;
+    const L = dados.logsMes || {};
+    const comMeta = meses.filter(m => Number(metaObj[m] || 0) > 0);
+    const per = comMeta.length ? comMeta : meses;
+    const mesAt = new Date().toLocaleDateString('sv-SE').slice(0, 7);
+    const somaM = (lista, f) => lista.reduce((s, m) => s + f(m), 0);
+    const entrou = m => Number((((L[m] || {}).Abertura) || {}).Entrante || 0);
+    const pctTxt = (fez, alvo) => alvo > 0 ? Math.round(fez / alvo * 100) : null;
+    const bloco = (titulo, cor, rotAlvo, alvo, fez, rotMesAt, alvoMes, fezMes) => {
+      const p = pctTxt(fez, alvo), falta = Math.max(0, alvo - fez), pm = pctTxt(fezMes, alvoMes);
+      return `<div class="bl" style="border-color:${cor}"><h5>${titulo}</h5>
+        <div class="ln"><span>${rotAlvo}</span><b>${nf(alvo)}</b></div>
+        <div class="ln"><span>Resolvido</span><b>${nf(fez)}</b></div>
+        <div class="ln"><span>Falta (devo)</span><b class="${falta ? 'ruim' : 'bom'}">${nf(falta)}</b></div>
+        <div class="pct ${p != null && p >= 100 ? 'bom' : ''}">${p == null ? '—' : p + '%'}<small>do ${rotAlvo.toLowerCase()}</small></div>
+        <div class="ln" style="margin-top:4px"><span>${rotMesAt}</span><b>${nf(fezMes)} de ${nf(alvoMes)}${pm == null ? '' : ' · ' + pm + '%'}</b></div></div>`;
+    };
+    const periodo = per.length ? `${rotMes(per[0])} a ${rotMes(per[per.length - 1])}` : '';
+    // Backlog total da carteira x soma de todos os Resolvidos de Backlog (jan até hoje, aba Logs)
+    const bTot = Number((dados.semanal || {}).bTotal || 0);
+    const resB = somaM(meses, m => val(m, 'Resolvido', 'Backlog'));
+    const pB = pctTxt(resB, bTot);
+    const blocoCarteira = bTot ? `<div class="bl" style="border-color:#1e3a8a"><h5>Backlog · total da carteira</h5>
+        <div class="ln"><span>Backlog que eu tinha</span><b>${nf(bTot)}</b></div>
+        <div class="ln"><span>Resolvidos (soma ${rotMes(meses[0])} a ${rotMes(meses[meses.length - 1])})</span><b>${nf(resB)}</b></div>
+        <div class="ln"><span>Falta</span><b class="${bTot - resB > 0 ? 'ruim' : 'bom'}">${nf(Math.max(0, bTot - resB))}</b></div>
+        <div class="pct">${pB == null ? '—' : pB + '%'}<small>do Backlog resolvido</small></div></div>` : '';
+    // Entrante total (em aberto + já tratados) x soma de todos os Resolvidos de Entrante (jan até hoje)
+    const eTot = dados.itens.filter(i => i.tp === 'Entrante').length + Number((dados.tratados || {}).Entrante || 0);
+    const resE = somaM(meses, m => val(m, 'Resolvido', 'Entrante'));
+    const pE = pctTxt(resE, eTot);
+    const blocoEnt = eTot ? `<div class="bl" style="border-color:${COR_TIPO.Entrante}"><h5>Entrante · total</h5>
+        <div class="ln"><span>Entrantes que eu tenho</span><b>${nf(eTot)}</b></div>
+        <div class="ln"><span>Resolvidos (soma ${rotMes(meses[0])} a ${rotMes(meses[meses.length - 1])})</span><b>${nf(resE)}</b></div>
+        <div class="ln"><span>Falta</span><b class="${eTot - resE > 0 ? 'ruim' : 'bom'}">${nf(Math.max(0, eTot - resE))}</b></div>
+        <div class="pct">${pE == null ? '—' : pE + '%'}<small>do Entrante resolvido</small></div></div>` : '';
+    box.innerHTML = blocoCarteira + blocoEnt + `<div class="per">Período com meta: ${periodo} · só Resolvido</div>` +
+      bloco('Backlog', COR_TIPO.Backlog, 'Meta', somaM(per, m => Number(metaObj[m] || 0)), somaM(per, m => val(m, 'Resolvido', 'Backlog')),
+        'Mês atual', Number(metaObj[mesAt] || 0), val(mesAt, 'Resolvido', 'Backlog')) +
+      bloco('Entrante', COR_TIPO.Entrante, 'Entrou', somaM(per, entrou), somaM(per, m => val(m, 'Resolvido', 'Entrante')),
+        'Mês atual', entrou(mesAt), val(mesAt, 'Resolvido', 'Entrante'));
+  }
+
   let tpLogs = '';   // '' = Backlog + Entrante
   function gLogsMes() {
     const L = dados.logsMes;
@@ -901,6 +962,7 @@
     const pct = meses.map((m, k) => vMeta[k] > 0 ? Math.round(vRes[k] / vMeta[k] * 100) : null);
     $('#afz-prog-sub').textContent = `${tpLogs || 'Backlog + Entrante'} · total no período: ${nf(total)} · ` +
       'cada mudança de status registrada na aba Logs, no mês da Data · % abaixo do mês = Resolvido ÷ Meta';
+    legendaMeta(meses, metaObj, (m, st, t) => val(m, st, t));
 
     desenhar('afz-g-prog', {
       type: 'bar',
@@ -1218,7 +1280,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v31';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v34';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1250,7 +1312,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v31 (modo Tipo Site: valores sem 0 a 4)';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v34 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
