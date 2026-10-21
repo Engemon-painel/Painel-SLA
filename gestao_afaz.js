@@ -902,7 +902,7 @@
   function abaPrio(itens) {
     const temPs = dados.itens.some(i => 'ps' in i);
     const avisos = [];
-    if (!temPs) avisos.push('⚠ O dados_afaz.json ainda não traz a prioridade do site. Atualize o Office Script do fluxo ' +
+    if (!temPs && !modoPi) avisos.push('⚠ O dados_afaz.json ainda não traz a prioridade do site. Atualize o Office Script do fluxo ' +
       '(gerar_dados_afaz.ts novo, que lê a aba Prioridades) e rode o fluxo de novo.');
     if (!temPi()) avisos.push('⚠ O dados_afaz.json ainda não traz a coluna PRIORIDADE INFRAESTRUTURA (Tipo Site). ' +
       'Troque o Office Script do fluxo pelo novo e rode o fluxo de novo. Enquanto isso, o quadro mostra as colunas antigas da aba Prioridades.');
@@ -1229,6 +1229,8 @@
     if (Array.isArray(dados)) dados = { registros: dados };
     const formatoAntigo = normalizar(dados);
     definirCoresPi();
+    // a coluna PRIORIDADE INFRAESTRUTURA vem como P0 ... P4: se tiver, ela vira a PRIORIDADE do painel
+    modoPi = dados.itens.some(i => /[0-4]/.test(String(i.pi == null ? '' : i.pi)));
     injetarCSS();
     montarLayout(el);
     atualizar();
