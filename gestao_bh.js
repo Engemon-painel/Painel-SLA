@@ -31,7 +31,7 @@
   // histórico fixo do que já foi tratado na TRATATIVA_GESTORES antes do painel (não muda)
   const ARQ_PEND_HIST = 'historico_pend_bh.json';   // gerado pelo script_pendencias_bh
   // Cole aqui a URL do gatilho "Quando uma solicitação HTTP for recebida" do fluxo "BH - Gravar justificativa"
-  const FLUXO_JUSTIFICATIVA = 'https://defaultc54e138a79f54294aa9bb004cf8d7f.f7.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/c543ddf154d648c79b86fb6191c44377/triggers/manual/paths/invoke?api-version=1';
+  const FLUXO_JUSTIFICATIVA = 'https://defaultc54e138a79f54294aa9bb004cf8d7f.f7.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/c543ddf154d648c79b86fb6191c44377/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=dtmz5AkW_myFfa3v7OG_VGqXggeIukyWjsjiKe3571U';
   // Tratativas que o gestor pode escolher em cada tipo de pendência
   // Tratativas que o gestor pode escolher (as mesmas da fórmula do Status_Automatico)
   const TRATATIVAS = {
@@ -351,6 +351,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     <div class="bh-aba" data-p="pend" hidden>
       <div id="bh-pd-msg"></div>
       <div class="bh-pd-kpis" id="bh-pd-kpis"></div>
+      <div class="bh-c" style="margin-bottom:12px">
+        <h3>Pendências por tipo</h3>
+        <p class="sub" id="bh-pd-g-sub" style="margin:0 0 6px">Quantidade de cada pendência por situação · clique na barra para filtrar a tabela</p>
+        <div style="position:relative;height:230px"><canvas id="bh-g-pdtipo"></canvas></div>
+      </div>
       <div class="bh-c">
         <div class="bh-evtopo">
           <div>
@@ -1233,6 +1238,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
     // tipo de pendência
     const tipos = {}; base.forEach(i => tipos[i.tipo] = (tipos[i.tipo] || 0) + 1);
+    gPendTipo(base, tipos);
     const raiz = document.getElementById(CONTAINER);
     const sTipo = raiz.querySelector('[data-pf="tipo"]');
     sTipo.innerHTML = `<option value="">Pendência: todas (${nf(base.length)})</option>` + Object.keys(tipos).sort().map(t => `<option value="${esc(t)}"${pendFiltro.tipo === t ? ' selected' : ''}>${esc(t)} (${nf(tipos[t])})</option>`).join('');
@@ -1284,6 +1290,57 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const todos = $('#bh-pd-todos');
     todos.onchange = () => { lista.slice(0, MAX).forEach(i => { if (!fechadaRH(i, justDe(i))) todos.checked ? pendSel.add(i.id) : pendSel.delete(i.id); }); renderPend(); };
     loteBar(lista);
+  }
+
+  // ALTERADO (21/10/2026): gráfico por pendência (barras por tipo, empilhadas por situação)
+  function gPendTipo(base, tipos) {
+    const nomes = Object.keys(tipos).sort((a, b) => tipos[b] - tipos[a] || a.localeCompare(b, 'pt-BR'));
+    const ROT_SIT = { 'Erro na Justificativa': 'Com erro', 'Pendente Operação': 'Pendente Operação', 'Justificado': 'Justificadas' };
+    const sits = ['Pendente Operação', 'Erro na Justificativa', 'Justificado'];
+    const totais = nomes.map(t => tipos[t]);
+    $('#bh-pd-g-sub').textContent = `${nf(base.length)} pendências${folhaSel() ? ' na folha ' + rotFolha(folhaSel()) : ''} · por situação · clique na barra para filtrar a tabela` +
+      (pendFiltro.tipo ? ` · filtrando: ${pendFiltro.tipo}` : '');
+    desenhar('bh-g-pdtipo', {
+      type: 'bar',
+      data: {
+        labels: nomes,
+        datasets: sits.map(st => ({
+          label: ROT_SIT[st], backgroundColor: COR_SIT[st], stack: 'p', borderRadius: 3,
+          data: nomes.map(t => base.filter(i => i.tipo === t && sitDe(i) === st).length),
+          datalabels: { color: '#fff', font: { size: 11, weight: '700' }, formatter: v => v ? nf(v) : '',
+            display: c => { const v = c.dataset.data[c.dataIndex]; const x = c.chart.scales.x; return v && Math.abs(x.getPixelForValue(v) - x.getPixelForValue(0)) > 22; } }
+        }))
+      },
+      plugins: [{
+        id: 'totPend',
+        afterDatasetsDraw(ch) {
+          const { ctx } = ch, metas = ch.data.datasets.map((d, k) => ch.getDatasetMeta(k)).filter(m => !m.hidden);
+          if (!metas.length) return;
+          ctx.save(); ctx.font = '700 12px sans-serif'; ctx.fillStyle = '#0f172a'; ctx.textBaseline = 'middle';
+          ch.data.labels.forEach((_, k) => {
+            const el = metas.reduce((a, m) => (m.data[k] && m.data[k].x > (a ? a.x : -1) ? m.data[k] : a), null);
+            if (el) ctx.fillText(nf(totais[k]), el.x + 6, el.y);
+          });
+          ctx.restore();
+        }
+      }],
+      options: {
+        indexAxis: 'y', layout: { padding: { right: 40 } },
+        scales: {
+          x: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } },
+          y: { stacked: true, grid: { display: false },
+            ticks: { color: c => nomes[c.index] === pendFiltro.tipo ? '#1d4ed8' : '#334155', font: c => ({ size: 12, weight: nomes[c.index] === pendFiltro.tipo ? '700' : '500' }) } }
+        },
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8 } } },
+        onClick: (e, els) => {
+          if (!els.length) return;
+          const t = nomes[els[0].index];
+          pendFiltro.tipo = pendFiltro.tipo === t ? '' : t; pendSel.clear();
+          setTimeout(() => { renderPend(); renderAndamento(); }, 0);
+        },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
+    });
   }
 
   function loteBar(lista) {
