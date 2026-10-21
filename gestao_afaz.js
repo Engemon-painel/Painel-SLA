@@ -779,7 +779,10 @@
       $('#afz-prog-sub').textContent = '⚠ Para ver este gráfico, atualize o Office Script do fluxo (script_afaz.ts novo, que lê a aba Logs) e rode o fluxo de novo.';
       return;
     }
-    const meses = Object.keys(L).sort();
+    // só de janeiro do ano atual até o mês atual
+    const anoAtual = new Date().getFullYear(), mesHoje = new Date().toLocaleDateString('sv-SE').slice(0, 7);
+    const meses = [];
+    for (let m = 1; anoAtual + '-' + String(m).padStart(2, '0') <= mesHoje; m++) meses.push(anoAtual + '-' + String(m).padStart(2, '0'));
     const tiposDe = t => t ? [t] : ['Backlog', 'Entrante', 'Sem tipo'];
     const val = (m, st, t) => tiposDe(t).reduce((s, x) => s + Number(((L[m] || {})[st] || {})[x] || 0), 0);
     const totalTipo = t => meses.reduce((s, m) => s + ST_LOG.reduce((a, st) => a + val(m, st.nome, t), 0), 0);
@@ -1104,7 +1107,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v21';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v22';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1136,7 +1139,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v21 (modo Tipo Site: valores sem 0 a 4)';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v22 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
