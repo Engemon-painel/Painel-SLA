@@ -224,6 +224,12 @@
           <p class="sub" id="afz-stc-sub">Tratados (status atual na aba Afaz) em Backlog e Entrante · clique na barra para ver o status no Meta x Executado</p>
           <div class="afz-box alto"><canvas id="afz-g-stc"></canvas></div>
         </div>
+        <div class="afz-card full">
+          <h3>Status por mês · Abertura x Devolvido x Finalizado x Resolvido</h3>
+          <div class="afz-st-chips" id="afz-lm-tp"></div>
+          <p class="sub" id="afz-lm-sub"></p>
+          <div class="afz-box alto"><canvas id="afz-g-logmes"></canvas></div>
+        </div>
         <div class="afz-card c4">
           <h3>Visão semanal · Backlog x Entrantes</h3>
           <p class="sub" id="afz-sem-sub">Semana de segunda a domingo · executados contados a partir da W26</p>
@@ -756,6 +762,71 @@
     });
   }
 
+  // 5c. Status por mês (aba Logs): Abertura x Devolvido x Finalizado x Resolvido, barras lado a lado
+  //     filtro próprio: Todos / Backlog / Entrante
+  const ST_LOG = [
+    { nome: 'Abertura', cor: '#dc2626', txt: '#475569' },
+    { nome: 'Devolvido', cor: '#1e3a8a', txt: '#475569' },
+    { nome: 'Finalizado', cor: '#16a34a', txt: '#475569' },
+    { nome: 'Resolvido', cor: '#facc15', txt: '#475569' }
+  ];
+  let tpLogs = '';   // '' = Backlog + Entrante
+  function gLogsMes() {
+    const L = dados.logsMes;
+    const box = $('#afz-lm-tp');
+    if (!L || !Object.keys(L).length) {
+      box.innerHTML = '';
+      $('#afz-lm-sub').textContent = '⚠ Para ver este gráfico, atualize o Office Script do fluxo (script_afaz.ts novo, que lê a aba Logs) e rode o fluxo de novo.';
+      return;
+    }
+    const meses = Object.keys(L).sort();
+    const tiposDe = t => t ? [t] : ['Backlog', 'Entrante', 'Sem tipo'];
+    const val = (m, st, t) => tiposDe(t).reduce((s, x) => s + Number(((L[m] || {})[st] || {})[x] || 0), 0);
+    const totalTipo = t => meses.reduce((s, m) => s + ST_LOG.reduce((a, st) => a + val(m, st.nome, t), 0), 0);
+
+    // chips Todos / Backlog / Entrante
+    const chip = (rot, t) => `<button type="button" class="${tpLogs === t ? 'on' : ''}" data-tp="${t}">${rot} <b>${nf(totalTipo(t))}</b></button>`;
+    box.innerHTML = chip('Todos', '') + chip('Backlog', 'Backlog') + chip('Entrante', 'Entrante');
+    box.querySelectorAll('button').forEach(bt => bt.addEventListener('click', () => { tpLogs = bt.dataset.tp; gLogsMes(); }));
+
+    const anos = [...new Set(meses.map(m => m.slice(0, 4)))];
+    const total = totalTipo(tpLogs);
+    $('#afz-lm-sub').textContent = `${tpLogs || 'Backlog + Entrante'} · total no período: ${nf(total)} · ` +
+      'Abertura = mês da coluna Abertura (aba Afaz) · Devolvido, Finalizado e Resolvido = cada mudança de status registrada na aba Logs';
+
+    desenhar('afz-g-logmes', {
+      type: 'bar',
+      data: {
+        labels: meses.map(m => MES_ABREV[+m.slice(5, 7) - 1] + (anos.length > 1 ? '/' + m.slice(2, 4) : '')),
+        datasets: ST_LOG.map(st => ({
+          label: st.nome, backgroundColor: st.cor, data: meses.map(m => val(m, st.nome, tpLogs)),
+          datalabels: { anchor: 'end', align: 'end', offset: 2, color: st.txt, font: { size: 11, weight: '600' },
+            formatter: v => v ? nf(v) : '' }
+        }))
+      },
+      options: {
+        layout: { padding: { top: 22 } },
+        datasets: { bar: { categoryPercentage: 0.78, barPercentage: 0.92 } },
+        scales: {
+          x: { grid: { display: false }, border: { display: false },
+            ticks: { maxRotation: 0, autoSkip: false, color: '#0f172a', font: { size: 12, weight: '600' } },
+            title: { display: anos.length === 1, text: anos[0], color: '#0f172a', font: { size: 12, weight: '600' } } },
+          y: { beginAtZero: true, display: false, grid: { display: false } }
+        },
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 14 } },
+          tooltip: { callbacks: {
+            footer: its => {
+              const m = meses[its[0].dataIndex];
+              const t = tpLogs ? '' : `\nBacklog ${nf(val(m, its[0].dataset.label, 'Backlog'))} · Entrante ${nf(val(m, its[0].dataset.label, 'Entrante'))}`;
+              return t;
+            }
+          } }
+        }
+      }
+    });
+  }
+
   // 6. Visão semanal (semana ISO: segunda a domingo), a partir da W26
   //   Backlog planejado restante = Backlog em aberto no início da W26 − meta mensal (aba Programação) distribuída por dia
   //   Backlog real restante      = Backlog em aberto no início da W26 − Backlog executado desde a W26
@@ -1033,7 +1104,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v20';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1065,7 +1136,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v20 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
@@ -1139,6 +1210,7 @@
     gPrio(itens);
     const pm = gProg();
     gStatusCarteira();
+    gLogsMes();
     gSemanal();
     kpis(itens, pm);
     tabela(itens);
