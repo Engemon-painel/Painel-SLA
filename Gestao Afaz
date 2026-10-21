@@ -32,8 +32,17 @@
   // prioridade do site (aba Prioridades da planilha): 0 = mais crítico
   const NIVEIS_PS = ['0', '1', '2', '3', '4', 'sem'];
   const COR_PS = { '0': '#b91c1c', '1': '#ea580c', '2': '#ca8a04', '3': '#2563eb', '4': '#64748b', sem: '#cbd5e1' };
-  const rotPS = k => k === 'sem' ? 'Fora da lista' : 'PRIORIDADE ' + k;
-  const psDe = i => (i.ps === null || i.ps === undefined || i.ps === '') ? 'sem' : String(i.ps);
+  // modoPi = o JSON traz a coluna PRIORIDADE INFRAESTRUTURA (campo "pi": P0, P1 ... P4).
+  // Nesse caso a PRIORIDADE 0 a 4 de todo o painel vem dela (e não mais da aba Prioridades).
+  let modoPi = false;
+  const rotPS = k => k === 'sem' ? (modoPi ? 'Sem prioridade' : 'Fora da lista') : 'PRIORIDADE ' + k;
+  const psDe = i => {
+    if (modoPi) {
+      const m = String(i.pi == null ? '' : i.pi).match(/[0-4]/);
+      return m ? m[0] : 'sem';
+    }
+    return (i.ps === null || i.ps === undefined || i.ps === '') ? 'sem' : String(i.ps);
+  };
   // demais colunas da aba Prioridades (quadro antigo, usado só se o JSON não tiver "pi")
   const ATRIB = [
     { k: 'cc', nome: 'Concentrador' }, { k: 'es', nome: 'Estratégico' },
@@ -251,13 +260,13 @@
             <p class="sub" id="afz-cls-sub">Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela</p>
             <div class="afz-cls" id="afz-cls"></div>
           </div>
-          <div class="afz-card">
+          ${modoPi ? '' : `<div class="afz-card">
             <h3>AFAZ abertos por PRIORIDADE</h3>
             <p class="sub">Coluna PRIORIDADE da aba Prioridades (0 = mais crítico) · clique na linha para filtrar</p>
             <div class="afz-mx-leg" id="afz-mx-leg"></div>
             <div class="afz-mx" id="afz-mx"></div>
-          </div>
-          <div class="afz-card">
+          </div>`}
+          <div class="afz-card${modoPi ? ' full' : ''}">
             <h3>Tempo parado, por PRIORIDADE</h3>
             <p class="sub">Pendências em aberto por faixa de dias no status atual · média de dias ao lado da barra</p>
             <div class="afz-box"><canvas id="afz-g-ps"></canvas></div>
@@ -285,7 +294,7 @@
     preencher('tp', ORDEM_TIPO.filter(t => it.some(i => i.tp === t)));
     preencher('pr', ORDEM_PR.filter(p => it.some(i => i.pr === p)), 'AFAZ: ');
     NIVEIS_PS.filter(k => it.some(i => psDe(i) === k)).forEach(k =>
-      $('select[data-f="ps"]', el).insertAdjacentHTML('beforeend', `<option value="${k}">PRIORIDADE ${k === 'sem' ? 'fora da lista' : k}</option>`));
+      $('select[data-f="ps"]', el).insertAdjacentHTML('beforeend', `<option value="${k}">${esc(rotPS(k))}</option>`));
     // Status: os em aberto (pendências) e os fechados (executados, vêm do execPorStatus do JSON)
     const selSt = $('select[data-f="st"]', el);
     const abertos = unicos(it, 'st').filter(v => !ehFechado(v));
@@ -902,8 +911,9 @@
     const niveis = NIVEIS_PS.filter(k => itens.some(i => psDe(i) === k));
     quadroClassificacao(itens);
 
-    // KPIs por prioridade do site
-    $('#afz-kpis-ps').innerHTML = niveis.map(k => {
+    // KPIs por prioridade do site (no modo PRIORIDADE INFRAESTRUTURA os cards do quadro já fazem esse papel)
+    $('#afz-kpis-ps').hidden = modoPi;
+    if (!modoPi) $('#afz-kpis-ps').innerHTML = niveis.map(k => {
       const g = itens.filter(i => psDe(i) === k);
       const sites = new Set(g.map(i => i.s)).size;
       const atr = g.filter(i => situacao(i) === 'Atrasado').length;
@@ -911,7 +921,8 @@
         <b>${nf(g.length)}</b><span>AFAZ abertos · ${nf(sites)} sites · ${nf(atr)} atrasados</span></div>`;
     }).join('');
 
-    // por PRIORIDADE (aba Prioridades): total de AFAZ abertos, sites e atrasados
+    // por PRIORIDADE (aba Prioridades): total de AFAZ abertos, sites e atrasados (só no modo antigo)
+    if (!modoPi) {
     const maxLinha = Math.max(1, ...niveis.map(k => itens.filter(i => psDe(i) === k).length));
     $('#afz-mx-leg').innerHTML = '';
     $('#afz-mx').innerHTML = niveis.map(k => {
@@ -931,6 +942,7 @@
       $(`select[data-f="ps"]`).value = filtro.ps;
       atualizar();
     }));
+    }
 
     // faixas de dias por prioridade do site
     const medias = niveis.map(k => {
@@ -963,8 +975,8 @@
     });
 
     // tabela: site mais crítico primeiro, depois o mais parado
-    const comPi = temPi();
-    const colsClasse = comPi ? '<th>Tipo Site</th>' : ATRIB.map(a => `<th>${esc(a.nome)}</th>`).join('');
+    const comPi = false;   // a PRIORIDADE já vem da coluna PRIORIDADE INFRAESTRUTURA: não repete em outra coluna
+    const colsClasse = modoPi ? '' : ATRIB.map(a => `<th>${esc(a.nome)}</th>`).join('');
     $('#afz-ps-head').innerHTML = `<th>AFAZ</th><th>Site</th><th>PRIORIDADE</th>${colsClasse}<th>Tipo</th><th>Status</th>` +
       '<th>Dias no status</th><th>Previsão</th><th>Situação</th><th>Título</th><th>Responsável</th>';
     const lista = itens.slice().sort((a, b) =>
@@ -974,7 +986,7 @@
       const k = psDe(i), f = FAIXAS[faixaDe(i.dst || 0)], sit = situacao(i);
       return `<tr><td>${esc(i.id)}</td><td>${esc(i.s)}</td>
         <td><span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}">${k === 'sem' ? '—' : k}</span></td>
-        ${comPi ? celPi(i) : ATRIB.map(a => celAt(i[a.k])).join('')}
+        ${modoPi ? '' : comPi ? celPi(i) : ATRIB.map(a => celAt(i[a.k])).join('')}
         <td><span class="afz-tag" style="background:${COR_TIPO[i.tp] || '#94a3b8'}">${esc(i.tp)}</span></td>
         <td>${esc(i.st)}</td><td><span class="afz-tag" style="background:${f.cor};color:${f.max === 30 || f.max === 60 ? '#0f172a' : '#fff'}">${nf(i.dst)} d</span></td>
         <td>${dataBR(i.prev)}</td><td><span class="afz-tag" style="background:${COR_SIT[sit]}">${sit}</span></td>
@@ -1014,7 +1026,41 @@
   const selosPs = g => NIVEIS_PS.filter(k => g.some(i => psDe(i) === k)).map(k =>
     `<span class="afz-tag" style="background:${COR_PS[k]};color:${k === 'sem' ? '#0f172a' : '#fff'}" title="${esc(rotPS(k))}">${k === 'sem' ? '—' : k}: ${nf(g.filter(i => psDe(i) === k).length)}</span>`).join(' ');
 
+  // selos Backlog x Entrante (ex.: Backlog 180 · Entrante 64)
+  const selosTipo = g => ORDEM_TIPO.filter(t => g.some(i => i.tp === t)).map(t =>
+    `<span class="afz-tag" style="background:${COR_TIPO[t]}" title="${esc(t)}">${esc(t)}: ${nf(g.filter(i => i.tp === t).length)}</span>`).join(' ');
+
+  // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
+  function quadroPrioridades(itens) {
+    $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar';
+    const niveis = ['0', '1', '2', '3', '4'];
+    if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
+    const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
+    cards.push({ k: '', titulo: 'Total em aberto', g: itens, total: true });
+
+    $('#afz-cls').innerHTML = cards.map(c => {
+      const sites = new Set(c.g.map(i => i.s)).size;
+      const atr = c.g.filter(i => situacao(i) === 'Atrasado').length;
+      const on = c.total ? !filtro.ps : filtro.ps === c.k;
+      const borda = c.total ? '' : ` style="border-left-color:${c.cor}"`;
+      return `<div class="afz-cls-b${c.total ? ' tot' : ''}${on ? ' on' : ''}" data-ps="${c.k}"${borda}>
+        <h4>${esc(c.titulo)}${c.k === '0' ? ' · mais crítico' : ''}</h4>
+        <b class="n">${nf(c.g.length)}</b><small>AFAZ abertos</small>
+        <div class="det">${nf(sites)} sites · ${nf(atr)} atrasados</div>
+        <div class="ps">${selosTipo(c.g) || '<span class="det">nenhum</span>'}</div></div>`;
+    }).join('');
+
+    $('#afz-cls').querySelectorAll('.afz-cls-b').forEach(cd => cd.addEventListener('click', () => {
+      const k = cd.dataset.ps;
+      filtro.ps = (!k || filtro.ps === k) ? '' : k;
+      $('select[data-f="ps"]').value = filtro.ps;
+      atualizar();
+    }));
+  }
+
   function quadroClassificacao(itens) {
+    if (modoPi) return quadroPrioridades(itens);
     let cards;
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
