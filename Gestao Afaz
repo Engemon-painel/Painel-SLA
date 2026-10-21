@@ -214,7 +214,7 @@
           <div class="afz-box"><canvas id="afz-g-prio"></canvas></div>
         </div>
         <div class="afz-card c4">
-          <h3>Meta Backlog x Executado Backlog x Executado Entrante</h3>
+          <h3 id="afz-prog-tit">Meta Backlog x Executado Backlog x Executado Entrante</h3>
           <div class="afz-st-chips" id="afz-prog-st"></div>
           <p class="sub" id="afz-prog-sub">Meta x executado no mês · executado empilhado (Backlog + Entrante) com o total em cima · % da meta de Backlog abaixo de cada mês</p>
           <div class="afz-box"><canvas id="afz-g-prog"></canvas></div>
@@ -223,12 +223,6 @@
           <h3>Por status e carteira</h3>
           <p class="sub" id="afz-stc-sub">Tratados (status atual na aba Afaz) em Backlog e Entrante · clique na barra para ver o status no Meta x Executado</p>
           <div class="afz-box alto"><canvas id="afz-g-stc"></canvas></div>
-        </div>
-        <div class="afz-card full">
-          <h3>Status por mês · Abertura x Devolvido x Finalizado x Resolvido</h3>
-          <div class="afz-st-chips" id="afz-lm-tp"></div>
-          <p class="sub" id="afz-lm-sub"></p>
-          <div class="afz-box alto"><canvas id="afz-g-logmes"></canvas></div>
         </div>
         <div class="afz-card c4">
           <h3>Visão semanal · Backlog x Entrantes</h3>
@@ -610,6 +604,12 @@
     const prog = dados.metaBacklog || dados.programado || {};
     let back = dados.execBacklog || dados.executadoBacklog || {};
     let ent = dados.execEntrante || dados.executadoEntrante || {};
+    // JSON com logsMes: este gráfico vira "Abertura x Devolvido x Finalizado x Resolvido" por mês (aba Logs)
+    if (dados.logsMes && Object.keys(dados.logsMes).length) {
+      gLogsMes();
+      const mesAt = new Date().toLocaleDateString('sv-SE').slice(0, 7);
+      return { mesAtual: mesAt, prog: prog[mesAt], exe: back[mesAt] || 0, entrante: ent[mesAt] || 0 };
+    }
     // filtro de Status num status fechado: mostra só o executado com aquele status
     const stF = ehFechado(filtro.st) ? filtro.st : '';
     const eps = dados.execPorStatus || null;
@@ -762,10 +762,9 @@
     });
   }
 
-  // 5c. Status por mês (aba Logs): Abertura x Devolvido x Finalizado x Resolvido, barras lado a lado
+  // 5c. Status por mês (aba Logs): Devolvido x Finalizado x Resolvido — desenhado no card do Meta x Executado, barras lado a lado
   //     filtro próprio: Todos / Backlog / Entrante
   const ST_LOG = [
-    { nome: 'Abertura', cor: '#dc2626', txt: '#475569' },
     { nome: 'Devolvido', cor: '#1e3a8a', txt: '#475569' },
     { nome: 'Finalizado', cor: '#16a34a', txt: '#475569' },
     { nome: 'Resolvido', cor: '#facc15', txt: '#475569' }
@@ -773,10 +772,11 @@
   let tpLogs = '';   // '' = Backlog + Entrante
   function gLogsMes() {
     const L = dados.logsMes;
-    const box = $('#afz-lm-tp');
+    const box = $('#afz-prog-st');
+    $('#afz-prog-tit').textContent = 'Devolvido x Finalizado x Resolvido por mês';
     if (!L || !Object.keys(L).length) {
       box.innerHTML = '';
-      $('#afz-lm-sub').textContent = '⚠ Para ver este gráfico, atualize o Office Script do fluxo (script_afaz.ts novo, que lê a aba Logs) e rode o fluxo de novo.';
+      $('#afz-prog-sub').textContent = '⚠ Para ver este gráfico, atualize o Office Script do fluxo (script_afaz.ts novo, que lê a aba Logs) e rode o fluxo de novo.';
       return;
     }
     const meses = Object.keys(L).sort();
@@ -791,10 +791,10 @@
 
     const anos = [...new Set(meses.map(m => m.slice(0, 4)))];
     const total = totalTipo(tpLogs);
-    $('#afz-lm-sub').textContent = `${tpLogs || 'Backlog + Entrante'} · total no período: ${nf(total)} · ` +
-      'Abertura = mês da coluna Abertura (aba Afaz) · Devolvido, Finalizado e Resolvido = cada mudança de status registrada na aba Logs';
+    $('#afz-prog-sub').textContent = `${tpLogs || 'Backlog + Entrante'} · total no período: ${nf(total)} · ` +
+      'cada mudança de status registrada na aba Logs, no mês da Data';
 
-    desenhar('afz-g-logmes', {
+    desenhar('afz-g-prog', {
       type: 'bar',
       data: {
         labels: meses.map(m => MES_ABREV[+m.slice(5, 7) - 1] + (anos.length > 1 ? '/' + m.slice(2, 4) : '')),
@@ -1104,7 +1104,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v20';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v21';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1136,7 +1136,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v20 (modo Tipo Site: valores sem 0 a 4)';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v21 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
@@ -1210,7 +1210,6 @@
     gPrio(itens);
     const pm = gProg();
     gStatusCarteira();
-    gLogsMes();
     gSemanal();
     kpis(itens, pm);
     tabela(itens);
