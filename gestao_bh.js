@@ -1048,6 +1048,44 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const f = new Date(Date.UTC(a, m, 14));
     return '15/' + String(m).padStart(2, '0') + '/' + a + ' a 14/' + String(f.getUTCMonth() + 1).padStart(2, '0') + '/' + f.getUTCFullYear();
   };
+  // ALTERADO (21/10/2026): saldo do dia da pendência (coluna "No dia")
+  //   HORA EXTRA → o "HE: hh:mm" do Detalhe (a base calcula: batidas x turno) = horas a mais (+)
+  //   demais     → horas trabalhadas (pares de batidas) − jornada do turno do dia; sem batida = deve o dia todo (−)
+  //   batidas ímpares (ponto aberto) → não dá para calcular
+  const DIAS_SEM = { DOM: 0, SEG: 1, TER: 2, QUA: 3, QUI: 4, SEX: 5, SAB: 6 };
+  const semAc = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const minDe = t => { const m = String(t).match(/(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : NaN; };
+  function jornadaDia(det, turno, dia) {
+    const td = String(det || '').match(/Turno \(dia\):\s*([^|]+(?:\|\s*(?:DOM|SEG|TER|QUA|QUI|SEX|SAB)[^|]*)*)/i);
+    const txt = semAc(td ? td[1] : turno), w = DIAS_SEM[semAc(dia).slice(0, 3)];
+    const re = /(?:(DOM|SEG|TER|QUA|QUI|SEX|SAB)(?:\s*A\s*(DOM|SEG|TER|QUA|QUI|SEX|SAB))?|12X36)[^0-9]*(\d{1,2}:\d{2})\s*AS\s*(\d{1,2}:\d{2})/g;
+    let m;
+    while ((m = re.exec(txt))) {
+      const a = m[1] ? DIAS_SEM[m[1]] : 0, b = m[1] ? (m[2] ? DIAS_SEM[m[2]] : a) : 6;
+      if (w == null || (w >= a && w <= b)) {
+        let j = minDe(m[4]) - minDe(m[3]); if (j < 0) j += 1440;
+        return j > 360 ? j - 60 : j;          // desconta 1h de intervalo em jornada acima de 6h
+      }
+    }
+    return null;
+  }
+  function saldoDia(i) {
+    const det = String(i.det || '');
+    if (i.tipo === 'HORA EXTRA') {
+      const he = det.match(/HE:\s*(\d{1,3}):(\d{2})/i);
+      if (he) return (+he[1] * 60 + +he[2]) / 60;
+      return +i.horas || null;
+    }
+    const mb = det.match(/Batidas:\s*([0-9:\s\/]*)/i);
+    if (!mb && i.tipo !== 'SEM MARCACAO') return null;   // INTERJORNADA, FOLGA NÃO CUMPRIDA...: sem batidas no detalhe
+    const b = mb ? (mb[1].match(/\d{1,2}:\d{2}/g) || []).map(minDe) : [];
+    if (b.length % 2) return null;
+    const jor = jornadaDia(det, i.turno, i.dia);
+    if (jor == null) return null;
+    let trab = 0;
+    for (let k = 0; k < b.length; k += 2) { let x = b[k + 1] - b[k]; if (x < 0) x += 1440; trab += x; }
+    return (trab - jor) / 60;
+  }
   const folhaSel = () => pendFiltro.folha == null ? folhaIniDe(hojeIso()) : pendFiltro.folha;
   // ALTERADO (21/10/2026): pendência só aparece depois de 2 dias úteis (seg a sex) da data da batida,
   // a não ser que o gestor já tenha respondido (ex.: batida sexta 16/10 → aparece a partir de quarta 21/10)
@@ -1217,7 +1255,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
     $('#bh-pd-sub').textContent = `${nf(lista.length)} pendências na lista · marque várias do mesmo tipo para justificar de uma vez` + (pendGerado ? ' · gerado em ' + new Date(pendGerado).toLocaleString('pt-BR') : '') + (pendFonte ? ' · ' + pendFonte : '') + (pendHistInfo ? ' · ' + pendHistInfo : '');
 
-    $('#bh-pd-head').innerHTML = `<tr><th style="width:26px"><input type="checkbox" id="bh-pd-todos" title="Marcar todas"></th><th>Situação</th><th>Pendência</th><th>Colaborador</th><th>Data</th><th>Detalhe / o que verificar</th><th>Supervisor</th><th class="num">Saldo BH</th><th class="num">Horas</th><th class="num" title="Horas extras da folha (só para HORA EXTRA)">HE folha</th><th>Justificativa</th><th></th></tr>`;
+    $('#bh-pd-head').innerHTML = `<tr><th style="width:26px"><input type="checkbox" id="bh-pd-todos" title="Marcar todas"></th><th>Situação</th><th>Pendência</th><th>Colaborador</th><th>Data</th><th>Detalhe / o que verificar</th><th>Supervisor</th><th class="num">Saldo BH</th><th class="num">Horas</th><th class="num" title="Saldo do dia: hora extra feita (+) ou horas que ficou devendo (−), pelas batidas x turno">No dia</th><th>Justificativa</th><th></th></tr>`;
     const MAX = 600;
     $('#bh-pd-body').innerHTML = lista.slice(0, MAX).map(i => {
       const j = justDe(i), s = sitDe(i), auto = j.auto || calcularStatus(j, i.hePerm, i.tipo)[0];
@@ -1232,7 +1270,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <td>${esc(i.sup || '—')}</td>
         <td class="num ${i.saldo < 0 ? 'neg' : 'pos'}">${hMin(+i.saldo || 0)}<small style="display:block;font-weight:500;color:#64748b">HE paga: ${esc(i.hePerm)}</small></td>
         <td class="num">${i.horas ? hMin(+i.horas).replace('+', '') : '—'}</td>
-        <td class="num">${i.tipo === 'HORA EXTRA' && i.heFolha ? esc(i.heFolha).replace(':', 'h') : '—'}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
+        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
         <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b>${j.tarefa ? ' · ' + esc(String(j.tarefa).split('—')[0].trim()) : ''}${j.chamado ? ' · ch. ' + esc(j.chamado) : ''}<small>${esc(j.texto || '')}</small>${j.dataResp ? `<small>respondido em ${esc(dataBr(j.dataResp))}</small>` : ''}${j.obsRH ? `<small>RH: ${esc(j.obsRH)}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
     }).join('') || '<tr><td colspan="12">Nenhuma pendência nesse filtro 🎉</td></tr>';
