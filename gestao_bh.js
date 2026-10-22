@@ -1447,7 +1447,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const geral = tp ? ta / tp * 100 : 0;
     const f1 = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
     const tpass = base.reduce((t, a) => t + (a.dPass || 0), 0);
-    $('#bh-abs-sub').textContent = `${fo ? 'Folha ' + rotFolha(fo) : 'Todas as folhas'} · geral ${f1(geral)}% (${nf(ta)} dias de falta sobre ${nf(tp)} dias de trabalho da folha inteira` +
+    $('#bh-abs-sub').textContent = `${fo ? 'Folha ' + rotFolha(fo) : 'Todas as folhas'} · geral ${f1(geral)}% (${nf(ta)} dias de falta sobre ${nf(tp)} dias de trabalho somando todos os colaboradores na folha inteira` +
       (tpass ? `, ${nf(tpass)} já passados` : '') + ') · dias da folha = os que já passaram pelo ponto + os que faltam pela escala (12x36 dia sim, dia não)';
     $('#bh-abs-alt').style.height = Math.max(220, sups.length * 26 + 60) + 'px';
     const cor = v => v >= 10 ? VERMELHO : v >= 5 ? '#f59e0b' : VERDE;
@@ -1456,7 +1456,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       data: { labels: sups, datasets: [{ label: 'Absenteísmo (%)', data: sups.map(k => Math.round(taxa(g[k]) * 10) / 10),
         backgroundColor: sups.map(k => cor(taxa(g[k]))), borderRadius: 3,
         datalabels: { anchor: 'end', align: 'right', color: '#0f172a', font: { size: 11, weight: '700' },
-          formatter: (v, c) => { const o = g[sups[c.dataIndex]]; return `${f1(v)}% · ${o.a}/${o.p} dias`; } } }] },
+          formatter: (v, c) => { const o = g[sups[c.dataIndex]]; return `${f1(v)}% · ${o.a} faltas · ${o.c.size} colab.`; } } }] },
       plugins: [{
         id: 'linhaGeral',
         afterDatasetsDraw(ch) {
@@ -1472,7 +1472,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
           tooltip: { callbacks: {
             label: c => `Absenteísmo: ${f1(c.raw)}%`,
             footer: its => { const o = g[sups[its[0].dataIndex]];
-              return `${o.a} dias de falta sobre ${o.p} dias de trabalho na folha\n${hMin(o.ha).replace('+', '')} de ${hMin(o.hp).replace('+', '')} · ${o.cf.size} de ${o.c.size} colaboradores faltaram`; } } } },
+              const med = o.c.size ? (o.p / o.c.size).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0';
+              return `${o.a} dias de falta sobre ${o.p} dias de trabalho da equipe na folha\n` +
+                `(${o.c.size} colaboradores × ~${med} dias cada)\n${o.cf.size} de ${o.c.size} colaboradores faltaram`; } } } },
         onClick: (e, els) => {
           if (!els.length) return;
           const k = sups[els[0].index]; if (k === 'Sem supervisor') return;
