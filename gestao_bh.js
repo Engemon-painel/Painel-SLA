@@ -1446,8 +1446,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const tp = sups.reduce((t, k) => t + g[k].p, 0), ta = sups.reduce((t, k) => t + g[k].a, 0);
     const geral = tp ? ta / tp * 100 : 0;
     const f1 = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-    $('#bh-abs-sub').textContent = `${fo ? 'Folha ' + rotFolha(fo) : 'Todas as folhas'} · geral ${f1(geral)}% (${nf(ta)} dias de falta em ${nf(tp)} dias previstos) · ` +
-      'dias previstos = dias com batida ou marcados "Ausente" (fora D.S.R., compensado, férias, afastamento) · só dias com 2 dias úteis passados';
+    const tpass = base.reduce((t, a) => t + (a.dPass || 0), 0);
+    $('#bh-abs-sub').textContent = `${fo ? 'Folha ' + rotFolha(fo) : 'Todas as folhas'} · geral ${f1(geral)}% (${nf(ta)} dias de falta sobre ${nf(tp)} dias de trabalho da folha inteira` +
+      (tpass ? `, ${nf(tpass)} já passados` : '') + ') · dias da folha = os que já passaram pelo ponto + os que faltam pela escala (12x36 dia sim, dia não)';
     $('#bh-abs-alt').style.height = Math.max(220, sups.length * 26 + 60) + 'px';
     const cor = v => v >= 10 ? VERMELHO : v >= 5 ? '#f59e0b' : VERDE;
     desenhar('bh-g-abs', {
@@ -1471,7 +1472,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
           tooltip: { callbacks: {
             label: c => `Absenteísmo: ${f1(c.raw)}%`,
             footer: its => { const o = g[sups[its[0].dataIndex]];
-              return `${o.a} dias de falta em ${o.p} dias previstos\n${hMin(o.ha).replace('+', '')} de ${hMin(o.hp).replace('+', '')} · ${o.cf.size} de ${o.c.size} colaboradores faltaram`; } } } },
+              return `${o.a} dias de falta sobre ${o.p} dias de trabalho na folha\n${hMin(o.ha).replace('+', '')} de ${hMin(o.hp).replace('+', '')} · ${o.cf.size} de ${o.c.size} colaboradores faltaram`; } } } },
         onClick: (e, els) => {
           if (!els.length) return;
           const k = sups[els[0].index]; if (k === 'Sem supervisor') return;
@@ -1512,7 +1513,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         plugins: { legend: { display: false },
           tooltip: { callbacks: {
             title: its => top[its[0].dataIndex].n,
-            label: c => { const o = top[c.dataIndex]; return `${o.a} dias de falta em ${o.d} previstos (${f1(o.a / o.d * 100)}%)`; },
+            label: c => { const o = top[c.dataIndex]; return `${o.a} dias de falta sobre ${o.d} dias de trabalho na folha (${f1(o.a / o.d * 100)}%)`; },
             footer: its => { const o = top[its[0].dataIndex]; return `${hMin(o.ha).replace('+', '')} ausentes · matrícula ${o.m} · ${String(o.sup || '—').trim()}`; } } } },
         onClick: (e, els) => {
           if (!els.length) return;
