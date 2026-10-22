@@ -40,7 +40,8 @@
     'SEM MARCACAO': ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'],
     'INTERJORNADA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO'],
     'FOLGA NAO CUMPRIDA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO', 'AUSENTE'],
-    'ATRASO': ['BANCO DE HORAS', 'APENAS JUSTIFICAR']   // BANCO DE HORAS sempre: desconta do saldo, mesmo que fique negativo
+    'ATRASO': ['BANCO DE HORAS', 'APENAS JUSTIFICAR'],
+    'FALTA': ['AUSENTE', 'BANCO DE HORAS', 'APENAS JUSTIFICAR']   // AUSENTE = falta confirmada (RH desconta)   // BANCO DE HORAS sempre: desconta do saldo, mesmo que fique negativo
   };
   const TRAT_PADRAO = ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'];
   const TAREFAS_HE = [
@@ -261,18 +262,19 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <button type="button" data-aba="evol"><span class="ic">📈</span>Evolução por Supervisor</button>
       <button type="button" data-aba="pend"><span class="ic">📝</span>Pendências<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="atraso"><span class="ic">⏰</span>Atrasos<span class="bh-cont" hidden></span></button>
+      <button type="button" data-aba="falta"><span class="ic">🚫</span>Faltas<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="andamento"><span class="ic">📋</span>Andamento por Supervisor</button>
     </nav>
     <div class="bh-conteudo">
     <div class="bh-filtros">
       <select data-f="co"><option value="">Coordenador: todos</option></select>
       <select data-f="sup"><option value="">Supervisor: todos</option></select>
-      <select data-f="tp" data-nao="pend andamento atraso"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
-      <select data-f="cr" data-nao="pend andamento atraso"><option value="">Criticidade: todas</option></select>
-      <select data-f="st" data-nao="pend andamento atraso"><option value="">Status: todos</option></select>
+      <select data-f="tp" data-nao="pend andamento atraso falta"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
+      <select data-f="cr" data-nao="pend andamento atraso falta"><option value="">Criticidade: todas</option></select>
+      <select data-f="st" data-nao="pend andamento atraso falta"><option value="">Status: todos</option></select>
       <select data-pf="tipo" data-so="pend andamento" hidden><option value="">Pendência: todas</option></select>
       <select data-pf="sit" data-so="pend" hidden></select>
-      <select data-pf="folha" data-so="pend andamento atraso" hidden title="Folha (dia 15 a 14)"></select>
+      <select data-pf="folha" data-so="pend andamento atraso falta" hidden title="Folha (dia 15 a 14)"></select>
       <input data-f="busca" type="search" placeholder="Buscar nome ou matrícula">
       <button type="button" class="bh-limpar">Limpar filtros</button>
     </div>
@@ -393,6 +395,21 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <h3>Atrasos para o gestor justificar</h3>
         <p class="sub" id="bh-at-sub" style="margin:0">Carregando…</p>
         <div class="bh-tab" style="max-height:640px;margin-top:10px"><table><thead id="bh-at-head"></thead><tbody id="bh-at-body"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ================= ABA: FALTAS ================= -->
+    <div class="bh-aba" data-p="falta" hidden>
+      <div class="bh-pd-kpis" id="bh-ft-kpis"></div>
+      <div class="bh-c" style="margin-bottom:12px">
+        <h3>Faltas por supervisor</h3>
+        <p class="sub" id="bh-ft-g-sub" style="margin:0 0 6px"></p>
+        <div style="position:relative;height:260px"><canvas id="bh-g-ft"></canvas></div>
+      </div>
+      <div class="bh-c">
+        <h3>Faltas para o gestor justificar</h3>
+        <p class="sub" id="bh-ft-sub" style="margin:0">Carregando…</p>
+        <div class="bh-tab" style="max-height:640px;margin-top:10px"><table><thead id="bh-ft-head"></thead><tbody id="bh-ft-body"></tbody></table></div>
       </div>
     </div>
 
@@ -1141,7 +1158,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       !String(j.texto || '').trim() ? 'INCOMPLETO - FALTA JUSTIFICATIVA' :
       rh === 'NÃO REALIZADO - DEVOLVIDO' ? 'DEVOLVIDO AO GESTOR' :
       trat === 'PAGAMENTO HE' && pend !== 'HORA EXTRA' ? 'INVÁLIDO - PAGAMENTO HE SOMENTE PARA HORA EXTRA' :
-      trat === 'BANCO DE HORAS' && pend !== 'HORA EXTRA' && pend !== 'ATRASO' ? 'INVÁLIDO - BANCO DE HORAS SOMENTE PARA HORA EXTRA' :
+      trat === 'BANCO DE HORAS' && pend !== 'HORA EXTRA' && pend !== 'ATRASO' && pend !== 'FALTA' ? 'INVÁLIDO - BANCO DE HORAS SOMENTE PARA HORA EXTRA' :
       trat === 'PAGAMENTO HE' && up(hePerm) === 'NÃO' ? 'INVÁLIDO - BH NEGATIVO NÃO PERMITE PAGAMENTO' :
       trat === 'PAGAMENTO HE' && !String(j.tarefa || '').trim() ? 'INCOMPLETO - FALTA TAREFA HE' :
       trat === 'AJUSTAR PONTO' && (pend === 'PONTO ABERTO' || pend === 'SEM MARCACAO') && !String(j.horario || '').trim() ? 'INCOMPLETO - FALTA HORÁRIO/MARCAÇÃO' :
@@ -1227,10 +1244,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     renderAndamento();
   }
 
-  function pendFiltrados(soAtraso) {
+  const TIPOS_PROPRIOS = ['ATRASO', 'FALTA'];   // têm aba própria: não entram em Pendências/Andamento
+  function pendFiltrados(soTipo) {
     const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
     const fo = folhaSel();
-    return (pend || []).filter(i => liberada(i) && (soAtraso ? i.tipo === 'ATRASO' : i.tipo !== 'ATRASO') &&
+    return (pend || []).filter(i => liberada(i) && (soTipo ? i.tipo === soTipo : !TIPOS_PROPRIOS.includes(i.tipo)) &&
       (!fo || folhaIniDe(i.d) === fo) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!filtro.tp || i.tpSaldo === filtro.tp) &&
@@ -1323,28 +1341,29 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   // ABA: ATRASOS (pendências tipo ATRASO: entrada mais de 5 min depois do início do turno)
   // =====================================================================
   const minDet = (det, rot) => { const m = String(det || '').match(new RegExp(rot + ':\\s*(\\d{1,2}:\\d{2})', 'i')); return m ? m[1] : '—'; };
-  function renderAtraso() {
-    if (!$('#bh-at-kpis') || !pend) return;
-    const base = pendFiltrados(true);
+  function renderTipo(T) {
+    const P = '#bh-' + T.pre + '-';
+    if (!$(P + 'kpis') || !pend) return;
+    const base = pendFiltrados(T.tipo);
     const cont = {}; ORDEM_SIT.forEach(st => cont[st] = 0);
     base.forEach(i => { cont[sitDe(i)] = (cont[sitDe(i)] || 0) + 1; });
     const aTratar = cont['Pendente Operação'] + cont['Erro na Justificativa'];
     const minTot = base.reduce((t, i) => t + Math.round((+i.horas || 0) * 60), 0);
-    const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="atraso"] .bh-cont');
+    const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="' + T.aba + '"] .bh-cont');
     if (nav) { nav.textContent = aTratar; nav.hidden = !aTratar; }
     const colab = new Set(base.map(i => i.m)).size;
     const cards = [['A tratar', aTratar, '#b45309', 'pendente operação + com erro'],
       ['Justificados', cont['Justificado'], COR_SIT['Justificado'], pct(cont['Justificado'], base.length) + '% do total'],
-      ['Atrasos', base.length, '#334155', `${nf(colab)} colaboradores${folhaSel() ? ' · folha ' + rotFolha(folhaSel()) : ''}`],
-      ['Tempo somado', hMin(minTot / 60).replace('+', ''), '#1e3a8a', base.length ? 'média de ' + Math.round(minTot / base.length) + ' min por atraso' : '']];
-    $('#bh-at-kpis').innerHTML = cards.map(c => `<div class="bh-k" style="background:${c[2]};opacity:1;cursor:default"><small>${c[0]}</small><b>${typeof c[1] === 'number' ? nf(c[1]) : c[1]}</b><span>${c[3]}</span></div>`).join('');
+      [T.nome, base.length, '#334155', `${nf(colab)} colaboradores${folhaSel() ? ' · folha ' + rotFolha(folhaSel()) : ''}`],
+      ['Tempo somado', hMin(minTot / 60).replace('+', ''), '#1e3a8a', base.length ? T.media(minTot, base.length) : '']];
+    $(P + 'kpis').innerHTML = cards.map(c => `<div class="bh-k" style="background:${c[2]};opacity:1;cursor:default"><small>${c[0]}</small><b>${typeof c[1] === 'number' ? nf(c[1]) : c[1]}</b><span>${c[3]}</span></div>`).join('');
 
     // gráfico por supervisor (a tratar x justificado)
     const porSup = {};
     base.forEach(i => { const k = String(i.sup || '—').trim(); const o = porSup[k] = porSup[k] || { t: 0, j: 0 }; sitDe(i) === 'Justificado' ? o.j++ : o.t++; });
     const sups = Object.keys(porSup).sort((a, b) => (porSup[b].t + porSup[b].j) - (porSup[a].t + porSup[a].j)).slice(0, 12);
-    $('#bh-at-g-sub').textContent = `${nf(base.length)} atrasos · entrada mais de 5 min depois do início do turno · só dias com entrada e saída marcadas`;
-    desenhar('bh-g-at', {
+    $(P + 'g-sub').textContent = `${nf(base.length)} ${T.nome.toLowerCase()} · ${T.regra}`;
+    desenhar('bh-g-' + T.pre, {
       type: 'bar',
       data: { labels: sups, datasets: [
         { label: 'A tratar', data: sups.map(k => porSup[k].t), backgroundColor: '#f59e0b', stack: 'a', borderRadius: 3 },
@@ -1359,24 +1378,36 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
     // tabela
     const lista = base.slice().sort((a, b) => ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (+b.horas || 0) - (+a.horas || 0));
-    $('#bh-at-sub').textContent = `${nf(lista.length)} atrasos · tolerância de 5 minutos · aparecem 2 dias úteis depois da data`;
-    $('#bh-at-head').innerHTML = '<tr><th>Situação</th><th>Colaborador</th><th>Data</th><th>Turno</th><th class="num">Início</th><th class="num">Entrada</th><th class="num">Atraso</th><th>Supervisor</th><th>Justificativa</th><th></th></tr>';
-    $('#bh-at-body').innerHTML = lista.map(i => {
+    $(P + 'sub').textContent = `${nf(lista.length)} ${T.nome.toLowerCase()} · ${T.regraTab}`;
+    $(P + 'head').innerHTML = '<tr><th>Situação</th><th>Colaborador</th><th>Data</th><th>Turno</th>' + T.cols.map(c => `<th class="num">${c[0]}</th>`).join('') + '<th>Supervisor</th><th>Justificativa</th><th></th></tr>';
+    $(P + 'body').innerHTML = lista.map(i => {
       const j = justDe(i), st = sitDe(i), fechado = fechadaRH(i, j);
       return `<tr data-id="${esc(i.id)}">
         <td>${tag(st, COR_SIT[st] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}</td>
         <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)} · ${esc(i.area || '')}</small></td>
         <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
         <td style="white-space:normal;max-width:220px">${esc(i.turno || '')}</td>
-        <td class="num">${minDet(i.det, 'Início do turno')}</td>
-        <td class="num">${minDet(i.det, 'Entrada')}</td>
-        <td class="num neg">${hMin(-(+i.horas || 0))}</td>
+        ${T.cols.map(c => `<td class="num${c[2] ? ' ' + c[2] : ''}">${c[1](i)}</td>`).join('')}
         <td>${esc(i.sup || '—')}</td>
         <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b><small>${esc(j.texto || '')}</small>${j.dataResp ? `<small>respondido em ${esc(dataBr(j.dataResp))}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
-    }).join('') || '<tr><td colspan="10">Nenhum atraso nesse filtro 🎉</td></tr>';
-    $('#bh-at-body').querySelectorAll('tr[data-id] .bh-pd-btn').forEach(bt => bt.onclick = () => abrirForm([bt.closest('tr').dataset.id]));
+    }).join('') || `<tr><td colspan="${7 + T.cols.length}">Nenhum registro nesse filtro 🎉</td></tr>`;
+    $(P + 'body').querySelectorAll('tr[data-id] .bh-pd-btn').forEach(bt => bt.onclick = () => abrirForm([bt.closest('tr').dataset.id]));
   }
+
+  const TIPOS_ABA = {
+    atraso: { tipo: 'ATRASO', pre: 'at', aba: 'atraso', nome: 'Atrasos',
+      media: (m, n) => 'média de ' + Math.round(m / n) + ' min por atraso',
+      regra: 'entrada mais de 5 min depois do início do turno · só dias com entrada e saída marcadas',
+      regraTab: 'tolerância de 5 minutos · aparecem 2 dias úteis depois da data',
+      cols: [['Início', i => minDet(i.det, 'Início do turno')], ['Entrada', i => minDet(i.det, 'Entrada')], ['Atraso', i => hMin(-(+i.horas || 0)), 'neg']] },
+    falta: { tipo: 'FALTA', pre: 'ft', aba: 'falta', nome: 'Faltas',
+      media: (m, n) => 'média de ' + hMin(m / 60 / n).replace('+', '') + ' por falta',
+      regra: 'dias marcados como "Ausente" na coluna observacao do Espelho de ponto (sem abono)',
+      regraTab: 'observacao = Ausente no Espelho de ponto · aparecem 2 dias úteis depois da data',
+      cols: [['Horas ausentes', i => hMin(-(+i.horas || 0)), 'neg']] }
+  };
+  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); };
 
   // ALTERADO (21/10/2026): gráfico por pendência (barras por tipo, empilhadas por situação)
   function gPendTipo(base, tipos) {
@@ -1521,6 +1552,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <div class="bh-modal-topo"><h3>Justificar · ${esc(tipo)}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
       <div class="bh-modal-lista">${itens.slice(0, 8).map(i => `<div><b>${esc(i.n)}</b> · ${dataBr(i.d)} (${esc(i.dia || '')}) · <span>${esc(i.det)}</span></div>`).join('')}${itens.length > 8 ? `<div>… e mais ${itens.length - 8}</div>` : ''}</div>
       ${ehHE && !permitido ? '<div class="bh-aviso">⚠ BH negativo: a HE não pode ser paga. Use "BANCO DE HORAS" para compensar o débito.</div>' : ''}
+      ${tipo === 'FALTA' ? '<div class="bh-aviso">AUSENTE = falta confirmada (o RH desconta) · BANCO DE HORAS = as horas da falta saem do banco (pode ficar negativo) · APENAS JUSTIFICAR = só registra o motivo.</div>' : ''}
       ${tipo === 'ATRASO' ? (temBanco ? '<div class="bh-aviso" style="background:#ecfdf5;color:#065f46">Colaborador com saldo positivo: o atraso pode ser descontado do banco de horas.</div>' : '<div class="bh-aviso">Colaborador sem saldo positivo: escolhendo "BANCO DE HORAS", o atraso é descontado e o banco fica (mais) negativo.</div>') : ''}
       <div class="bh-form">
 
@@ -1549,7 +1581,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const j = ler();
       modal.querySelector('[data-campo="tarefa"]').hidden = !(ehHE && j.trat === 'PAGAMENTO HE');   // BANCO DE HORAS não pede tarefa
       modal.querySelector('[data-campo="chamado"]').hidden = !ehHE;
-      modal.querySelector('[data-campo="local"]').hidden = tipo === 'ATRASO';
+      modal.querySelector('[data-campo="local"]').hidden = tipo === 'ATRASO' || tipo === 'FALTA';
       modal.querySelector('[data-campo="horario"]').hidden = j.trat !== 'AJUSTAR PONTO';
       const r = itens.map(i => calcularStatus(j, i.hePerm, i.tipo));
       const ruim = r.find(x => x[1] !== 'Justificado');
