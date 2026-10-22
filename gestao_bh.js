@@ -40,7 +40,7 @@
     'SEM MARCACAO': ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'],
     'INTERJORNADA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO'],
     'FOLGA NAO CUMPRIDA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO', 'AUSENTE'],
-    'ATRASO': ['BANCO DE HORAS', 'APENAS JUSTIFICAR']   // BANCO DE HORAS só aparece se o colaborador tiver saldo positivo
+    'ATRASO': ['BANCO DE HORAS', 'APENAS JUSTIFICAR']   // BANCO DE HORAS sempre: desconta do saldo, mesmo que fique negativo
   };
   const TRAT_PADRAO = ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'];
   const TAREFAS_HE = [
@@ -1442,7 +1442,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const atual = itens.length === 1 ? justDe(itens[0]) : {};
     // ATRASO: desconta do banco só quando todos os selecionados têm saldo positivo; senão, apenas justificar
     const temBanco = itens.every(i => (+i.saldo || 0) > 0);
-    const trats = (TRATATIVAS[tipo] || TRAT_PADRAO).filter(t => !(tipo === 'ATRASO' && t === 'BANCO DE HORAS' && !temBanco));
+    const trats = TRATATIVAS[tipo] || TRAT_PADRAO;
     const ehHE = tipo === 'HORA EXTRA';
 
     const modal = document.createElement('div');
@@ -1451,7 +1451,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <div class="bh-modal-topo"><h3>Justificar · ${esc(tipo)}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
       <div class="bh-modal-lista">${itens.slice(0, 8).map(i => `<div><b>${esc(i.n)}</b> · ${dataBr(i.d)} (${esc(i.dia || '')}) · <span>${esc(i.det)}</span></div>`).join('')}${itens.length > 8 ? `<div>… e mais ${itens.length - 8}</div>` : ''}</div>
       ${ehHE && !permitido ? '<div class="bh-aviso">⚠ BH negativo: a HE não pode ser paga. Use "BANCO DE HORAS" para compensar o débito.</div>' : ''}
-      ${tipo === 'ATRASO' ? (temBanco ? '<div class="bh-aviso" style="background:#ecfdf5;color:#065f46">Colaborador com saldo positivo: o atraso pode ser descontado do banco de horas.</div>' : '<div class="bh-aviso">Sem saldo positivo no banco de horas: o atraso só pode ser justificado.</div>') : ''}
+      ${tipo === 'ATRASO' ? (temBanco ? '<div class="bh-aviso" style="background:#ecfdf5;color:#065f46">Colaborador com saldo positivo: o atraso pode ser descontado do banco de horas.</div>' : '<div class="bh-aviso">Colaborador sem saldo positivo: escolhendo "BANCO DE HORAS", o atraso é descontado e o banco fica (mais) negativo.</div>') : ''}
       <div class="bh-form">
 
         <label>Tratativa<select data-c="trat"><option value="">— escolha —</option>${trats.map(t => `<option value="${esc(t)}"${atual.trat === t ? ' selected' : ''}${t === 'PAGAMENTO HE' && !permitido ? ' disabled' : ''}>${esc(t)}${t === 'PAGAMENTO HE' && !permitido ? ' (bloqueado: BH negativo)' : ''}</option>`).join('')}</select></label>
