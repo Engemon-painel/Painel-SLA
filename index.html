@@ -555,6 +555,28 @@
           <div class="unb-grid" id="unbGrid"></div>
         </div>
 
+        <div class="grid" style="margin-bottom:0;">
+          <div class="panel">
+            <h2>Admitidos x Demitidos</h2>
+            <div id="turnoverMedioLabel" class="mono" style="font-size:12px; color:var(--muted); margin:2px 0 12px;"></div>
+            <canvas id="admDemChart" height="160"></canvas>
+          </div>
+          <div class="panel">
+            <h2>Evolução da Equipe</h2>
+            <canvas id="evolucaoChart" height="160"></canvas>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px; margin-bottom:16px;">
+          <h2>Técnicos Ativos Únicos por Supervisor</h2>
+          <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+            <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto; flex:1 1 320px; min-width:280px;">
+              <canvas id="tecnicosSupervisorChart"></canvas>
+            </div>
+            <div id="tecnicosSupervisorResumoBox" style="flex:0 0 240px; max-height:340px; overflow-y:auto; border:1px solid var(--line); border-radius:10px; background:var(--panel);"></div>
+          </div>
+        </div>
+
         <div class="panel" style="margin-bottom:16px;">
           <h2>Colaboradores</h2>
 
@@ -590,28 +612,6 @@
               <tbody id="hcTableBody"></tbody>
             </table>
             <div id="hcNoResults" class="no-results" style="display:none">Nenhum colaborador encontrado.</div>
-          </div>
-        </div>
-
-        <div class="grid">
-          <div class="panel">
-            <h2>Admitidos x Demitidos</h2>
-            <div id="turnoverMedioLabel" class="mono" style="font-size:12px; color:var(--muted); margin:2px 0 12px;"></div>
-            <canvas id="admDemChart" height="160"></canvas>
-          </div>
-          <div class="panel">
-            <h2>Evolução da Equipe</h2>
-            <canvas id="evolucaoChart" height="160"></canvas>
-          </div>
-        </div>
-
-        <div class="panel" style="margin-top:16px;">
-          <h2>Técnicos Ativos Únicos por Supervisor</h2>
-          <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
-            <div id="tecnicosSupervisorChartWrap" style="position:relative; height:340px; max-height:50vh; overflow-y:auto; flex:1 1 320px; min-width:280px;">
-              <canvas id="tecnicosSupervisorChart"></canvas>
-            </div>
-            <div id="tecnicosSupervisorResumoBox" style="flex:0 0 240px; max-height:340px; overflow-y:auto; border:1px solid var(--line); border-radius:10px; background:var(--panel);"></div>
           </div>
         </div>
       </div>
