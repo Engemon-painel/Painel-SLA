@@ -513,6 +513,7 @@
       <div class="grid" style="grid-template-columns:1.4fr 1fr;">
         <div class="panel">
           <h2>Realizado x Meta Diária</h2>
+          <div class="mono" style="font-size:11px;color:#6b7590;margin:-4px 0 6px;">Clique num dia para ver na tabela abaixo as preventivas executadas nele</div>
           <div style="position:relative;height:300px;"><canvas id="pv-op-diario"></canvas></div>
         </div>
         <div class="panel">
@@ -522,7 +523,7 @@
       </div>
       <div class="panel">
         <div class="pv-tab-topo">
-          <h2>Preventivas (<span id="pv-op-qtd">0</span>)</h2>
+          <h2>Preventivas (<span id="pv-op-qtd">0</span>) <span id="pv-op-dia"></span></h2>
           <div class="search">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style="opacity:.6"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2"/></svg>
             <input id="pv-op-busca" type="search" placeholder="Buscar WO, site, chamado...">
@@ -574,6 +575,7 @@
   }
 
   let graficoDiario = null;
+  let diaOp = '';   // ALTERADO (22/10/2026): dia clicado no gráfico (aaaa-mm-dd) → tabela só com as executadas nele
   function ritmoOp(regs) {
     const dias = diasDoMes(dados.mes);
     const ref = dataReferencia(dados.mes);
@@ -636,7 +638,8 @@
       realDia.push(d.data <= ref || feito ? feito : null);
       metaDia.push(meta === null ? null : Math.round(meta * 100) / 100);
       deficitAnt.push(deficit);
-      corBarra.push(meta === null ? 'rgba(107,117,144,.55)' : feito >= meta - 0.005 ? 'rgba(5,150,105,.8)' : 'rgba(220,38,38,.75)');
+      const corB = meta === null ? 'rgba(107,117,144,.55)' : feito >= meta - 0.005 ? 'rgba(5,150,105,.8)' : 'rgba(220,38,38,.75)';
+      corBarra.push(diaOp && d.data !== diaOp ? corB.replace(/[\d.]+\)$/, '.25)') : corB);
       realAcumAnt += feito;
     });
 
@@ -664,6 +667,13 @@
         responsive: true, maintainAspectRatio: false,
         layout: { padding: { top: 14 } },
         interaction: { mode: 'index', intersect: false },
+        onClick: (e, els) => {
+          if (!els.length) return;
+          const d = dias[els[0].index].data;
+          diaOp = diaOp === d ? '' : d;
+          setTimeout(() => { ritmoOp(filtrarOp()); tabelaOp(filtrarOp()); }, 0);
+        },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
         plugins: {
           legend: { labels: { color: COR.muted, font: { family: 'Inter', size: 11 }, boxWidth: 12 } },
           tooltip: { callbacks: {
@@ -801,10 +811,16 @@
   }
 
   function tabelaOp(regs) {
-    const lista = regs.filter(r => !buscaOp ||
-      [r.w, r.si, r.s, r.ch, r.t, r.ti, r.x, r.m].some(v => String(v ?? '').toLowerCase().includes(buscaOp)))
+    const lista = regs.filter(r => (!diaOp || (r.st === 'Executada' && r.d === diaOp)) && (!buscaOp ||
+      [r.w, r.si, r.s, r.ch, r.t, r.ti, r.x, r.m].some(v => String(v ?? '').toLowerCase().includes(buscaOp))))
       .sort((a, b) => String(a.w).localeCompare(String(b.w)));
     raiz.querySelector('#pv-op-qtd').textContent = fmt(lista.length);
+    const selo = raiz.querySelector('#pv-op-dia');
+    if (selo) {
+      selo.innerHTML = diaOp ? `<button type="button" title="Mostrar todos os dias" style="margin-left:8px;padding:3px 10px;border:0;border-radius:999px;background:#0e7c86;color:#fff;font:600 12px Inter,sans-serif;cursor:pointer;">executadas em ${diaOp.slice(8, 10)}/${diaOp.slice(5, 7)} ✕</button>` : '';
+      const bt = selo.querySelector('button');
+      if (bt) bt.onclick = () => { diaOp = ''; ritmoOp(filtrarOp()); tabelaOp(filtrarOp()); };
+    }
     raiz.querySelector('#pv-op-tbody').innerHTML = lista.map(r => {
       return `<tr>
         <td class="mono" style="font-size:12px;">${esc(r.w)}</td><td>${esc(r.si)}</td><td>${esc(r.ti) || '-'}</td><td>${esc(r.x)}</td>
@@ -813,7 +829,7 @@
         <td>Preventiva infra - ${esc(r.t)}</td>
         <td class="num">${fmtPct(r.pc)}</td><td>${esc(r.er)}</td><td>${esc(r.xp)}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="11" style="text-align:center;color:#6b7590">Nenhuma preventiva encontrada</td></tr>';
+    }).join('') || (diaOp ? '<tr><td colspan="11" style="text-align:center;color:#6b7590">Nenhuma preventiva executada neste dia com os filtros atuais</td></tr>' : '<tr><td colspan="11" style="text-align:center;color:#6b7590">Nenhuma preventiva encontrada</td></tr>');
   }
 
   function trocarAba(aba) {
