@@ -210,6 +210,7 @@ ${C} .bh-cmp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12
 ${C} .bh-cmp select{padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:12px;background:#fff}
 ${C} tr.tot td{font-weight:700;background:#e2e8f0;position:sticky;bottom:0;border-top:2px solid #94a3b8}
 ${C} .bh-cont{margin-left:auto;background:#dc2626;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px}
+@media (max-width:900px){${C} .bh-pd-graf{grid-template-columns:1fr!important}}
 ${C} .bh-pd-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}
 ${C} .bh-pd-kpis .bh-k{border:0;text-align:left;font:inherit;cursor:pointer;opacity:.75;transition:opacity .15s,transform .15s}
 ${C} .bh-pd-kpis .bh-k b{font-size:26px}
@@ -353,10 +354,17 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     <div class="bh-aba" data-p="pend" hidden>
       <div id="bh-pd-msg"></div>
       <div class="bh-pd-kpis" id="bh-pd-kpis"></div>
-      <div class="bh-c" style="margin-bottom:12px">
-        <h3>Pendências por tipo</h3>
-        <p class="sub" id="bh-pd-g-sub" style="margin:0 0 6px">Quantidade de cada pendência por situação · clique na barra para filtrar a tabela</p>
-        <div style="position:relative;height:230px"><canvas id="bh-g-pdtipo"></canvas></div>
+      <div class="bh-pd-graf" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:12px;margin-bottom:12px">
+        <div class="bh-c">
+          <h3>Pendências por tipo</h3>
+          <p class="sub" id="bh-pd-g-sub" style="margin:0 0 6px">Quantidade de cada pendência por situação · clique na barra para filtrar a tabela</p>
+          <div style="position:relative;height:200px"><canvas id="bh-g-pdtipo"></canvas></div>
+        </div>
+        <div class="bh-c">
+          <h3>Hora extra por supervisor · folha atual</h3>
+          <p class="sub" id="bh-pd-he-sub" style="margin:0 0 6px"></p>
+          <div id="bh-pd-he-box" style="position:relative;height:200px;overflow-y:auto"><div id="bh-pd-he-alt" style="position:relative;height:200px"><canvas id="bh-g-pdhe"></canvas></div></div>
+        </div>
       </div>
       <div class="bh-c">
         <div class="bh-evtopo">
@@ -1256,6 +1264,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     // tipo de pendência
     const tipos = {}; base.forEach(i => tipos[i.tipo] = (tipos[i.tipo] || 0) + 1);
     gPendTipo(base, tipos);
+    gHeSup();
     const raiz = document.getElementById(CONTAINER);
     const sTipo = raiz.querySelector('[data-pf="tipo"]');
     sTipo.innerHTML = `<option value="">Pendência: todas (${nf(base.length)})</option>` + Object.keys(tipos).sort().map(t => `<option value="${esc(t)}"${pendFiltro.tipo === t ? ' selected' : ''}>${esc(t)} (${nf(tipos[t])})</option>`).join('');
@@ -1414,6 +1423,67 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
           const t = nomes[els[0].index];
           pendFiltro.tipo = pendFiltro.tipo === t ? '' : t; pendSel.clear();
           setTimeout(() => { renderPend(); renderAndamento(); }, 0);
+        },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
+    });
+  }
+
+  // ALTERADO (22/10/2026): total de hora extra feita por supervisor na folha atual (15 a 14)
+  //   soma o "HE: hh:mm" de cada pendência HORA EXTRA da folha atual, de qualquer situação
+  //   (respeita Coordenador, Supervisor e busca; não depende do filtro de folha nem da regra dos 2 dias úteis)
+  function gHeSup() {
+    if (!$('#bh-g-pdhe')) return;
+    const fo = folhaIniDe(hojeIso()), b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
+    const he = (pend || []).filter(i => i.tipo === 'HORA EXTRA' && folhaIniDe(i.d) === fo &&
+      (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
+      (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)));
+    const g = {};
+    he.forEach(i => {
+      const k = tr(i.sup) || 'Sem supervisor', h = saldoDia(i) || 0;
+      const o = g[k] = g[k] || { h: 0, q: 0, just: 0, colab: new Set() };
+      o.h += h; o.q++; o.colab.add(i.m); if (sitDe(i) === 'Justificado') o.just += h;
+    });
+    const sups = Object.keys(g).sort((a, c) => g[c].h - g[a].h);
+    const tot = sups.reduce((t, k) => t + g[k].h, 0);
+    $('#bh-pd-he-sub').textContent = `Folha ${rotFolha(fo)} · ${hMin(tot).replace('+', '')} de hora extra em ${nf(he.length)} lançamentos · verde = já justificada`;
+    $('#bh-pd-he-alt').style.height = Math.max(200, sups.length * 26 + 50) + 'px';
+    const aTratar = sups.map(k => Math.round((g[k].h - g[k].just) * 100) / 100), justif = sups.map(k => Math.round(g[k].just * 100) / 100);
+    desenhar('bh-g-pdhe', {
+      type: 'bar',
+      data: { labels: sups, datasets: [
+        { label: 'A tratar', data: aTratar, backgroundColor: '#f59e0b', stack: 'h', borderRadius: 3, datalabels: { display: false } },
+        { label: 'Justificada', data: justif, backgroundColor: COR_SIT['Justificado'], stack: 'h', borderRadius: 3, datalabels: { display: false } }] },
+      plugins: [{
+        id: 'totHe',
+        afterDatasetsDraw(ch) {
+          const { ctx } = ch, m0 = ch.getDatasetMeta(0), m1 = ch.getDatasetMeta(1);
+          ctx.save(); ctx.font = '700 11px sans-serif'; ctx.fillStyle = '#0f172a'; ctx.textBaseline = 'middle';
+          sups.forEach((k, i) => {
+            const el = [!m1.hidden && m1.data[i], !m0.hidden && m0.data[i]].filter(Boolean).reduce((a, e) => (!a || e.x > a.x ? e : a), null);
+            if (el) ctx.fillText(`${hMin(g[k].h).replace('+', '')} · ${g[k].q} HE`, el.x + 6, el.y);
+          });
+          ctx.restore();
+        }
+      }],
+      options: {
+        indexAxis: 'y', layout: { padding: { right: 100 } },
+        scales: { x: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => v + 'h' } },
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } } },
+        plugins: {
+          legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8 } },
+          tooltip: { callbacks: {
+            label: c => `${c.dataset.label}: ${hMin(c.raw).replace('+', '')}`,
+            footer: its => { const o = g[sups[its[0].dataIndex]]; return `Total ${hMin(o.h).replace('+', '')} · ${o.q} lançamentos · ${o.colab.size} colaboradores`; } } }
+        },
+        onClick: (e, els) => {
+          if (!els.length) return;
+          const k = sups[els[0].index];
+          if (k === 'Sem supervisor') return;
+          filtro.sup = filtro.sup === k ? '' : k;
+          const sel = document.querySelector('#' + CONTAINER + ' [data-f="sup"]');
+          if (sel) sel.value = filtro.sup;
+          setTimeout(atualizar, 0);
         },
         onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
       }
