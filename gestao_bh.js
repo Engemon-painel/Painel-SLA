@@ -401,6 +401,18 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     <!-- ================= ABA: FALTAS ================= -->
     <div class="bh-aba" data-p="falta" hidden>
       <div class="bh-pd-kpis" id="bh-ft-kpis"></div>
+      <div class="bh-pd-graf" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:12px">
+        <div class="bh-c">
+          <h3>Absenteísmo por supervisor</h3>
+          <p class="sub" id="bh-abs-sub" style="margin:0 0 6px"></p>
+          <div style="position:relative;height:260px" id="bh-abs-alt"><canvas id="bh-g-abs"></canvas></div>
+        </div>
+        <div class="bh-c">
+          <h3>Funcionários que mais faltaram</h3>
+          <p class="sub" id="bh-absf-sub" style="margin:0 0 6px"></p>
+          <div style="position:relative;height:260px" id="bh-absf-alt"><canvas id="bh-g-absf"></canvas></div>
+        </div>
+      </div>
       <div class="bh-c" style="margin-bottom:12px">
         <h3>Faltas por supervisor</h3>
         <p class="sub" id="bh-ft-g-sub" style="margin:0 0 6px"></p>
@@ -1192,6 +1204,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     try {
       const [d, h] = await Promise.all([lerJson(ARQ_PEND), lerJson(ARQ_PEND_HIST).catch(() => null)]);
       pend = Array.isArray(d) ? d : (d.itens || []);
+      pendAbs = (d && Array.isArray(d.absenteismo)) ? d.absenteismo : null;
       // junta o histórico da TRATATIVA_GESTORES: mesma pendência = matrícula (6 dígitos) | data | tipo
       const chaveP = i => String(i.m || '').replace(/\D/g, '').padStart(6, '0').slice(-6) + '|' + String(i.d || '').slice(0, 10) + '|' + String(i.tipo || '').trim().toUpperCase();
       const hItens = h ? (Array.isArray(h) ? h : (h.itens || [])) : [];
@@ -1244,6 +1257,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     renderAndamento();
   }
 
+  let pendAbs = null;   // absenteísmo por colaborador e folha (dados_pend_bh.json → absenteismo)
   const TIPOS_PROPRIOS = ['ATRASO', 'FALTA'];   // têm aba própria: não entram em Pendências/Andamento
   function pendFiltrados(soTipo) {
     const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
@@ -1407,7 +1421,110 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       regraTab: 'observacao = Ausente no Espelho de ponto · aparecem 2 dias úteis depois da data',
       cols: [['Horas ausentes', i => hMin(-(+i.horas || 0)), 'neg']] }
   };
-  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); };
+  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); gAbsenteismo(); };
+
+  // ALTERADO (22/10/2026): absenteísmo por supervisor = dias de falta ÷ dias previstos (trabalhou ou faltou)
+  //   vem pronto do script (dados_pend_bh.json → absenteismo); segue Coordenador, Supervisor, busca e Folha
+  function gAbsenteismo() {
+    if (!$('#bh-g-abs')) return;
+    if (!pendAbs) {
+      if ($('#bh-absf-sub')) $('#bh-absf-sub').textContent = 'Aguardando o script novo (veja o aviso ao lado).';
+      $('#bh-abs-sub').textContent = '⚠ Para ver o absenteísmo, atualize o script Pendencias no Excel (versão que lê o Espelho de ponto) e rode o fluxo diário.';
+      return;
+    }
+    const fo = folhaSel(), b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
+    const base = pendAbs.filter(a => (!fo || a.f === fo) && (!filtro.co || tr(a.co) === tr(filtro.co)) &&
+      (!filtro.sup || tr(a.sup) === tr(filtro.sup)) && (!b || String(a.n).toLowerCase().includes(b) || String(a.m).includes(b)));
+    const g = {};
+    base.forEach(a => {
+      const k = tr(a.sup) || 'Sem supervisor';
+      const o = g[k] = g[k] || { p: 0, a: 0, hp: 0, ha: 0, c: new Set(), cf: new Set() };
+      o.p += a.dPrev; o.a += a.dAus; o.hp += a.hPrev; o.ha += a.hAus; o.c.add(a.m); if (a.dAus) o.cf.add(a.m);
+    });
+    const taxa = o => o.p ? o.a / o.p * 100 : 0;
+    const sups = Object.keys(g).filter(k => g[k].p).sort((x, y) => taxa(g[y]) - taxa(g[x]));
+    const tp = sups.reduce((t, k) => t + g[k].p, 0), ta = sups.reduce((t, k) => t + g[k].a, 0);
+    const geral = tp ? ta / tp * 100 : 0;
+    const f1 = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    $('#bh-abs-sub').textContent = `${fo ? 'Folha ' + rotFolha(fo) : 'Todas as folhas'} · geral ${f1(geral)}% (${nf(ta)} dias de falta em ${nf(tp)} dias previstos) · ` +
+      'dias previstos = dias com batida ou marcados "Ausente" (fora D.S.R., compensado, férias, afastamento) · só dias com 2 dias úteis passados';
+    $('#bh-abs-alt').style.height = Math.max(220, sups.length * 26 + 60) + 'px';
+    const cor = v => v >= 10 ? VERMELHO : v >= 5 ? '#f59e0b' : VERDE;
+    desenhar('bh-g-abs', {
+      type: 'bar',
+      data: { labels: sups, datasets: [{ label: 'Absenteísmo (%)', data: sups.map(k => Math.round(taxa(g[k]) * 10) / 10),
+        backgroundColor: sups.map(k => cor(taxa(g[k]))), borderRadius: 3,
+        datalabels: { anchor: 'end', align: 'right', color: '#0f172a', font: { size: 11, weight: '700' },
+          formatter: (v, c) => { const o = g[sups[c.dataIndex]]; return `${f1(v)}% · ${o.a}/${o.p} dias`; } } }] },
+      plugins: [{
+        id: 'linhaGeral',
+        afterDatasetsDraw(ch) {
+          const x = ch.scales.x.getPixelForValue(geral), { top, bottom } = ch.chartArea, ctx = ch.ctx;
+          ctx.save(); ctx.strokeStyle = '#334155'; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+          ctx.setLineDash([]); ctx.fillStyle = '#334155'; ctx.font = '600 10px sans-serif'; ctx.fillText('geral ' + f1(geral) + '%', x + 4, top + 10); ctx.restore();
+        }
+      }],
+      options: {
+        indexAxis: 'y', layout: { padding: { right: 120 } },
+        scales: { x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => v + '%' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } },
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: {
+            label: c => `Absenteísmo: ${f1(c.raw)}%`,
+            footer: its => { const o = g[sups[its[0].dataIndex]];
+              return `${o.a} dias de falta em ${o.p} dias previstos\n${hMin(o.ha).replace('+', '')} de ${hMin(o.hp).replace('+', '')} · ${o.cf.size} de ${o.c.size} colaboradores faltaram`; } } } },
+        onClick: (e, els) => {
+          if (!els.length) return;
+          const k = sups[els[0].index]; if (k === 'Sem supervisor') return;
+          filtro.sup = filtro.sup === k ? '' : k;
+          const sel = document.querySelector('#' + CONTAINER + ' [data-f="sup"]'); if (sel) sel.value = filtro.sup;
+          setTimeout(atualizar, 0);
+        },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
+    });
+    gAbsFuncionario(base, f1);
+  }
+
+  // ALTERADO (22/10/2026): ranking dos funcionários que mais faltaram (dias de falta; desempate pelo %)
+  function gAbsFuncionario(base, f1) {
+    if (!$('#bh-g-absf')) return;
+    const p = {};
+    base.forEach(a => {   // junta as folhas quando o filtro é "todas"
+      const o = p[a.m] = p[a.m] || { n: a.n, m: a.m, sup: a.sup, d: 0, a: 0, ha: 0 };
+      o.d += a.dPrev; o.a += a.dAus; o.ha += a.hAus;
+    });
+    const todos = Object.values(p).filter(o => o.a > 0);
+    const top = todos.sort((x, y) => y.a - x.a || (y.a / y.d) - (x.a / x.d) || String(x.n).localeCompare(String(y.n), 'pt-BR')).slice(0, 15);
+    $('#bh-absf-sub').textContent = todos.length
+      ? `${nf(todos.length)} funcionários com falta · mostrando os ${top.length} que mais faltaram · clique para buscar o funcionário`
+      : 'Nenhuma falta nesse filtro 🎉';
+    $('#bh-absf-alt').style.height = Math.max(220, top.length * 24 + 50) + 'px';
+    const curto = n => { const w = String(n || '').split(' '); return w.length > 2 ? w[0] + ' ' + w[w.length - 1] : n; };
+    desenhar('bh-g-absf', {
+      type: 'bar',
+      data: { labels: top.map(o => curto(o.n)), datasets: [{ label: 'Dias de falta', data: top.map(o => o.a),
+        backgroundColor: top.map(o => { const t = o.a / o.d * 100; return t >= 10 ? VERMELHO : t >= 5 ? '#f59e0b' : VERDE; }), borderRadius: 3,
+        datalabels: { anchor: 'end', align: 'right', color: '#0f172a', font: { size: 11, weight: '700' },
+          formatter: (v, c) => { const o = top[c.dataIndex]; return `${v} falta${v > 1 ? 's' : ''} · ${f1(o.a / o.d * 100)}%`; } } }] },
+      options: {
+        indexAxis: 'y', layout: { padding: { right: 110 } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#f1f5f9' } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } },
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: {
+            title: its => top[its[0].dataIndex].n,
+            label: c => { const o = top[c.dataIndex]; return `${o.a} dias de falta em ${o.d} previstos (${f1(o.a / o.d * 100)}%)`; },
+            footer: its => { const o = top[its[0].dataIndex]; return `${hMin(o.ha).replace('+', '')} ausentes · matrícula ${o.m} · ${String(o.sup || '—').trim()}`; } } } },
+        onClick: (e, els) => {
+          if (!els.length) return;
+          const o = top[els[0].index];
+          filtro.busca = filtro.busca === o.m ? '' : o.m;
+          const inp = document.querySelector('#' + CONTAINER + ' [data-f="busca"]'); if (inp) inp.value = filtro.busca;
+          setTimeout(atualizar, 0);
+        },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; }
+      }
+    });
+  }
 
   // ALTERADO (21/10/2026): gráfico por pendência (barras por tipo, empilhadas por situação)
   function gPendTipo(base, tipos) {
