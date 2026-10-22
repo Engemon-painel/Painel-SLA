@@ -295,7 +295,10 @@
             <div class="afz-box"><canvas id="afz-g-ps"></canvas></div>
           </div>
           <div class="afz-card full">
-            <h3>Prioridades em aberto</h3>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <h3 style="margin:0">Prioridades em aberto</h3>
+              <button type="button" class="afz-limpar" id="afz-ps-exp" style="margin-left:auto;background:#0e7c86;color:#fff">⬇ Exportar (Excel)</button>
+            </div>
             <p class="sub" id="afz-ps-sub"></p>
             <div class="afz-tab"><table>
               <thead><tr id="afz-ps-head"></tr></thead>
@@ -307,6 +310,7 @@
       <div class="afz-rodape" id="afz-rodape"></div>`;
 
     el.querySelectorAll('.afz-abas button').forEach(b => b.addEventListener('click', () => trocarAba(b.dataset.aba)));
+    $('#afz-ps-exp', el).addEventListener('click', exportarPrio);
 
     // opções dos filtros
     const it = dados.itens;
@@ -1231,6 +1235,7 @@
       '<th>Dias no status</th><th>Previsão</th><th>Situação</th><th>Título</th><th>Responsável</th>';
     const lista = itens.slice().sort((a, b) =>
       (rankPs(psDe(a)) - rankPs(psDe(b))) || ((b.dst || 0) - (a.dst || 0)));
+    listaPrioExport = lista;
     const LIM = 500;
     $('#afz-ps-tbody').innerHTML = lista.slice(0, LIM).map(i => {
       const k = psDe(i), f = FAIXAS[faixaDe(i.dst || 0)], sit = situacao(i);
@@ -1244,7 +1249,9 @@
     }).join('');
     const atr = lista.filter(i => situacao(i) === 'Atrasado').length;
     $('#afz-ps-sub').textContent = `${nf(lista.length)} AFAZ em aberto · ${nf(atr)} com previsão vencida · ordenado pela PRIORIDADE do site e pelos dias parado` +
-      (lista.length > LIM ? ` · mostrando os ${LIM} primeiros (use os filtros)` : '');
+      (lista.length > LIM ? ` · mostrando os ${LIM} primeiros na tela (o Exportar leva todos os ${nf(lista.length)})` : '');
+    const bExp = $('#afz-ps-exp');
+    if (bExp) bExp.textContent = `⬇ Exportar ${nf(lista.length)} AFAZ (Excel)`;
 
     // contador na aba: pendências em sites prioridade 0 e 1
     const crit = itens.filter(i => k01(psDe(i))).length;
@@ -1252,6 +1259,28 @@
     $('#afz-aba-cont').title = 'Pendências em sites prioridade 0 e 1';
   }
   const k01 = k => k === '0' || k === '1';
+
+  // ALTERADO (22/10/2026): exporta a tabela "Prioridades em aberto" com os filtros da tela (todas as linhas)
+  let listaPrioExport = [];
+  function exportarPrio() {
+    const lista = listaPrioExport || [];
+    if (!lista.length) { alert('Nenhum AFAZ no filtro atual para exportar.'); return; }
+    const cols = [
+      ['AFAZ', i => i.id], ['Site', i => i.s], ['PRIORIDADE', i => { const k = psDe(i); return k === 'sem' ? '' : k; }],
+      ['PRIORIDADE INFRAESTRUTURA', i => i.pi || ''], ['Tipo Site', i => i.tsi || ''], ['Tipo', i => i.tp], ['Status', i => i.st],
+      ['Dias no status', i => i.dst || 0], ['Abertura', i => dataBR(i.ab)], ['Previsão', i => dataBR(i.prev)], ['Situação', i => situacao(i)],
+      ['Título', i => i.ti], ['Área/Sistema', i => i.ar], ['Responsável', i => i.resp], ['Prioridade AFAZ', i => i.pr]
+    ];
+    const cel = v => { const t = String(v == null ? '' : v).replace(/—/g, '').replace(/[\r\n]+/g, ' '); return /[";]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const csv = '\ufeff' + [cols.map(c => c[0]).join(';')].concat(lista.map(i => cols.map(c => cel(c[1](i))).join(';'))).join('\r\n');
+    const nomeFiltro = [filtro.ps !== '' && filtro.ps != null ? 'prioridade-' + filtro.ps : '', filtro.tp, filtro.st, filtro.site]
+      .filter(Boolean).join('_').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9_-]+/g, '-');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'afaz_prioridades' + (nomeFiltro ? '_' + nomeFiltro : '') + '_' + new Date().toLocaleDateString('sv-SE') + '.csv';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
 
   // célula da tabela: "Sim" em destaque, "Não" apagado, outros valores (PONTA, HUBS E CENTRAIS...) em texto normal
   function celAt(v) {
@@ -1283,7 +1312,7 @@
   // modo PRIORIDADE INFRAESTRUTURA: um card por PRIORIDADE, sempre de 0 a 4, com Backlog x Entrante
   function quadroPrioridades(itens) {
     $('#afz-cls-tit').textContent = 'AFAZ abertos por PRIORIDADE';
-    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v36';
+    $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz (0 = mais crítico) · Backlog x Entrante em cada prioridade · clique num card para filtrar · painel v37';
     const niveis = ['0', '1', '2', '3', '4'];
     if (itens.some(i => psDe(i) === 'sem')) niveis.push('sem');
     const cards = niveis.map(k => ({ k, titulo: rotPS(k), cor: COR_PS[k], g: itens.filter(i => psDe(i) === k) }));
@@ -1315,7 +1344,7 @@
     if (temPi()) {
       // um card por Tipo Site (coluna PRIORIDADE INFRAESTRUTURA), do maior para o menor
       $('#afz-cls-tit').textContent = 'AFAZ abertos por Tipo Site';
-      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v36 (modo Tipo Site: valores sem 0 a 4)';
+      $('#afz-cls-sub').textContent = 'Coluna PRIORIDADE INFRAESTRUTURA da aba Afaz · quebra pela PRIORIDADE do site · clique num card para filtrar a tabela · painel v37 (modo Tipo Site: valores sem 0 a 4)';
       const cont = {};
       itens.forEach(i => { const v = piDe(i); cont[v] = (cont[v] || 0) + 1; });
       // mantém o card filtrado visível mesmo se a combinação de filtros zerar
