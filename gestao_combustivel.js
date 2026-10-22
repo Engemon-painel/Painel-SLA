@@ -315,8 +315,15 @@
     if (pGasto) abaC.appendChild(pGasto);
     if (pRanking) abaC.appendChild(pRanking);
 
+    // ALTERADO (22/10/2026): lista de veículos (placa, condutor... com busca) volta para a aba Veículos
+    if (pVeiculos) {
+      pVeiculos.style.marginTop = '16px';
+      const tit = pVeiculos.querySelector('h2');
+      if (tit) tit.textContent = 'Veículos — pesquise por placa, condutor, marca ou modelo';
+      abaV.appendChild(pVeiculos);
+    }
     // O que não foi pedido fica escondido (o código original continua funcionando)
-    [gridGraficos, pVeiculos].forEach(el => { if (el) oculto.appendChild(el); });
+    [gridGraficos].forEach(el => { if (el) oculto.appendChild(el); });
 
     abas.querySelectorAll('.fr-aba').forEach(ch => ch.onclick = () => {
       abaFrota = ch.dataset.aba;
@@ -703,7 +710,7 @@
   }
 
   instalar();
-  console.log('[Combustível] v14 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
+  console.log('[Combustível] v15 módulo carregado. renderFrota envolvida:', !!(window.renderFrota && renderFrota._combV8));
   carregarCombustivel();
   setInterval(carregarCombustivel, 5 * 60 * 1000);
 })();
