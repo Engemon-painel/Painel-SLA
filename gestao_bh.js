@@ -520,7 +520,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       Object.keys(filtro).forEach(k => filtro[k] = '');
       filtro.st = statusPadrao();
       faixaSel = ''; tipoSel = '';
-      pendFiltro.tipo = ''; pendFiltro.sit = 'tratar'; pendFiltro.folha = null; pendSel.clear();
+      pendFiltro.tipo = ''; pendFiltro.sit = 'tratar'; pendFiltro.folha = null; pendFiltro.semAlmoco = false; pendSel.clear();
       el.querySelectorAll('[data-f]').forEach(c => c.value = c.dataset.f === 'st' ? filtro.st : '');
       atualizar();
     });
@@ -1128,9 +1128,25 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }
     return null;
   }
+  const ehSemAlmoco = i => i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null;
+  function heSemAlmoco(i) {
+    const det = String(i.det || '');
+    const mb = det.match(/Batidas:\s*([0-9:\s\/]*)/i);
+    const b = mb ? (mb[1].match(/\d{1,2}:\d{2}/g) || []).map(minDe) : [];
+    if (b.length !== 2) return null;
+    const jor = jornadaDia(det, i.turno, i.dia);          // já sem a 1h de intervalo quando a jornada passa de 6h
+    if (jor == null) return null;
+    let trab = b[1] - b[0]; if (trab < 0) trab += 1440;
+    if (trab <= 360) return null;                           // jornada curta: sem intervalo obrigatório
+    return (trab - 60 - jor) / 60;
+  }
   function saldoDia(i) {
     const det = String(i.det || '');
     if (i.tipo === 'HORA EXTRA') {
+      // ALTERADO (23/10/2026): só entrada e saída (almoço não marcado) em jornada acima de 6h →
+      // a base conta o almoço como HE; aqui desconta 1h de intervalo e recalcula
+      const semAlmoco = heSemAlmoco(i);
+      if (semAlmoco != null) return semAlmoco;
       const he = det.match(/HE:\s*(\d{1,3}):(\d{2})/i);
       if (he) return (+he[1] * 60 + +he[2]) / 60;
       return +i.horas || null;
@@ -1278,6 +1294,21 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     msg.innerHTML = avisos.map(a => `<div class="bh-aviso">⚠ ${esc(a)}</div>`).join('');
 
     const base = pendFiltrados();
+
+    // ALTERADO (23/10/2026): alerta das HE com almoço não marcado (só entrada e saída) — a base conta o almoço como HE
+    const semAlm = base.filter(ehSemAlmoco);
+    if (semAlm.length) {
+      const hBase = semAlm.reduce((t, i) => { const m = String(i.det || '').match(/HE:\s*(\d{1,3}):(\d{2})/i); return t + (m ? +m[1] + m[2] / 60 : 0); }, 0);
+      const hReal = semAlm.reduce((t, i) => t + Math.max(0, heSemAlmoco(i) || 0), 0);
+      const colab = new Set(semAlm.map(i => i.m)).size;
+      msg.insertAdjacentHTML('beforeend', `<div class="bh-aviso" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff7ed;border:1px solid #fdba74;color:#9a3412">
+        <span style="font-size:20px">🍽️</span>
+        <span style="flex:1;min-width:260px"><b>${nf(semAlm.length)} hora${semAlm.length > 1 ? 's' : ''} extra${semAlm.length > 1 ? 's' : ''} com almoço não marcado</b> (${nf(colab)} colaborador${colab > 1 ? 'es' : ''}) ·
+          a base considerou <b>${hMin(hBase).replace('+', '')}</b> de HE, mas descontando o almoço sobram <b>${hMin(hReal).replace('+', '')}</b>.
+          Só tem entrada e saída: o gestor deve orientar a marcar o intervalo ou ajustar o ponto.</span>
+        <button type="button" class="bh-pd-btn${pendFiltro.semAlmoco ? ' on' : ''}" id="bh-pd-semalm">${pendFiltro.semAlmoco ? 'Mostrar todas' : 'Ver esses casos'}</button></div>`);
+      $('#bh-pd-semalm').onclick = () => { pendFiltro.semAlmoco = !pendFiltro.semAlmoco; if (pendFiltro.semAlmoco) { pendFiltro.sit = ''; pendFiltro.tipo = ''; } pendSel.clear(); renderPend(); };
+    } else pendFiltro.semAlmoco = false;
     const cont = {}; ORDEM_SIT.forEach(s => cont[s] = 0);
     base.forEach(i => { cont[sitDe(i)] = (cont[sitDe(i)] || 0) + 1; });
     const aTratar = cont['Pendente Operação'] + cont['Erro na Justificativa'];
@@ -1313,7 +1344,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const lista = base.filter(i => {
       const s = sitDe(i);
       return (!pendFiltro.tipo || i.tipo === pendFiltro.tipo) &&
-        (!pendFiltro.sit || (pendFiltro.sit === 'tratar' ? ehATratar(s) : s === pendFiltro.sit));
+        (!pendFiltro.sit || (pendFiltro.sit === 'tratar' ? ehATratar(s) : s === pendFiltro.sit)) &&
+        (!pendFiltro.semAlmoco || ehSemAlmoco(i));
     }).sort((a, b) => ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (b.dias || 0) - (a.dias || 0) || String(a.n).localeCompare(String(b.n), 'pt-BR'));
     [...pendSel].forEach(id => { if (!lista.some(i => i.id === id)) pendSel.delete(id); });
 
@@ -1327,14 +1359,14 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       return `<tr data-id="${esc(i.id)}">
         <td>${fechado ? '' : `<input type="checkbox" class="bh-pd-ck"${pendSel.has(i.id) ? ' checked' : ''}>`}</td>
         <td>${tag(s, COR_SIT[s] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}${s === 'Erro na Justificativa' ? `<small class="bh-pd-err">${esc(auto)}</small>` : ''}</td>
-        <td><b>${esc(i.tipo)}</b>${i.hist ? `<small style="display:block;color:#64748b">${pendFimBase && String(i.d || '') > pendFimBase ? 'só no histórico (TRATATIVA_GESTORES)' : 'fora da base atual'}</small>` : ''}</td>
+        <td><b>${esc(i.tipo)}</b>${ehSemAlmoco(i) ? '<small style="display:block;margin-top:2px;padding:1px 6px;border-radius:999px;background:#fed7aa;color:#9a3412;font-weight:700;width:max-content" title="Só entrada e saída: a base contou o almoço como hora extra">🍽️ almoço não marcado</small>' : ''}${i.hist ? `<small style="display:block;color:#64748b">${pendFimBase && String(i.d || '') > pendFimBase ? 'só no histórico (TRATATIVA_GESTORES)' : 'fora da base atual'}</small>` : ''}</td>
         <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)} · ${esc(i.area || '')}</small></td>
         <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
         <td class="bh-pd-det" title="${esc(i.det)}">${esc(i.det)}</td>
         <td>${esc(i.sup || '—')}</td>
         <td class="num ${i.saldo < 0 ? 'neg' : 'pos'}">${hMin(+i.saldo || 0)}<small style="display:block;font-weight:500;color:#64748b">HE paga: ${esc(i.hePerm)}</small></td>
         <td class="num">${i.horas ? hMin(+i.horas).replace('+', '') : '—'}</td>
-        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
+        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? 'Almoço não marcado: descontada 1h de intervalo (a base considerou o almoço como hora extra)' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}${i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? '<small style="display:block;font-weight:500;color:#b45309">sem almoço marcado</small>' : ''}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
         <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b>${j.tarefa ? ' · ' + esc(String(j.tarefa).split('—')[0].trim()) : ''}${j.chamado ? ' · ch. ' + esc(j.chamado) : ''}<small>${esc(j.texto || '')}</small>${j.dataResp ? `<small>respondido em ${esc(dataBr(j.dataResp))}</small>` : ''}${j.obsRH ? `<small>RH: ${esc(j.obsRH)}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
     }).join('') || '<tr><td colspan="12">Nenhuma pendência nesse filtro 🎉</td></tr>';
