@@ -263,18 +263,19 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <button type="button" data-aba="pend"><span class="ic">📝</span>Pendências<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="atraso"><span class="ic">⏰</span>Atrasos<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="falta"><span class="ic">🚫</span>Faltas<span class="bh-cont" hidden></span></button>
+      <button type="button" data-aba="rh"><span class="ic">🧾</span>Resposta do RH<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="andamento"><span class="ic">📋</span>Andamento por Supervisor</button>
     </nav>
     <div class="bh-conteudo">
     <div class="bh-filtros">
       <select data-f="co"><option value="">Coordenador: todos</option></select>
       <select data-f="sup"><option value="">Supervisor: todos</option></select>
-      <select data-f="tp" data-nao="pend andamento atraso falta"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
-      <select data-f="cr" data-nao="pend andamento atraso falta"><option value="">Criticidade: todas</option></select>
-      <select data-f="st" data-nao="pend andamento atraso falta"><option value="">Status: todos</option></select>
+      <select data-f="tp" data-nao="pend andamento atraso falta rh"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
+      <select data-f="cr" data-nao="pend andamento atraso falta rh"><option value="">Criticidade: todas</option></select>
+      <select data-f="st" data-nao="pend andamento atraso falta rh"><option value="">Status: todos</option></select>
       <select data-pf="tipo" data-so="pend andamento" hidden><option value="">Pendência: todas</option></select>
       <select data-pf="sit" data-so="pend" hidden></select>
-      <select data-pf="folha" data-so="pend andamento atraso falta" hidden title="Folha (dia 15 a 14)"></select>
+      <select data-pf="folha" data-so="pend andamento atraso falta rh" hidden title="Folha (dia 15 a 14)"></select>
       <input data-f="busca" type="search" placeholder="Buscar nome ou matrícula">
       <button type="button" class="bh-limpar">Limpar filtros</button>
     </div>
@@ -422,6 +423,16 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <h3>Faltas para o gestor justificar</h3>
         <p class="sub" id="bh-ft-sub" style="margin:0">Carregando…</p>
         <div class="bh-tab" style="max-height:640px;margin-top:10px"><table><thead id="bh-ft-head"></thead><tbody id="bh-ft-body"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ================= ABA: RESPOSTA DO RH ================= -->
+    <div class="bh-aba" data-p="rh" hidden>
+      <div class="bh-pd-kpis" id="bh-rh-kpis"></div>
+      <div class="bh-c">
+        <h3>Resposta do RH</h3>
+        <p class="sub" id="bh-rh-sub" style="margin:0">Carregando…</p>
+        <div class="bh-tab" style="max-height:640px;margin-top:10px"><table><thead id="bh-rh-head"></thead><tbody id="bh-rh-body"></tbody></table></div>
       </div>
     </div>
 
@@ -1128,6 +1139,25 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }
     return null;
   }
+  // ALTERADO (23/10/2026): percentual da hora extra pela escala do dia
+  //   dia de trabalho da escala → 50% · sábado → 50% · domingo ou dia de folga da escala ("FOLGA TER"...) → 100%
+  //   12x36 → 50% (o turno do dia não diz se era folga) · feriados não são considerados (não há lista no painel)
+  function percHE(i) {
+    if (i.tipo !== 'HORA EXTRA') return null;
+    const det = String(i.det || '');
+    const td = det.match(/Turno \(dia\):\s*([^|]+(?:\|\s*(?:FOLGA\s+)?(?:DOM|SEG|TER|QUA|QUI|SEX|SAB)[^|]*)*)/i);
+    const turno = semAc(td ? td[1] : i.turno);
+    let w = DIAS_SEM[semAc(i.dia).slice(0, 3)];
+    if (w == null && i.d) w = new Date(String(i.d).slice(0, 10) + 'T12:00:00Z').getUTCDay();
+    if (/\d+\s*X\s*\d+/.test(turno)) return { p: 50, motivo: 'escala 12x36' };
+    const nomes = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
+    if (w != null && new RegExp('FOLGA\\s+' + nomes[w] + '\\b').test(turno)) return { p: 100, motivo: 'dia de folga da escala (FOLGA ' + nomes[w] + ')' };
+    if (w === 0 && !/\bDOM\b/.test(turno)) return { p: 100, motivo: 'domingo (fora da escala)' };
+    if (w === 6) return { p: 50, motivo: 'sábado (50%)' };   // sábado é sempre 50%, mesmo fora da escala
+    if (jornadaDia(det, i.turno, i.dia) == null) return { p: 100, motivo: 'dia fora da escala (' + (nomes[w] || '?') + ')' };
+    return { p: 50, motivo: 'dia de trabalho da escala' };
+  }
+  const tagPerc = i => { const x = percHE(i); return x ? `<small title="${esc(x.motivo)}" style="display:inline-block;margin-top:2px;padding:0 6px;border-radius:999px;font-weight:700;color:#fff;background:${x.p === 100 ? '#dc2626' : '#d97706'}">HE ${x.p}%</small>` : ''; };
   const ehSemAlmoco = i => i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null;
   function heSemAlmoco(i) {
     const det = String(i.det || '');
@@ -1366,7 +1396,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <td>${esc(i.sup || '—')}</td>
         <td class="num ${i.saldo < 0 ? 'neg' : 'pos'}">${hMin(+i.saldo || 0)}<small style="display:block;font-weight:500;color:#64748b">HE paga: ${esc(i.hePerm)}</small></td>
         <td class="num">${i.horas ? hMin(+i.horas).replace('+', '') : '—'}</td>
-        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? 'Almoço não marcado: descontada 1h de intervalo (a base considerou o almoço como hora extra)' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}${i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? '<small style="display:block;font-weight:500;color:#b45309">sem almoço marcado</small>' : ''}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
+        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? 'Almoço não marcado: descontada 1h de intervalo (a base considerou o almoço como hora extra)' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}${i.tipo === 'HORA EXTRA' ? '<span style="display:block">' + tagPerc(i) + '</span>' : ''}${i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? '<small style="display:block;font-weight:500;color:#b45309">sem almoço marcado</small>' : ''}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
         <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b>${j.tarefa ? ' · ' + esc(String(j.tarefa).split('—')[0].trim()) : ''}${j.chamado ? ' · ch. ' + esc(j.chamado) : ''}<small>${esc(j.texto || '')}</small>${j.dataResp ? `<small>respondido em ${esc(dataBr(j.dataResp))}</small>` : ''}${j.obsRH ? `<small>RH: ${esc(j.obsRH)}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
     }).join('') || '<tr><td colspan="12">Nenhuma pendência nesse filtro 🎉</td></tr>';
@@ -1453,7 +1483,52 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       regraTab: 'observacao = Ausente no Espelho de ponto · aparecem 2 dias úteis depois da data',
       cols: [['Horas ausentes', i => hMin(-(+i.horas || 0)), 'neg']] }
   };
-  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); gAbsenteismo(); };
+  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); gAbsenteismo(); renderRH(); };
+
+  // ALTERADO (23/10/2026): aba RESPOSTA DO RH — pendências já respondidas pelo gestor com o que o RH preencheu
+  //   na JUSTIFICATIVAS_PAINEL (Pagamento_HE_Permitido, Status_RH, Observacao_RH, Data_Ajuste_RH)
+  let rhFiltro = '';   // '' = todas · 'aguardando' · 'AJUSTADO' · 'devolvido' · 'outros'
+  const grupoRH = j => { const t = up(j.stRH); return !t ? 'aguardando' : t === 'AJUSTADO' ? 'AJUSTADO' : /DEVOLV/.test(t) ? 'devolvido' : 'outros'; };
+  function renderRH() {
+    if (!$('#bh-rh-kpis') || !pend) return;
+    const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim(), fo = folhaSel();
+    const base = pend.filter(i => { const j = justDe(i); return j.trat && (!fo || folhaIniDe(i.d) === fo) &&
+      (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
+      (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)); });
+    const cont = { aguardando: 0, AJUSTADO: 0, devolvido: 0, outros: 0 };
+    base.forEach(i => cont[grupoRH(justDe(i))]++);
+    const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="rh"] .bh-cont');
+    if (nav) { nav.textContent = cont.aguardando; nav.hidden = !cont.aguardando; }
+    const cards = [['aguardando', 'Aguardando RH', cont.aguardando, '#b45309', 'gestor respondeu, RH ainda não'],
+      ['AJUSTADO', 'Ajustado pelo RH', cont.AJUSTADO, COR_SIT['Justificado'], pct(cont.AJUSTADO, base.length) + '% do total'],
+      ['devolvido', 'Devolvido ao gestor', cont.devolvido, VERMELHO, 'RH pediu correção'],
+      ['', 'Respondidas', base.length, '#334155', folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'todas as folhas']];
+    $('#bh-rh-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${rhFiltro === c[0] ? ' on' : ''}" data-r="${c[0]}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[4]}</span></button>`).join('');
+    $('#bh-rh-kpis').querySelectorAll('button').forEach(bt => bt.onclick = () => { rhFiltro = rhFiltro === bt.dataset.r ? '' : bt.dataset.r; renderRH(); });
+
+    const lista = base.filter(i => !rhFiltro || grupoRH(justDe(i)) === rhFiltro)
+      .sort((a, c) => (justDe(c).dataResp || '').localeCompare(justDe(a).dataResp || '') || String(c.d).localeCompare(String(a.d)));
+    $('#bh-rh-sub').textContent = `${nf(lista.length)} pendências respondidas pelo gestor · o RH preenche Pagamento_HE_Permitido, Status_RH, Observacao_RH e Data_Ajuste_RH na aba JUSTIFICATIVAS_PAINEL · atualiza no fluxo diário`;
+    $('#bh-rh-head').innerHTML = '<tr><th>Colaborador</th><th>Pendência</th><th>Data</th><th>Supervisor</th><th>Tratativa do gestor</th><th>Respondido em</th>' +
+      '<th>Pagamento HE permitido</th><th>Status RH</th><th>Observação RH</th><th>Data ajuste RH</th></tr>';
+    const corRH = j => ({ aguardando: '#f59e0b', AJUSTADO: COR_SIT['Justificado'], devolvido: VERMELHO, outros: '#64748b' })[grupoRH(j)];
+    const MAX = 600;
+    $('#bh-rh-body').innerHTML = lista.slice(0, MAX).map(i => {
+      const j = justDe(i), perm = up(i.hePerm);
+      return `<tr>
+        <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)}</small></td>
+        <td><b>${esc(i.tipo)}</b></td>
+        <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
+        <td>${esc(i.sup || '—')}</td>
+        <td class="bh-pd-just"><b>${esc(j.trat)}</b><small>${esc(j.texto || '')}</small></td>
+        <td>${j.dataResp ? esc(dataBr(j.dataResp)) : '—'}</td>
+        <td>${i.tipo !== 'HORA EXTRA' ? '<span style="color:#cbd5e1">—</span>' : tag(perm || '—', perm === 'NÃO' || perm === 'NAO' ? VERMELHO : perm ? COR_SIT['Justificado'] : '#94a3b8')}</td>
+        <td>${tag(j.stRH || 'Aguardando RH', corRH(j))}</td>
+        <td style="white-space:normal;max-width:260px">${esc(j.obsRH || '') || '<span style="color:#cbd5e1">—</span>'}</td>
+        <td>${j.dataRH ? esc(dataBr(j.dataRH)) : '—'}</td></tr>`;
+    }).join('') || '<tr><td colspan="10">Nenhuma resposta nesse filtro</td></tr>';
+    if (lista.length > MAX) $('#bh-rh-body').insertAdjacentHTML('beforeend', `<tr><td colspan="10" style="color:#64748b">Mostrando ${MAX} de ${nf(lista.length)} · use os filtros</td></tr>`);
+  }
 
   // ALTERADO (22/10/2026): absenteísmo por supervisor = dias de falta ÷ dias previstos (trabalhou ou faltou)
   //   vem pronto do script (dados_pend_bh.json → absenteismo); segue Coordenador, Supervisor, busca e Folha
@@ -1624,8 +1699,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const g = {};
     he.forEach(i => {
       const k = tr(i.sup) || 'Sem supervisor', h = saldoDia(i) || 0;
-      const o = g[k] = g[k] || { h: 0, q: 0, just: 0, colab: new Set() };
+      const o = g[k] = g[k] || { h: 0, q: 0, just: 0, colab: new Set(), h50: 0, h100: 0 };
       o.h += h; o.q++; o.colab.add(i.m); if (sitDe(i) === 'Justificado') o.just += h;
+      const pc = percHE(i); if (pc && pc.p === 100) o.h100 += Math.max(0, h); else o.h50 += Math.max(0, h);
     });
     const sups = Object.keys(g).sort((a, c) => g[c].h - g[a].h);
     const tot = sups.reduce((t, k) => t + g[k].h, 0);
@@ -1657,7 +1733,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
           legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8 } },
           tooltip: { callbacks: {
             label: c => `${c.dataset.label}: ${hMin(c.raw).replace('+', '')}`,
-            footer: its => { const o = g[sups[its[0].dataIndex]]; return `Total ${hMin(o.h).replace('+', '')} · ${o.q} lançamentos · ${o.colab.size} colaboradores`; } } }
+            footer: its => { const o = g[sups[its[0].dataIndex]]; return `Total ${hMin(o.h).replace('+', '')} · ${o.q} lançamentos · ${o.colab.size} colaboradores\nHE 50%: ${hMin(o.h50).replace('+', '')} · HE 100%: ${hMin(o.h100).replace('+', '')}`; } } }
         },
         onClick: (e, els) => {
           if (!els.length) return;
