@@ -1332,10 +1332,10 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const hReal = semAlm.reduce((t, i) => t + Math.max(0, heSemAlmoco(i) || 0), 0);
       const colab = new Set(semAlm.map(i => i.m)).size;
       msg.insertAdjacentHTML('beforeend', `<div class="bh-aviso" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff7ed;border:1px solid #fdba74;color:#9a3412">
-        <span style="font-size:20px">🍽️</span>
-        <span style="flex:1;min-width:260px"><b>${nf(semAlm.length)} hora${semAlm.length > 1 ? 's' : ''} extra${semAlm.length > 1 ? 's' : ''} com almoço não marcado</b> (${nf(colab)} colaborador${colab > 1 ? 'es' : ''}) ·
-          a base considerou <b>${hMin(hBase).replace('+', '')}</b> de HE, mas descontando o almoço sobram <b>${hMin(hReal).replace('+', '')}</b>.
-          Só tem entrada e saída: o gestor deve orientar a marcar o intervalo ou ajustar o ponto.</span>
+        <span style="font-size:20px">⚙️</span>
+        <span style="flex:1;min-width:260px"><b>${nf(semAlm.length)} hora${semAlm.length > 1 ? 's' : ''} extra${semAlm.length > 1 ? 's' : ''} com erro de parametrização do almoço</b> (${nf(colab)} colaborador${colab > 1 ? 'es' : ''}) ·
+          a base considerou <b>${hMin(hBase).replace('+', '')}</b> de HE, mas descontando o intervalo de almoço sobram <b>${hMin(hReal).replace('+', '')}</b>.
+          Só tem entrada e saída e o sistema contou o almoço como hora extra: ajustar a parametrização do ponto (intervalo pré-assinalado).</span>
         <button type="button" class="bh-pd-btn${pendFiltro.semAlmoco ? ' on' : ''}" id="bh-pd-semalm">${pendFiltro.semAlmoco ? 'Mostrar todas' : 'Ver esses casos'}</button></div>`);
       $('#bh-pd-semalm').onclick = () => { pendFiltro.semAlmoco = !pendFiltro.semAlmoco; if (pendFiltro.semAlmoco) { pendFiltro.sit = ''; pendFiltro.tipo = ''; } pendSel.clear(); renderPend(); };
     } else pendFiltro.semAlmoco = false;
@@ -1389,14 +1389,14 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       return `<tr data-id="${esc(i.id)}">
         <td>${fechado ? '' : `<input type="checkbox" class="bh-pd-ck"${pendSel.has(i.id) ? ' checked' : ''}>`}</td>
         <td>${tag(s, COR_SIT[s] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}${s === 'Erro na Justificativa' ? `<small class="bh-pd-err">${esc(auto)}</small>` : ''}</td>
-        <td><b>${esc(i.tipo)}</b>${ehSemAlmoco(i) ? '<small style="display:block;margin-top:2px;padding:1px 6px;border-radius:999px;background:#fed7aa;color:#9a3412;font-weight:700;width:max-content" title="Só entrada e saída: a base contou o almoço como hora extra">🍽️ almoço não marcado</small>' : ''}${i.hist ? `<small style="display:block;color:#64748b">${pendFimBase && String(i.d || '') > pendFimBase ? 'só no histórico (TRATATIVA_GESTORES)' : 'fora da base atual'}</small>` : ''}</td>
+        <td><b>${esc(i.tipo)}</b>${ehSemAlmoco(i) ? '<small style="display:block;margin-top:2px;padding:1px 6px;border-radius:999px;background:#fed7aa;color:#9a3412;font-weight:700;width:max-content" title="Erro de parametrização do almoço: só entrada e saída, e o sistema contou o almoço como hora extra">⚙️ Erro de parametrização do almoço</small>' : ''}${i.hist ? `<small style="display:block;color:#64748b">${pendFimBase && String(i.d || '') > pendFimBase ? 'só no histórico (TRATATIVA_GESTORES)' : 'fora da base atual'}</small>` : ''}</td>
         <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)} · ${esc(i.area || '')}</small></td>
         <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
         <td class="bh-pd-det" title="${esc(i.det)}">${esc(i.det)}</td>
         <td>${esc(i.sup || '—')}</td>
         <td class="num ${i.saldo < 0 ? 'neg' : 'pos'}">${hMin(+i.saldo || 0)}<small style="display:block;font-weight:500;color:#64748b">HE paga: ${esc(i.hePerm)}</small></td>
         <td class="num">${i.horas ? hMin(+i.horas).replace('+', '') : '—'}</td>
-        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? 'Almoço não marcado: descontada 1h de intervalo (a base considerou o almoço como hora extra)' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}${i.tipo === 'HORA EXTRA' ? '<span style="display:block">' + tagPerc(i) + '</span>' : ''}${i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? '<small style="display:block;font-weight:500;color:#b45309">sem almoço marcado</small>' : ''}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
+        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? 'Erro de parametrização do almoço: descontada 1h de intervalo (o sistema considerou o almoço como hora extra)' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}${i.tipo === 'HORA EXTRA' ? '<span style="display:block">' + tagPerc(i) + '</span>' : ''}${i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? '<small style="display:block;font-weight:500;color:#b45309">erro de parametrização do almoço</small>' : ''}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
         <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b>${j.tarefa ? ' · ' + esc(String(j.tarefa).split('—')[0].trim()) : ''}${j.chamado ? ' · ch. ' + esc(j.chamado) : ''}<small>${esc(j.texto || '')}</small>${j.dataResp ? `<small>respondido em ${esc(dataBr(j.dataResp))}</small>` : ''}${j.obsRH ? `<small>RH: ${esc(j.obsRH)}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
     }).join('') || '<tr><td colspan="12">Nenhuma pendência nesse filtro 🎉</td></tr>';
