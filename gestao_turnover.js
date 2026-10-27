@@ -93,7 +93,7 @@
 
         <div class="panel" style="margin-bottom:16px;">
           <h2>Causas de Desligamento por Mês</h2>
-          <div class="hint">Quantidade de desligamentos de cada causa, mês a mês · clique na legenda para esconder uma causa</div>
+          <div class="hint">Uma barra por causa em cada mês · clique na legenda para esconder uma causa</div>
           <div style="position:relative; height:360px;"><canvas id="toCausaMesChart"></canvas></div>
         </div>
 
@@ -373,26 +373,24 @@
     novoChart('toCausaMesChart', {
       type:'bar',
       data:{
-        labels: mesesCm.map(k => MES_PT[Number(k.slice(5,7)) - 1] + '/' + k.slice(2,4)),
+        // total do mês vai embaixo do nome do mês
+        labels: mesesCm.map((k, i) => [MES_PT[Number(k.slice(5,7)) - 1] + '/' + k.slice(2,4), totMes[i] + ' deslig.']),
         datasets: causas.map(([causa], i) => ({
-          label: causa, backgroundColor: CORES_CAUSA[i % CORES_CAUSA.length], borderRadius:2, stack:'c',
+          label: causa, backgroundColor: CORES_CAUSA[i % CORES_CAUSA.length], borderRadius:3,
+          categoryPercentage:.8, barPercentage:.9,
           data: mesesCm.map(k => itens.filter(r => mesDe(r) === k && (norm(r.causaPareto) || 'Não informado') === causa).length),
-          datalabels:{ display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 0, color:'#ffffff', font:{size:9, family:'JetBrains Mono', weight:'700'} }
-        })).concat([{
-          // só para mostrar o total do mês em cima da pilha
-          label:'Total', data: mesesCm.map(() => 0), stack:'c', backgroundColor:'rgba(0,0,0,0)',
-          datalabels:{ display: ctx => totMes[ctx.dataIndex] > 0, anchor:'end', align:'top', color:'#000000',
-            font:{size:10, family:'JetBrains Mono', weight:'700'}, formatter: (v, ctx) => totMes[ctx.dataIndex] }
-        }])
+          datalabels:{ display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 0, anchor:'end', align:'top', offset:1,
+            color:'#000000', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+        }))
       },
-      options:{ responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:18 } },
+      options:{ responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:20 } },
         plugins:{
-          legend:{ position:'right', labels:{ color:C.text, font:{family:'Inter', size:11}, boxWidth:12, filter: it => it.text !== 'Total' } },
-          tooltip:{ mode:'index', filter: it => it.dataset.label !== 'Total' && it.raw > 0,
+          legend:{ position:'top', labels:{ color:C.text, font:{family:'Inter', size:11}, boxWidth:12 } },
+          tooltip:{ mode:'index', filter: it => it.raw > 0,
             callbacks:{ footer: its => its.length ? 'Total do mês: ' + totMes[its[0].dataIndex] : '' } },
           datalabels:{display:true} },
-        scales:{ x:{ stacked:true, ticks:{color:C.text, font:{size:10, weight:'bold'}}, grid:{display:false} },
-                 y:{ stacked:true, ticks:{color:C.text, font:{weight:'bold'}, precision:0}, grid:{display:false}, beginAtZero:true } } }
+        scales:{ x:{ ticks:{color:C.text, font:{size:11, weight:'bold'}}, grid:{display:false} },
+                 y:{ ticks:{color:C.text, font:{weight:'bold'}, precision:0}, grid:{display:false}, beginAtZero:true, grace:'8%' } } }
     });
 
     // Por supervisor
