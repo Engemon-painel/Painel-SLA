@@ -91,6 +91,12 @@
           <div id="toParetoWrap" style="position:relative; height:340px;"><canvas id="toParetoChart"></canvas></div>
         </div>
 
+        <div class="panel" style="margin-bottom:16px;">
+          <h2>Causas de Desligamento por Mês</h2>
+          <div class="hint">Quantidade de desligamentos de cada causa, mês a mês · clique na legenda para esconder uma causa</div>
+          <div style="position:relative; height:360px;"><canvas id="toCausaMesChart"></canvas></div>
+        </div>
+
         <div class="grid" style="grid-template-columns: 1fr 1.4fr; margin-bottom:16px;">
           <div class="panel">
             <h2>Tipo de Desligamento</h2>
@@ -356,6 +362,37 @@
         plugins:{ legend:{ labels:{ color:C.muted, font:{family:'Inter', size:10} } }, datalabels:{display:true} },
         scales:{ x:{ stacked:true, ticks:{color:C.text, font:{size:10, weight:'bold'}}, grid:{display:false} },
                  y:{ stacked:true, ticks:{color:C.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true } } }
+    });
+
+    // Causas por mês (empilhado por causa, na ordem do Pareto)
+    const CORES_CAUSA = ['#dc2626','#2563eb','#d97706','#0e7c86','#5e34b5','#059669','#be185d','#a16207','#0e7490','#4d7c0f','#64748b','#f97316'];
+    const mesDe = r => (r.dataDemissao || '').slice(0,7);
+    const ini = chavesMes.findIndex(k => itens.some(r => mesDe(r) === k));   // começa no 1º mês com desligamento
+    const mesesCm = ini < 0 ? chavesMes : chavesMes.slice(ini);
+    const totMes = mesesCm.map(k => itens.filter(r => mesDe(r) === k).length);
+    novoChart('toCausaMesChart', {
+      type:'bar',
+      data:{
+        labels: mesesCm.map(k => MES_PT[Number(k.slice(5,7)) - 1] + '/' + k.slice(2,4)),
+        datasets: causas.map(([causa], i) => ({
+          label: causa, backgroundColor: CORES_CAUSA[i % CORES_CAUSA.length], borderRadius:2, stack:'c',
+          data: mesesCm.map(k => itens.filter(r => mesDe(r) === k && (norm(r.causaPareto) || 'Não informado') === causa).length),
+          datalabels:{ display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 0, color:'#ffffff', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+        })).concat([{
+          // só para mostrar o total do mês em cima da pilha
+          label:'Total', data: mesesCm.map(() => 0), stack:'c', backgroundColor:'rgba(0,0,0,0)',
+          datalabels:{ display: ctx => totMes[ctx.dataIndex] > 0, anchor:'end', align:'top', color:'#000000',
+            font:{size:10, family:'JetBrains Mono', weight:'700'}, formatter: (v, ctx) => totMes[ctx.dataIndex] }
+        }])
+      },
+      options:{ responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:18 } },
+        plugins:{
+          legend:{ position:'right', labels:{ color:C.text, font:{family:'Inter', size:11}, boxWidth:12, filter: it => it.text !== 'Total' } },
+          tooltip:{ mode:'index', filter: it => it.dataset.label !== 'Total' && it.raw > 0,
+            callbacks:{ footer: its => its.length ? 'Total do mês: ' + totMes[its[0].dataIndex] : '' } },
+          datalabels:{display:true} },
+        scales:{ x:{ stacked:true, ticks:{color:C.text, font:{size:10, weight:'bold'}}, grid:{display:false} },
+                 y:{ stacked:true, ticks:{color:C.text, font:{weight:'bold'}, precision:0}, grid:{display:false}, beginAtZero:true } } }
     });
 
     // Por supervisor
