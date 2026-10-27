@@ -221,7 +221,7 @@ ${C} .bh-sel{padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;font:in
 ${C} .bh-pd-det{max-width:300px;white-space:normal;min-width:200px;font-size:11.5px;color:#334155}
 ${C} .bh-pd-just{max-width:260px;white-space:normal;min-width:160px}
 ${C} .bh-pd-just small,${C} .bh-pd-env,${C} .bh-pd-err{display:block;font-size:11px;color:#64748b;white-space:normal}
-${C} .bh-pd-env{color:#2563eb}${C} .bh-pd-err{color:#dc2626;font-weight:600;max-width:200px}
+${C} .bh-pd-env{color:#2563eb}${C} .bh-pd-trat{display:block;margin-top:3px;padding:1px 7px;border-radius:999px;background:#dbeafe;color:#0b3a75;font-size:11px;font-weight:700;width:max-content}${C} .bh-pd-err{color:#dc2626;font-weight:600;max-width:200px}
 ${C} .bh-pd-btn{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;color:#0b3a75;white-space:nowrap}
 ${C} .bh-pd-btn:hover{border-color:#0b3a75}
 ${C} .bh-pd-btn.on{background:#0b3a75;color:#fff;border-color:#0b3a75}
@@ -1097,11 +1097,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   // "Status Pendência" como na planilha (LISTAS, coluna De/para)
   const ORDEM_SIT = ['Erro na Justificativa', 'Pendente Operação', 'Justificado'];
   const COR_SIT = { 'Pendente Operação': '#f59e0b', 'Erro na Justificativa': '#dc2626', 'Justificado': '#0f9d58' };
-  const SITS = [['tratar', 'A tratar'], ['Pendente Operação', 'Pendente Operação'], ['Erro na Justificativa', 'Com erro'], ['Justificado', 'Justificado'], ['', 'Todas']];
+  const SITS = [['tratar', 'A tratar'], ['Pendente Operação', 'Pendente Operação'], ['Erro na Justificativa', 'Com erro'], ['Justificado', 'Justificado'], ['tratada', 'Tratadas (saíram da base)'], ['', 'Todas']];
   const ehATratar = s => s === 'Pendente Operação' || s === 'Erro na Justificativa';
   const fechadaRH = (i, j) => (j.auto || calcularStatus(j, i.hePerm, i.tipo)[0]) === 'CONCLUÍDO';   // RH marcou AJUSTADO
 
-  let pend = null, pendErro = '', pendGerado = '', pendFonte = '', pendHistInfo = '', pendFimBase = '';
+  let pend = null, pendErro = '', pendGerado = '', pendFonte = '', pendHistInfo = '', pendFimBase = '', pendIniBase = '';
   const pendSel = new Set();
   const pendFiltro = { tipo: '', sit: 'tratar', folha: null };   // folha: null = folha atual (padrão) · '' = todas
   // ALTERADO (21/10/2026): período da folha = sempre do dia 15 ao dia 14 do mês seguinte
@@ -1245,12 +1245,22 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     return it.just || {};
   }
   const sitDe = it => { const j = justDe(it); const s = j.status; return COR_SIT[s] ? s : calcularStatus(j, it.hePerm, it.tipo)[1]; };
+  // ALTERADO (27/10/2026): justificada e já saiu da base na atualização (dentro do período que a base cobre) = tratada
+  const ehTratada = it => { const d = String(it.d || '').slice(0, 10);
+    return !!it.hist && sitDe(it) === 'Justificado' && !!pendIniBase && !!pendFimBase && d >= pendIniBase && d <= pendFimBase; };
 
   async function carregarPend() {
     try {
       const [d, h] = await Promise.all([lerJson(ARQ_PEND), lerJson(ARQ_PEND_HIST).catch(() => null)]);
       pend = Array.isArray(d) ? d : (d.itens || []);
       pendAbs = (d && Array.isArray(d.absenteismo)) ? d.absenteismo : null;
+      // ALTERADO (27/10/2026): período coberto pela base atual (do início da folha da pendência aberta mais antiga
+      // até a mais recente). Pendência justificada que não está mais na base, dentro desse período, foi tratada.
+      {
+        const datasBase = pend.filter(i => !i.hist && i.d).map(i => String(i.d).slice(0, 10)).sort();
+        pendFimBase = datasBase.length ? datasBase[datasBase.length - 1] : '';
+        pendIniBase = datasBase.length ? folhaIniDe(datasBase[0]) : '';
+      }
       // junta o histórico da TRATATIVA_GESTORES: mesma pendência = matrícula (6 dígitos) | data | tipo
       const chaveP = i => String(i.m || '').replace(/\D/g, '').padStart(6, '0').slice(-6) + '|' + String(i.d || '').slice(0, 10) + '|' + String(i.tipo || '').trim().toUpperCase();
       const hItens = h ? (Array.isArray(h) ? h : (h.itens || [])) : [];
@@ -1350,8 +1360,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     // cards
     const cards = [['tratar', 'A tratar', aTratar, '#b45309'], ['Pendente Operação', 'Pendente Operação', cont['Pendente Operação'], COR_SIT['Pendente Operação']],
       ['Erro na Justificativa', 'Com erro', cont['Erro na Justificativa'], COR_SIT['Erro na Justificativa']],
-      ['Justificado', 'Justificadas', cont['Justificado'], COR_SIT['Justificado']], ['', 'Total', base.length, '#334155']];
-    $('#bh-pd-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${pendFiltro.sit === c[0] ? ' on' : ''}" data-s="${esc(c[0])}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[0] === 'tratar' ? 'pendente operação + com erro' : c[0] === '' ? (folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'pendências no filtro · todas as folhas') : pct(c[2], base.length) + '% do total'}</span></button>`).join('');
+      ['Justificado', 'Justificadas', cont['Justificado'], COR_SIT['Justificado']], ['tratada', '✅ Tratadas', base.filter(ehTratada).length, '#0b3a75'], ['', 'Total', base.length, '#334155']];
+    $('#bh-pd-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${pendFiltro.sit === c[0] ? ' on' : ''}" data-s="${esc(c[0])}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[0] === 'tratar' ? 'pendente operação + com erro' : c[0] === 'tratada' ? 'justificadas que já saíram da base' : c[0] === '' ? (folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'pendências no filtro · todas as folhas') : pct(c[2], base.length) + '% do total'}</span></button>`).join('');
     $('#bh-pd-kpis').querySelectorAll('button').forEach(b => b.onclick = () => { pendFiltro.sit = b.dataset.s; pendSel.clear(); renderPend(); });
 
     // tipo de pendência
@@ -1374,7 +1384,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const lista = base.filter(i => {
       const s = sitDe(i);
       return (!pendFiltro.tipo || i.tipo === pendFiltro.tipo) &&
-        (!pendFiltro.sit || (pendFiltro.sit === 'tratar' ? ehATratar(s) : s === pendFiltro.sit)) &&
+        (!pendFiltro.sit || (pendFiltro.sit === 'tratar' ? ehATratar(s) : pendFiltro.sit === 'tratada' ? ehTratada(i) : s === pendFiltro.sit)) &&
         (!pendFiltro.semAlmoco || ehSemAlmoco(i));
     }).sort((a, b) => ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (b.dias || 0) - (a.dias || 0) || String(a.n).localeCompare(String(b.n), 'pt-BR'));
     [...pendSel].forEach(id => { if (!lista.some(i => i.id === id)) pendSel.delete(id); });
@@ -1388,8 +1398,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const fechado = fechadaRH(i, j);
       return `<tr data-id="${esc(i.id)}">
         <td>${fechado ? '' : `<input type="checkbox" class="bh-pd-ck"${pendSel.has(i.id) ? ' checked' : ''}>`}</td>
-        <td>${tag(s, COR_SIT[s] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}${s === 'Erro na Justificativa' ? `<small class="bh-pd-err">${esc(auto)}</small>` : ''}</td>
-        <td><b>${esc(i.tipo)}</b>${ehSemAlmoco(i) ? '<small style="display:block;margin-top:2px;padding:1px 6px;border-radius:999px;background:#fed7aa;color:#9a3412;font-weight:700;width:max-content" title="Erro de parametrização do almoço: só entrada e saída, e o sistema contou o almoço como hora extra">⚙️ Erro de parametrização do almoço</small>' : ''}${i.hist ? `<small style="display:block;color:#64748b">${pendFimBase && String(i.d || '') > pendFimBase ? 'só no histórico (TRATATIVA_GESTORES)' : 'fora da base atual'}</small>` : ''}</td>
+        <td>${tag(s, COR_SIT[s] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}${s === 'Erro na Justificativa' ? `<small class="bh-pd-err">${esc(auto)}</small>` : ''}${ehTratada(i) ? '<small class="bh-pd-trat" title="Foi justificada e, na atualização da base, não aparece mais: a pendência foi tratada no ponto">✅ Tratada · saiu da base</small>' : ''}</td>
+        <td><b>${esc(i.tipo)}</b>${ehSemAlmoco(i) ? '<small style="display:block;margin-top:2px;padding:1px 6px;border-radius:999px;background:#fed7aa;color:#9a3412;font-weight:700;width:max-content" title="Erro de parametrização do almoço: só entrada e saída, e o sistema contou o almoço como hora extra">⚙️ Erro de parametrização do almoço</small>' : ''}${i.hist && !ehTratada(i) ? `<small style="display:block;color:#64748b">${pendFimBase && String(i.d || '') > pendFimBase ? 'só no histórico (TRATATIVA_GESTORES)' : 'fora da base atual'}</small>` : ''}</td>
         <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)} · ${esc(i.area || '')}</small></td>
         <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
         <td class="bh-pd-det" title="${esc(i.det)}">${esc(i.det)}</td>
@@ -1459,7 +1469,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     $(P + 'body').innerHTML = lista.map(i => {
       const j = justDe(i), st = sitDe(i), fechado = fechadaRH(i, j);
       return `<tr data-id="${esc(i.id)}">
-        <td>${tag(st, COR_SIT[st] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}</td>
+        <td>${tag(st, COR_SIT[st] || '#94a3b8')}${j.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}${ehTratada(i) ? '<small class="bh-pd-trat" title="Foi justificada e, na atualização da base, não aparece mais: a pendência foi tratada no ponto">✅ Tratada · saiu da base</small>' : ''}</td>
         <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)} · ${esc(i.area || '')}</small></td>
         <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
         <td style="white-space:normal;max-width:220px">${esc(i.turno || '')}</td>
