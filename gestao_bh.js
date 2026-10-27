@@ -80,7 +80,17 @@
 
   let dados = null, dadosBrutos = null;
   const graficos = {};
-  const filtro = { co: '', sup: '', tp: '', cr: '', st: 'Ativo', busca: '' };
+  const filtro = { pj: '', co: '', sup: '', tp: '', cr: '', st: 'Ativo', busca: '' };
+  // ALTERADO (27/10/2026): filtro de projeto (Claro / Cirion) — vem do campo "projeto" do dados_bh.json;
+  // para pendências, atrasos e faltas o projeto é achado pela matrícula do colaborador no dados_bh.json.
+  const projDe = t => /CIRION/i.test(String(t || '')) ? 'CIRION' : /CLARO/i.test(String(t || '')) ? 'CLARO' : '';
+  const mat6 = m => String(m || '').replace(/\D/g, '').padStart(6, '0').slice(-6);
+  let mapaProj = null;
+  const projDaMat = m => {
+    if (!mapaProj) { mapaProj = {}; ((dados && dados.itens) || []).forEach(i => { mapaProj[mat6(i.m)] = projDe(i.projeto); }); }
+    return mapaProj[mat6(m)] || '';
+  };
+  const passaProj = i => !filtro.pj || (i.projeto != null ? projDe(i.projeto) : (projDe(i.cc) || projDaMat(i.m))) === filtro.pj;
 
   // estado das abas novas
   let aba = 'geral';
@@ -268,6 +278,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     </nav>
     <div class="bh-conteudo">
     <div class="bh-filtros">
+      <select data-f="pj" data-nao="evol"><option value="">Projeto: todos</option><option value="CLARO">Claro</option><option value="CIRION">Cirion</option></select>
       <select data-f="co"><option value="">Coordenador: todos</option></select>
       <select data-f="sup"><option value="">Supervisor: todos</option></select>
       <select data-f="tp" data-nao="pend andamento atraso falta rh"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
@@ -566,7 +577,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
   function filtrados() {
     const b = filtro.busca.toLowerCase();
-    return dados.itens.filter(i =>
+    return dados.itens.filter(i => passaProj(i) &&
       (!filtro.co || i.co === filtro.co) && (!filtro.sup || i.sup === filtro.sup) &&
       (!filtro.tp || i.tp === filtro.tp) && (!filtro.cr || i.cr === filtro.cr) &&
       (!filtro.st || i.st === filtro.st) &&
@@ -1319,7 +1330,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
     const fo = folhaSel();
     return (pend || []).filter(i => liberada(i) && (soTipo ? i.tipo === soTipo : !TIPOS_PROPRIOS.includes(i.tipo)) &&
-      (!fo || folhaIniDe(i.d) === fo) &&
+      (!fo || folhaIniDe(i.d) === fo) && passaProj(i) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!filtro.tp || i.tpSaldo === filtro.tp) &&
       (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)));
@@ -1502,7 +1513,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   function renderRH() {
     if (!$('#bh-rh-kpis') || !pend) return;
     const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim(), fo = folhaSel();
-    const base = pend.filter(i => { const j = justDe(i); return j.trat && (!fo || folhaIniDe(i.d) === fo) &&
+    const base = pend.filter(i => { const j = justDe(i); return j.trat && (!fo || folhaIniDe(i.d) === fo) && passaProj(i) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)); });
     const cont = { aguardando: 0, AJUSTADO: 0, devolvido: 0, outros: 0 };
@@ -1550,7 +1561,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       return;
     }
     const fo = folhaSel(), b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
-    const base = pendAbs.filter(a => (!fo || a.f === fo) && (!filtro.co || tr(a.co) === tr(filtro.co)) &&
+    const base = pendAbs.filter(a => (!fo || a.f === fo) && passaProj(a) && (!filtro.co || tr(a.co) === tr(filtro.co)) &&
       (!filtro.sup || tr(a.sup) === tr(filtro.sup)) && (!b || String(a.n).toLowerCase().includes(b) || String(a.m).includes(b)));
     const g = {};
     base.forEach(a => {
@@ -1703,33 +1714,38 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   function gHeSup() {
     if (!$('#bh-g-pdhe')) return;
     const fo = folhaIniDe(hojeIso()), b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
-    const he = (pend || []).filter(i => i.tipo === 'HORA EXTRA' && folhaIniDe(i.d) === fo &&
+    const he = (pend || []).filter(i => i.tipo === 'HORA EXTRA' && folhaIniDe(i.d) === fo && passaProj(i) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)));
     const g = {};
     he.forEach(i => {
       const k = tr(i.sup) || 'Sem supervisor', h = saldoDia(i) || 0;
-      const o = g[k] = g[k] || { h: 0, q: 0, just: 0, colab: new Set(), h50: 0, h100: 0 };
-      o.h += h; o.q++; o.colab.add(i.m); if (sitDe(i) === 'Justificado') o.just += h;
+      const o = g[k] = g[k] || { h: 0, q: 0, just: 0, banco: 0, colab: new Set(), h50: 0, h100: 0 };
+      o.h += h; o.q++; o.colab.add(i.m);
+      // ALTERADO (27/10/2026): justificada com tratativa BANCO DE HORAS aparece separada, como "Banco de horas"
+      if (sitDe(i) === 'Justificado') { if (String(justDe(i).trat || '').trim().toUpperCase() === 'BANCO DE HORAS') o.banco += h; else o.just += h; }
       const pc = percHE(i); if (pc && pc.p === 100) o.h100 += Math.max(0, h); else o.h50 += Math.max(0, h);
     });
     const sups = Object.keys(g).sort((a, c) => g[c].h - g[a].h);
     const tot = sups.reduce((t, k) => t + g[k].h, 0);
-    $('#bh-pd-he-sub').textContent = `Folha ${rotFolha(fo)} · ${hMin(tot).replace('+', '')} de hora extra em ${nf(he.length)} lançamentos · verde = já justificada`;
+    $('#bh-pd-he-sub').textContent = `Folha ${rotFolha(fo)} · ${hMin(tot).replace('+', '')} de hora extra em ${nf(he.length)} lançamentos · azul = foi para o banco de horas · verde = justificada com outra tratativa`;
     $('#bh-pd-he-alt').style.height = Math.max(200, sups.length * 26 + 50) + 'px';
-    const aTratar = sups.map(k => Math.round((g[k].h - g[k].just) * 100) / 100), justif = sups.map(k => Math.round(g[k].just * 100) / 100);
+    const r2 = v => Math.round(v * 100) / 100;
+    const aTratar = sups.map(k => r2(g[k].h - g[k].just - g[k].banco)), banco = sups.map(k => r2(g[k].banco)), justif = sups.map(k => r2(g[k].just));
     desenhar('bh-g-pdhe', {
       type: 'bar',
       data: { labels: sups, datasets: [
         { label: 'A tratar', data: aTratar, backgroundColor: '#f59e0b', stack: 'h', borderRadius: 3, datalabels: { display: false } },
+        { label: 'Banco de horas', data: banco, backgroundColor: '#2563eb', stack: 'h', borderRadius: 3,
+          datalabels: { display: c => c.raw >= 0.5, color: '#fff', font: { weight: '700', size: 10 }, formatter: v => hMin(v).replace('+', '') } },
         { label: 'Justificada', data: justif, backgroundColor: COR_SIT['Justificado'], stack: 'h', borderRadius: 3, datalabels: { display: false } }] },
       plugins: [{
         id: 'totHe',
         afterDatasetsDraw(ch) {
-          const { ctx } = ch, m0 = ch.getDatasetMeta(0), m1 = ch.getDatasetMeta(1);
+          const { ctx } = ch, metas = ch.data.datasets.map((_, n) => ch.getDatasetMeta(n));
           ctx.save(); ctx.font = '700 11px sans-serif'; ctx.fillStyle = '#0f172a'; ctx.textBaseline = 'middle';
           sups.forEach((k, i) => {
-            const el = [!m1.hidden && m1.data[i], !m0.hidden && m0.data[i]].filter(Boolean).reduce((a, e) => (!a || e.x > a.x ? e : a), null);
+            const el = metas.map(m => !m.hidden && m.data[i]).filter(Boolean).reduce((a, e) => (!a || e.x > a.x ? e : a), null);
             if (el) ctx.fillText(`${hMin(g[k].h).replace('+', '')} · ${g[k].q} HE`, el.x + 6, el.y);
           });
           ctx.restore();
@@ -2045,6 +2061,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     if (typeof Chart === 'undefined') { el.innerHTML = '<p>Chart.js não carregado.</p>'; return; }
     try {
       dados = await lerJson(ARQUIVO);
+      mapaProj = null;
       dadosBrutos = Array.isArray(dados) ? dados : Object.assign({}, dados);
     } catch (e) {
       el.innerHTML = `<p style="color:#dc2626">Não foi possível carregar ${ARQUIVO}: ${esc(e.message)}</p>`;
