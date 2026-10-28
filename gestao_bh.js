@@ -276,6 +276,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <button type="button" data-aba="falta"><span class="ic">🚫</span>Faltas<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="rh"><span class="ic">🧾</span>Resposta do RH<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="andamento"><span class="ic">📋</span>Andamento por Supervisor</button>
+      <button type="button" data-aba="espelho"><span class="ic">🪪</span>No Espelho de Ponto<span class="bh-cont" hidden></span></button>
     </nav>
     <div class="bh-conteudo">
     <div class="bh-filtros">
@@ -453,6 +454,18 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       </div>
     </div>
 
+    <!-- ================= ABA: NO ESPELHO DE PONTO ================= -->
+    <div class="bh-aba" data-p="espelho" hidden>
+      <div class="bh-pd-kpis" id="bh-es-kpis"></div>
+      <div class="bh-g">
+        <div class="bh-c s12">
+          <h3>Funcionários do Banco de Horas × Espelho de ponto</h3>
+          <p class="sub" id="bh-es-sub">Carregando…</p>
+          <div class="bh-tab" style="max-height:640px"><table><thead><tr><th>Nome</th><th>Supervisor</th><th>Tipo</th><th>Status</th><th class="num">Saldo</th><th>No espelho de ponto?</th></tr></thead><tbody id="bh-es-body"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
     <div class="bh-aba" data-p="andamento" hidden>
       <div class="bh-pd-kpis" id="bh-an-kpis"></div>
       <div class="bh-g">
@@ -584,6 +597,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     el.querySelectorAll('.bh-filtros [data-so]').forEach(c => { c.hidden = !c.dataset.so.split(' ').includes(nome); });
     el.querySelectorAll('.bh-filtros [data-nao]').forEach(c => { c.hidden = c.dataset.nao.split(' ').includes(nome); });
     if (nome === 'evol' && !hist && !carregandoHist) abrirHistorico();
+    if (nome === 'espelho') renderEspelho();
     setTimeout(() => window.bhResize(), 30);
     window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 10);
   }
@@ -1346,6 +1360,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     renderPend();
     renderAndamento();
     alertaEspelho();
+    renderEspelho();
   }
 
   // ALTERADO (28/10/2026): funcionário Claro do Banco de Horas (dados_bh.json) que NÃO aparece no Espelho de ponto
@@ -1368,6 +1383,43 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         ${faltam.map(i => `<tr><td class="nm">${esc(i.n)}</td><td>${esc(i.m)}</td><td>${esc(i.sup || '—')}</td><td>${esc(i.st || '—')}</td><td class="num ${i.h < 0 ? 'neg' : 'pos'}">${hMin(+i.h || 0)}</td></tr>`).join('')}
       </tbody></table></div>` : ''}`;
     $('#bh-esp-ver').onclick = () => { espAberto = !espAberto; alertaEspelho(); };
+  }
+
+  // ALTERADO (28/10/2026): aba "No Espelho de Ponto" — cada funcionário do BH (respeita os filtros) com Sim / Não
+  let espSit = '';   // '' = todos · 'SIM' · 'NAO'
+  function renderEspelho() {
+    const body = $('#bh-es-body');
+    if (!body || !dados) return;
+    const itens = filtrados();
+    const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="espelho"] .bh-cont');
+    if (!pendEsp || !pendEsp.mats.length) {
+      $('#bh-es-kpis').innerHTML = '';
+      $('#bh-es-sub').textContent = 'A lista do espelho de ponto ainda não chegou: ela vem no dados_pend_bh.json, gerado pelo script de Pendências (versão de 28/10 em diante).';
+      body.innerHTML = `<tr><td colspan="6">Sem dados do espelho de ponto</td></tr>`;
+      if (nav) nav.hidden = true;
+      return;
+    }
+    const noEsp = new Set(pendEsp.mats.map(mat6));
+    const esta = i => noEsp.has(mat6(i.m));
+    const nSim = itens.filter(esta).length, nNao = itens.length - nSim;
+    if (nav) { nav.textContent = nNao; nav.hidden = !nNao; }
+    const per = pendEsp.ini ? `espelho de ${dataBr(pendEsp.ini)}${pendEsp.fim ? ' a ' + dataBr(pendEsp.fim) : ''}` : 'espelho de ponto';
+    $('#bh-es-sub').textContent = `${per} · comparado pela matrícula · respeita os filtros de cima (projeto, supervisor, status…)`;
+    const cards = [['', 'Funcionários', itens.length, '#334155', 'no filtro'], ['SIM', '✅ No espelho', nSim, '#0f9d58', pct(nSim, itens.length) + '% · Sim'],
+      ['NAO', '🚨 Fora do espelho', nNao, '#dc2626', pct(nNao, itens.length) + '% · Não']];
+    $('#bh-es-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${espSit === c[0] ? ' on' : ''}" data-s="${c[0]}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[4]}</span></button>`).join('');
+    $('#bh-es-kpis').querySelectorAll('button').forEach(b => b.onclick = () => { espSit = b.dataset.s; renderEspelho(); });
+    const lista = itens.filter(i => !espSit || (espSit === 'SIM') === esta(i))
+      .sort((a, b) => (esta(a) - esta(b)) || String(a.sup || '').localeCompare(String(b.sup || ''), 'pt-BR') || String(a.n).localeCompare(String(b.n), 'pt-BR'));
+    body.innerHTML = lista.map(i => { const neg = i.tp === 'NEGATIVO', ok = esta(i);
+      return `<tr${ok ? '' : ' style="background:#fef2f2"'}>
+        <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)}</small></td>
+        <td>${esc(i.sup || '—')}</td>
+        <td>${neg ? tag('▼ Negativo', VERMELHO) : tag('▲ Positivo', VERDE)}</td>
+        <td>${esc(i.st || '—')}</td>
+        <td class="num ${neg ? 'neg' : 'pos'}">${hMin(i.h)}</td>
+        <td>${ok ? tag('Sim', '#0f9d58') : tag('Não', '#dc2626')}</td></tr>`; }).join('') ||
+      `<tr><td colspan="6">Nenhum funcionário nesse filtro</td></tr>`;
   }
 
   let pendAbs = null;   // absenteísmo por colaborador e folha (dados_pend_bh.json → absenteismo)
@@ -2074,6 +2126,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     tabelas(pos, neg);
     acoes(pos, neg);
     resumo(itens, pos, neg);
+    renderEspelho();
     renderFaixas(itens);
     if (hist) renderEvolucao();
     if (pend) { renderPend(); renderAndamento(); }
