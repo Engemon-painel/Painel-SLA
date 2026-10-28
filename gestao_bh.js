@@ -1152,7 +1152,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   function jornadaDia(det, turno, dia) {
     const td = String(det || '').match(/Turno \(dia\):\s*([^|]+(?:\|\s*(?:DOM|SEG|TER|QUA|QUI|SEX|SAB)[^|]*)*)/i);
     const txt = semAc(td ? td[1] : turno), w = DIAS_SEM[semAc(dia).slice(0, 3)];
-    const re = /(?:(DOM|SEG|TER|QUA|QUI|SEX|SAB)(?:\s*A\s*(DOM|SEG|TER|QUA|QUI|SEX|SAB))?|12X36)[^0-9]*(\d{1,2}:\d{2})\s*AS\s*(\d{1,2}:\d{2})/g;
+    // ALTERADO (28/10/2026): aceita o horário escrito "08:00 AS 17:00", "08:00 A 17:00" ou "08:00-17:00" (ex.: "| SEX 08:00-17:00")
+    const re = /(?:(DOM|SEG|TER|QUA|QUI|SEX|SAB)(?:\s*A\s*(DOM|SEG|TER|QUA|QUI|SEX|SAB))?|12X36|\d+X\d+)[^0-9]*(\d{1,2}:\d{2})\s*(?:AS|A|-|–)\s*(\d{1,2}:\d{2})/g;
     let m;
     while ((m = re.exec(txt))) {
       const a = m[1] ? DIAS_SEM[m[1]] : 0, b = m[1] ? (m[2] ? DIAS_SEM[m[2]] : a) : 6;
@@ -1182,6 +1183,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     return { p: 50, motivo: 'dia de trabalho da escala' };
   }
   const tagPerc = i => { const x = percHE(i); return x ? `<small title="${esc(x.motivo)}" style="display:inline-block;margin-top:2px;padding:0 6px;border-radius:999px;font-weight:700;color:#fff;background:${x.p === 100 ? '#dc2626' : '#d97706'}">HE ${x.p}%</small>` : ''; };
+  // ALTERADO (28/10/2026): Horas_Pendencia_h é o tempo que a pendência está aberta → mostra em dias ("7 dias", "1 dia e 5h")
+  const tempoPend = h => { h = +h || 0; if (!h) return '—';
+    const d = Math.floor(h / 24 + 1e-9), r = Math.round(h - d * 24);
+    const tD = d ? d + (d === 1 ? ' dia' : ' dias') : '';
+    return r && r < 24 ? (tD ? tD + ' e ' : '') + r + 'h' : tD || hMin(h).replace('+', ''); };
   const ehSemAlmoco = i => i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null;
   function heSemAlmoco(i) {
     const det = String(i.det || '');
@@ -1429,7 +1435,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
     $('#bh-pd-sub').textContent = `${nf(lista.length)} pendências na lista · marque várias do mesmo tipo para justificar de uma vez` + (pendGerado ? ' · gerado em ' + new Date(pendGerado).toLocaleString('pt-BR') : '') + (pendFonte ? ' · ' + pendFonte : '') + (pendHistInfo ? ' · ' + pendHistInfo : '');
 
-    $('#bh-pd-head').innerHTML = `<tr><th style="width:26px"><input type="checkbox" id="bh-pd-todos" title="Marcar todas"></th><th>Situação</th><th>Pendência</th><th>Colaborador</th><th>Data</th><th>Detalhe / o que verificar</th><th>Supervisor</th><th class="num">Saldo BH</th><th class="num">Horas</th><th class="num" title="Saldo do dia: hora extra feita (+) ou horas que ficou devendo (−), pelas batidas x turno">No dia</th><th>Justificativa</th><th></th></tr>`;
+    $('#bh-pd-head').innerHTML = `<tr><th style="width:26px"><input type="checkbox" id="bh-pd-todos" title="Marcar todas"></th><th>Situação</th><th>Pendência</th><th>Colaborador</th><th>Data</th><th>Detalhe / o que verificar</th><th>Supervisor</th><th class="num">Saldo BH</th><th class="num" title="Há quanto tempo a pendência está aberta: da data da pendência até a geração da base (coluna Horas_Pendencia_h)">Tempo da pendência</th><th class="num" title="Saldo do dia: hora extra feita (+) ou horas que ficou devendo (−), pelas batidas x turno">No dia</th><th>Justificativa</th><th></th></tr>`;
     const MAX = 600;
     $('#bh-pd-body').innerHTML = lista.slice(0, MAX).map(i => {
       const j = justDe(i), s = sitDe(i), auto = j.auto || calcularStatus(j, i.hePerm, i.tipo)[0];
@@ -1443,7 +1449,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <td class="bh-pd-det" title="${esc(i.det)}">${esc(i.det)}</td>
         <td>${esc(i.sup || '—')}</td>
         <td class="num ${i.saldo < 0 ? 'neg' : 'pos'}">${hMin(+i.saldo || 0)}<small style="display:block;font-weight:500;color:#64748b">HE paga: ${esc(i.hePerm)}</small></td>
-        <td class="num">${i.horas ? hMin(+i.horas).replace('+', '') : '—'}</td>
+        <td class="num" title="${i.horas ? esc(hMin(+i.horas).replace('+', '')) + ' em aberto' : ''}">${tempoPend(i.horas)}</td>
         <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? 'Erro de parametrização do almoço: descontada 1h de intervalo (o sistema considerou o almoço como hora extra)' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}${i.tipo === 'HORA EXTRA' ? '<span style="display:block">' + tagPerc(i) + '</span>' : ''}${i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? '<small style="display:block;font-weight:500;color:#b45309">erro de parametrização do almoço</small>' : ''}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
         <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b>${j.tarefa ? ' · ' + esc(String(j.tarefa).split('—')[0].trim()) : ''}${j.chamado ? ' · ch. ' + esc(j.chamado) : ''}<small>${esc(j.texto || '')}</small>${j.dataResp ? `<small>respondido em ${esc(dataBr(j.dataResp))}</small>` : ''}${j.obsRH ? `<small>RH: ${esc(j.obsRH)}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
