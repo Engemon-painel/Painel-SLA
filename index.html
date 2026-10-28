@@ -5147,7 +5147,7 @@ if(kpiRow){
     const datasetFicou = {
       label: 'Não reclassificação',
       data: causaLabelsOrdenados.map(c => causaFicouCounts[c] || 0),
-      backgroundColor: 'rgba(94,52,181,.75)', borderRadius: 4,
+      backgroundColor: '#0b2545', borderRadius: 4,
       datalabels: {
         display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
         color: '#ffffff', anchor:'center', align:'center',
