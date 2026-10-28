@@ -163,6 +163,7 @@ ${C} .bh-nav .ic{font-size:18px;width:22px;text-align:center;flex:0 0 22px}
 ${C} .bh-conteudo{min-width:0}
 @media (max-width:900px){${C} .bh-layout{grid-template-columns:1fr}${C} .bh-nav{position:static;flex-direction:row;overflow-x:auto}${C} .bh-nav .rot{display:none}${C} .bh-nav button{white-space:nowrap;width:auto}}
 ${C} .bh-filtros{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+${C} .bh-dt{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#475569}${C} .bh-dt[hidden]{display:none}
 ${C} .bh-filtros select,${C} .bh-filtros input{padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:13px;background:#fff;color:#0f172a}
 ${C} .bh-filtros button{padding:7px 12px;border:0;border-radius:8px;background:#e2e8f0;font:inherit;font-size:13px;cursor:pointer}
 ${C} .bh-g{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}
@@ -287,6 +288,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <select data-pf="tipo" data-so="pend andamento" hidden><option value="">Pendência: todas</option></select>
       <select data-pf="sit" data-so="pend" hidden></select>
       <select data-pf="folha" data-so="pend andamento atraso falta rh" hidden title="Folha (dia 15 a 14)"></select>
+      <select data-pf="sem" data-so="pend andamento atraso falta rh" hidden title="Atalho: escolhe uma semana (segunda a domingo) e preenche De / Até"></select>
+      <label class="bh-dt" data-so="pend andamento atraso falta rh" hidden title="Pendências a partir desta data">De <input type="date" data-pf="de"></label>
+      <label class="bh-dt" data-so="pend andamento atraso falta rh" hidden title="Pendências até esta data">Até <input type="date" data-pf="ate"></label>
       <input data-f="busca" type="search" placeholder="Buscar nome ou matrícula">
       <button type="button" class="bh-limpar">Limpar filtros</button>
     </div>
@@ -535,14 +539,21 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       atualizar();
     }));
     el.querySelectorAll('[data-pf]').forEach(c => c.addEventListener('change', () => {
-      pendFiltro[c.dataset.pf] = c.value; pendSel.clear();
+      const pf = c.dataset.pf;
+      if (pf === 'sem') {   // atalho da semana: preenche De / Até
+        const [de, ate] = c.value ? c.value.split('|') : ['', ''];
+        pendFiltro.de = de; pendFiltro.ate = ate;
+        $('[data-pf="de"]', el).value = de; $('[data-pf="ate"]', el).value = ate;
+      } else pendFiltro[pf] = c.value;
+      pendSel.clear();
       if (pend) { renderPend(); renderAndamento(); }
     }));
     $('.bh-limpar', el).addEventListener('click', () => {
       Object.keys(filtro).forEach(k => filtro[k] = '');
       filtro.st = statusPadrao();
       faixaSel = ''; tipoSel = '';
-      pendFiltro.tipo = ''; pendFiltro.sit = 'tratar'; pendFiltro.folha = null; pendFiltro.semAlmoco = false; pendSel.clear();
+      pendFiltro.tipo = ''; pendFiltro.sit = 'tratar'; pendFiltro.folha = null; pendFiltro.semAlmoco = false; pendFiltro.de = ''; pendFiltro.ate = ''; pendSel.clear();
+      el.querySelectorAll('[data-pf="de"],[data-pf="ate"],[data-pf="sem"]').forEach(c => c.value = '');
       el.querySelectorAll('[data-f]').forEach(c => c.value = c.dataset.f === 'st' ? filtro.st : '');
       atualizar();
     });
@@ -1114,7 +1125,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
   let pend = null, pendErro = '', pendGerado = '', pendFonte = '', pendHistInfo = '', pendFimBase = '', pendIniBase = '';
   const pendSel = new Set();
-  const pendFiltro = { tipo: '', sit: 'tratar', folha: null };   // folha: null = folha atual (padrão) · '' = todas
+  const pendFiltro = { tipo: '', sit: 'tratar', folha: null, de: '', ate: '' };   // de/ate: aaaa-mm-dd (filtro por data da pendência)
+  // ALTERADO (28/10/2026): filtro De / Até pela data da pendência (+ atalho por semana, seg a dom)
+  const noPeriodo = i => { const d = String(i.d || '').slice(0, 10); return (!pendFiltro.de || d >= pendFiltro.de) && (!pendFiltro.ate || d <= pendFiltro.ate); };   // folha: null = folha atual (padrão) · '' = todas
   // ALTERADO (21/10/2026): período da folha = sempre do dia 15 ao dia 14 do mês seguinte
   const folhaIniDe = iso => {
     const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -1330,7 +1343,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
     const fo = folhaSel();
     return (pend || []).filter(i => liberada(i) && (soTipo ? i.tipo === soTipo : !TIPOS_PROPRIOS.includes(i.tipo)) &&
-      (!fo || folhaIniDe(i.d) === fo) && passaProj(i) &&
+      (!fo || folhaIniDe(i.d) === fo) && noPeriodo(i) && passaProj(i) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!filtro.tp || i.tpSaldo === filtro.tp) &&
       (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)));
@@ -1372,7 +1385,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const cards = [['tratar', 'A tratar', aTratar, '#b45309'], ['Pendente Operação', 'Pendente Operação', cont['Pendente Operação'], COR_SIT['Pendente Operação']],
       ['Erro na Justificativa', 'Com erro', cont['Erro na Justificativa'], COR_SIT['Erro na Justificativa']],
       ['Justificado', 'Justificadas', cont['Justificado'], COR_SIT['Justificado']], ['tratada', '✅ Tratadas', base.filter(ehTratada).length, '#0b3a75'], ['', 'Total', base.length, '#334155']];
-    $('#bh-pd-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${pendFiltro.sit === c[0] ? ' on' : ''}" data-s="${esc(c[0])}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[0] === 'tratar' ? 'pendente operação + com erro' : c[0] === 'tratada' ? 'justificadas que já saíram da base' : c[0] === '' ? (folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'pendências no filtro · todas as folhas') : pct(c[2], base.length) + '% do total'}</span></button>`).join('');
+    $('#bh-pd-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${pendFiltro.sit === c[0] ? ' on' : ''}" data-s="${esc(c[0])}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[0] === 'tratar' ? 'pendente operação + com erro' : c[0] === 'tratada' ? 'justificadas que já saíram da base' : c[0] === '' ? (pendFiltro.de || pendFiltro.ate ? 'datas ' + (pendFiltro.de ? pendFiltro.de.split('-').reverse().join('/') : 'início') + ' a ' + (pendFiltro.ate ? pendFiltro.ate.split('-').reverse().join('/') : 'hoje') : folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'pendências no filtro · todas as folhas') : pct(c[2], base.length) + '% do total'}</span></button>`).join('');
     $('#bh-pd-kpis').querySelectorAll('button').forEach(b => b.onclick = () => { pendFiltro.sit = b.dataset.s; pendSel.clear(); renderPend(); });
 
     // tipo de pendência
@@ -1388,6 +1401,19 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const folhas = [...new Set((pend || []).filter(liberada).map(i => folhaIniDe(i.d)).filter(Boolean).concat([atualF]))].sort().reverse();
       sFolha.innerHTML = `<option value=""${folhaSel() === '' ? ' selected' : ''}>Folha: todas</option>` +
         folhas.map(f => `<option value="${f}"${folhaSel() === f ? ' selected' : ''}>Folha ${rotFolha(f)}${f === atualF ? ' (atual)' : ''}</option>`).join('');
+    }
+    const sSem = raiz.querySelector('[data-pf="sem"]');
+    if (sSem) {
+      const iso = dt => dt.toISOString().slice(0, 10);
+      const segDe = d => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return iso(x); };
+      const fo = folhaSel();
+      const segs = [...new Set((pend || []).filter(i => liberada(i) && i.d && (!fo || folhaIniDe(i.d) === fo)).map(i => segDe(String(i.d).slice(0, 10))))].sort().reverse();
+      const br = d => d.slice(8, 10) + '/' + d.slice(5, 7);
+      const atual = pendFiltro.de && pendFiltro.ate ? pendFiltro.de + '|' + pendFiltro.ate : '';
+      sSem.innerHTML = `<option value="">Semana: todas</option>` + segs.map(sg => { const f = new Date(sg + 'T12:00:00Z'); f.setUTCDate(f.getUTCDate() + 6);
+        const v = sg + '|' + iso(f); return `<option value="${v}"${v === atual ? ' selected' : ''}>Semana ${br(sg)} a ${br(iso(f))}</option>`; }).join('') +
+        (atual && !segs.some(sg => atual.startsWith(sg + '|')) ? `<option value="${atual}" selected>${br(pendFiltro.de)} a ${br(pendFiltro.ate)}</option>` : '');
+      if (!atual) sSem.value = '';
     }
     const sSit = raiz.querySelector('[data-pf="sit"]');
     sSit.innerHTML = SITS.map(([v, r]) => `<option value="${esc(v)}"${pendFiltro.sit === v ? ' selected' : ''}>Situação: ${r}</option>`).join('');
@@ -1513,7 +1539,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   function renderRH() {
     if (!$('#bh-rh-kpis') || !pend) return;
     const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim(), fo = folhaSel();
-    const base = pend.filter(i => { const j = justDe(i); return j.trat && (!fo || folhaIniDe(i.d) === fo) && passaProj(i) &&
+    const base = pend.filter(i => { const j = justDe(i); return j.trat && (!fo || folhaIniDe(i.d) === fo) && noPeriodo(i) && passaProj(i) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)); });
     const cont = { aguardando: 0, AJUSTADO: 0, devolvido: 0, outros: 0 };
@@ -1714,7 +1740,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   function gHeSup() {
     if (!$('#bh-g-pdhe')) return;
     const fo = folhaIniDe(hojeIso()), b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
-    const he = (pend || []).filter(i => i.tipo === 'HORA EXTRA' && folhaIniDe(i.d) === fo && passaProj(i) &&
+    const he = (pend || []).filter(i => i.tipo === 'HORA EXTRA' && folhaIniDe(i.d) === fo && noPeriodo(i) && passaProj(i) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)));
     const g = {};
