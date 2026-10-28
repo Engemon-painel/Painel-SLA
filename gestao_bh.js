@@ -1225,7 +1225,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     while (n > 0) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) n--; }
     return d.toISOString().slice(0, 10);
   };
-  const liberada = i => (i.just && i.just.trat) || hojeIso() > somarDiasUteis(i.d, 2);
+  // ALTERADO (28/10/2026): a espera de 2 dias úteis vale só para PONTO ABERTO; as outras pendências aparecem na hora
+  const liberada = i => String(i.tipo || '').trim().toUpperCase() !== 'PONTO ABERTO' || (i.just && i.just.trat) || hojeIso() > somarDiasUteis(i.d, 2);
 
   const up = v => String(v == null ? '' : v).trim().toUpperCase();
   const dataBr = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(iso || ''); };
@@ -1522,12 +1523,12 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     atraso: { tipo: 'ATRASO', pre: 'at', aba: 'atraso', nome: 'Atrasos',
       media: (m, n) => 'média de ' + Math.round(m / n) + ' min por atraso',
       regra: 'entrada mais de 5 min depois do início do turno · só dias com entrada e saída marcadas',
-      regraTab: 'tolerância de 5 minutos · aparecem 2 dias úteis depois da data',
+      regraTab: 'tolerância de 5 minutos',
       cols: [['Início', i => minDet(i.det, 'Início do turno')], ['Entrada', i => minDet(i.det, 'Entrada')], ['Atraso', i => hMin(-(+i.horas || 0)), 'neg']] },
     falta: { tipo: 'FALTA', pre: 'ft', aba: 'falta', nome: 'Faltas',
       media: (m, n) => 'média de ' + hMin(m / 60 / n).replace('+', '') + ' por falta',
       regra: 'dias marcados como "Ausente" na coluna observacao do Espelho de ponto (sem abono)',
-      regraTab: 'observacao = Ausente no Espelho de ponto · aparecem 2 dias úteis depois da data',
+      regraTab: 'observacao = Ausente no Espelho de ponto',
       cols: [['Horas ausentes', i => hMin(-(+i.horas || 0)), 'neg']] }
   };
   const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); gAbsenteismo(); renderRH(); };
