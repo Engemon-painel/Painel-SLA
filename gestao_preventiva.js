@@ -296,14 +296,18 @@
     const planejado = regs.length;
     const planD1 = Math.round(planejado * duRef / duMes);
     const realizado = regs.filter(r => r.st === 'Executada').length;   // cards contam tudo; só os gráficos filtram por data
+    // ALTERADO (28/10/2026): Realizado / Entrega D-1 / Aderência / Saldo contam só o executado ATÉ ONTEM (D-1),
+    // para comparar com a meta D-1; o que foi executado hoje aparece à parte ("+ hoje")
+    const realD1 = regs.filter(r => r.st === 'Executada' && (!r.d || r.d <= ref)).length;
+    const realHoje = realizado - realD1;
     const pendentes = planejado - realizado;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
     // ALTERADO (07/10/2026): Aderência em D-1 — compara o realizado com a mesma
     // meta do card "Realizado / Meta D-1" (dias úteis até ontem).
     // Para um mês já fechado, D-1 é o último dia do mês, então vale o mês inteiro.
-    const saldo = realizado - planD1;
-    const ader = planD1 ? realizado / planD1 * 100 : 0;
-    const entrega = planejado ? realizado / planejado * 100 : 0;
+    const saldo = realD1 - planD1;
+    const ader = planD1 ? realD1 / planD1 * 100 : 0;
+    const entrega = planejado ? realD1 / planejado * 100 : 0;
 
     // faixa de sinal (30 blocos) = aderência em D-1
     const strip = raiz.querySelector('#pv-signal');
@@ -317,10 +321,10 @@
         <div class="delta" style="color:${COR.muted}">${duMes} dias úteis no mês</div></div>
       <div class="kpi"><div class="label">✅ Realizado / Meta D-1</div>
         <div style="display:grid;grid-template-columns:auto auto auto;justify-content:start;column-gap:14px;align-items:baseline;">
-          <div class="value"><span style="color:${COR.good}">${fmt(realizado)}</span></div>
+          <div class="value" title="Executadas até ontem (D-1)${realHoje ? ' · + ' + fmt(realHoje) + ' executadas hoje' : ''}"><span style="color:${COR.good}">${fmt(realD1)}</span></div>
           <div class="value"><span class="pv-sep">|</span></div>
           <div class="value">${fmt(planD1)}</div>
-          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b></div>
+          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b>${realHoje ? `<br><span title="Executadas hoje: ainda não entram no D-1">+ ${fmt(realHoje)} hoje</span>` : ''}</div>
           <div></div>
           <div class="delta" style="color:${COR.muted};white-space:nowrap;">Planejado D-1<br><b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b></div>
         </div></div>
