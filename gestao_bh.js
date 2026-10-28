@@ -87,10 +87,16 @@
   const mat6 = m => String(m || '').replace(/\D/g, '').padStart(6, '0').slice(-6);
   let mapaProj = null;
   const projDaMat = m => {
-    if (!mapaProj) { mapaProj = {}; ((dados && dados.itens) || []).forEach(i => { mapaProj[mat6(i.m)] = projDe(i.projeto); }); }
+    if (!mapaProj) { mapaProj = {}; ((dados && dados.itens) || []).forEach(i => { mapaProj[mat6(i.m)] = projForcado(i.n) || projDe(i.projeto); }); }
     return mapaProj[mat6(m)] || '';
   };
-  const passaProj = i => !filtro.pj || (i.projeto != null ? projDe(i.projeto) : (projDe(i.cc) || projDaMat(i.m))) === filtro.pj;
+  // ALTERADO (28/10/2026): colaboradores cadastrados como Cirion que contam como Claro (pelo nome, sem acento)
+  const PROJ_FORCADO = { 'LIVIA MARIA VIEIRA YADA': 'CLARO', 'LEONARDO PERES FERRAZ': 'CLARO' };
+  const nomeChave = n => String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const projForcado = n => { const k = nomeChave(n); if (PROJ_FORCADO[k]) return PROJ_FORCADO[k];
+    const f = k.length >= 15 && Object.keys(PROJ_FORCADO).find(x => x.startsWith(k) || k.startsWith(x)); return f ? PROJ_FORCADO[f] : ''; };   // nome cortado no BH
+  const projItem = i => projForcado(i.n) || (i.projeto != null ? projDe(i.projeto) : (projDe(i.cc) || projDaMat(i.m)));
+  const passaProj = i => !filtro.pj || projItem(i) === filtro.pj;
 
   // estado das abas novas
   let aba = 'geral';
@@ -1371,7 +1377,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     if (!box) return;
     if (!pendEsp || !pendEsp.mats.length || !dados) { box.innerHTML = ''; return; }
     const noEsp = new Set(pendEsp.mats.map(mat6));
-    const faltam = dados.itens.filter(i => projDe(i.projeto) === 'CLARO' && i.st !== 'Demitido' && !noEsp.has(mat6(i.m)))
+    const faltam = dados.itens.filter(i => projItem(i) === 'CLARO' && i.st !== 'Demitido' && !noEsp.has(mat6(i.m)))
       .sort((a, b) => String(a.sup || '').localeCompare(String(b.sup || ''), 'pt-BR') || String(a.n).localeCompare(String(b.n), 'pt-BR'));
     if (!faltam.length) { box.innerHTML = ''; return; }
     const per = pendEsp.ini ? ` (espelho de ${dataBr(pendEsp.ini)}${pendEsp.fim ? ' a ' + dataBr(pendEsp.fim) : ''})` : '';
