@@ -1402,6 +1402,16 @@ const INCIDENTES_EXCLUIDOS = new Set([
   'INC000006003097',
   'INC000006003174'
 ]);
+// ALTERADO (28/10/2026): regras de causa do FCA — incidentes de "Falha complexa" nestes sites passam a contar
+// como restrição de acesso (o site tem restrição de acesso conhecida).
+const CAUSA_POR_SITE = { 'SMPENI4': { de: 'Falha complexa', para: 'Restrição de acesso(Local)' } };
+function aplicarRegrasCausa(lista){
+  (lista || []).forEach(p => {
+    const r = CAUSA_POR_SITE[String((p && p.site) || '').toUpperCase().replace(/\s+/g, '')];
+    if(r && String(p.causa || '').trim().toLowerCase() === r.de.toLowerCase()){ p.causaOriginal = p.causa; p.causa = r.para; }
+  });
+  return lista;
+}
 function semExcluidos(lista){
   return (lista || []).filter(p =>
     !INCIDENTES_EXCLUIDOS.has(String((p && p.incidente) || '').trim().toUpperCase())
@@ -1419,8 +1429,8 @@ async function carregarDados(){
     SEMANAL_6H = data.semanal6h && data.semanal6h.length ? data.semanal6h : data.semanal;
     DIARIO_4H = data.diario || [];
     DIARIO_6H = data.diario6h && data.diario6h.length ? data.diario6h : DIARIO_4H;
-    PENDENTES_FCA = semExcluidos(data.pendentesFca);
-    FCA_TIPO_DIVERGENTE = semExcluidos(data.fcaTipoDivergente);
+    PENDENTES_FCA = aplicarRegrasCausa(semExcluidos(data.pendentesFca));
+    FCA_TIPO_DIVERGENTE = aplicarRegrasCausa(semExcluidos(data.fcaTipoDivergente));
     COLABORADORES = data.colaboradores || [];
     FROTA = data.frota || [];
     VAGAS = data.vagas || [];
@@ -5124,7 +5134,8 @@ if(kpiRow){
     const totalReclassificado = Object.values(causaSaiuCounts).reduce((a,b) => a+b, 0);
     const totalCausaGeral = totalNaoReclassificado + totalReclassificado;
     causaTotalLabelEl.textContent = 'Total analisado e preenchido: ' + totalCausaGeral.toLocaleString('pt-BR') +
-      ' (' + totalNaoReclassificado.toLocaleString('pt-BR') + ' não reclassificação / ' + totalReclassificado.toLocaleString('pt-BR') + ' reclassificação)';
+      ' (' + totalNaoReclassificado.toLocaleString('pt-BR') + ' não reclassificação / ' + totalReclassificado.toLocaleString('pt-BR') + ' reclassificação)' +
+      ' · % = não reclassificação ÷ total fora do prazo (' + total.toLocaleString('pt-BR') + ')';
   }
 
   if(causaChart) causaChart.destroy();
@@ -5157,7 +5168,11 @@ if(kpiRow){
       datalabels: {
         anchor:'end', align:'right', offset:4,
         color: '#000000', font:{size:11, family:'JetBrains Mono', weight:'700'},
-        formatter: (value, context) => (causaFicouCounts[causaLabelsOrdenados[context.dataIndex]] || 0) + (causaSaiuCounts[causaLabelsOrdenados[context.dataIndex]] || 0)
+        // ALTERADO (28/10/2026): total da causa + % sobre o total fora do prazo (ex.: 96 ÷ 225)
+        formatter: (value, context) => {
+          const c = causaLabelsOrdenados[context.dataIndex], fic = causaFicouCounts[c] || 0, tot = fic + (causaSaiuCounts[c] || 0);
+          return tot + (total > 0 ? ' · ' + (fic / total * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '');
+        }
       }
     };
 
@@ -5169,12 +5184,14 @@ if(kpiRow){
       },
       plugins: [ChartDataLabels],
       options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 90 } },
         plugins: {
           legend: {
             labels:{ color: cor.muted, font:{family:'Inter', size:11} },
             filter: (item) => item.text !== 'Total'
           },
+          tooltip: { callbacks: { afterBody: (its) => { const c = causaLabelsOrdenados[its[0].dataIndex], fic = causaFicouCounts[c] || 0;
+            return total > 0 ? fic + ' de ' + total + ' fora do prazo = ' + (fic / total * 100).toFixed(1).replace('.', ',') + '%' : ''; } } },
           datalabels: { display:true }
         },
         scales: {
