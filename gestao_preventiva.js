@@ -327,7 +327,7 @@
           <div class="value" title="Executadas até ontem (D-1)${realAntes ? ' + ' + fmt(realAntes) + ' fechadas hoje que já estavam abertas antes' : ''}${realHoje ? ' · + ' + fmt(realHoje) + ' abertas e fechadas hoje (ainda não entram)' : ''}"><span style="color:${COR.good}">${fmt(realD1)}</span></div>
           <div class="value"><span class="pv-sep">|</span></div>
           <div class="value">${fmt(planD1)}</div>
-          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b>${realAntes ? `<br><span title="Fechadas hoje, mas a WO já estava aberta antes de hoje: entram no D-1">inclui ${fmt(realAntes)} fechadas hoje</span>` : ''}${realHoje ? `<br><span title="Abertas e fechadas hoje: ainda não entram no D-1">+ ${fmt(realHoje)} abertas e fechadas hoje</span>` : ''}</div>
+          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b></div>
           <div></div>
           <div class="delta" style="color:${COR.muted};white-space:nowrap;">Planejado D-1<br><b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b></div>
         </div></div>
