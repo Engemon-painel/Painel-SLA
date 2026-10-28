@@ -296,9 +296,12 @@
     const planejado = regs.length;
     const planD1 = Math.round(planejado * duRef / duMes);
     const realizado = regs.filter(r => r.st === 'Executada').length;   // cards contam tudo; só os gráficos filtram por data
-    // ALTERADO (28/10/2026): Realizado / Entrega D-1 / Aderência / Saldo contam só o executado ATÉ ONTEM (D-1),
-    // para comparar com a meta D-1; o que foi executado hoje aparece à parte ("+ hoje")
-    const realD1 = regs.filter(r => r.st === 'Executada' && (!r.d || r.d <= ref)).length;
+    // ALTERADO (28/10/2026): Realizado / Entrega D-1 / Aderência / Saldo contam o executado ATÉ ONTEM (D-1)
+    // + o que foi fechado hoje mas já estava aberto antes de hoje (início da WO até ontem = estava aberta de manhã).
+    // Só fica de fora o que abriu e fechou hoje — aparece à parte ("+ hoje")
+    const entraD1 = r => !r.d || r.d <= ref || (r.ini && String(r.ini).slice(0, 10) <= ref);
+    const realD1 = regs.filter(r => r.st === 'Executada' && entraD1(r)).length;
+    const realAntes = regs.filter(r => r.st === 'Executada' && r.d && r.d > ref && r.ini && String(r.ini).slice(0, 10) <= ref).length;
     const realHoje = realizado - realD1;
     const pendentes = planejado - realizado;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
@@ -321,10 +324,10 @@
         <div class="delta" style="color:${COR.muted}">${duMes} dias úteis no mês</div></div>
       <div class="kpi"><div class="label">✅ Realizado / Meta D-1</div>
         <div style="display:grid;grid-template-columns:auto auto auto;justify-content:start;column-gap:14px;align-items:baseline;">
-          <div class="value" title="Executadas até ontem (D-1)${realHoje ? ' · + ' + fmt(realHoje) + ' executadas hoje' : ''}"><span style="color:${COR.good}">${fmt(realD1)}</span></div>
+          <div class="value" title="Executadas até ontem (D-1)${realAntes ? ' + ' + fmt(realAntes) + ' fechadas hoje que já estavam abertas antes' : ''}${realHoje ? ' · + ' + fmt(realHoje) + ' abertas e fechadas hoje (ainda não entram)' : ''}"><span style="color:${COR.good}">${fmt(realD1)}</span></div>
           <div class="value"><span class="pv-sep">|</span></div>
           <div class="value">${fmt(planD1)}</div>
-          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b>${realHoje ? `<br><span title="Executadas hoje: ainda não entram no D-1">+ ${fmt(realHoje)} hoje</span>` : ''}</div>
+          <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b>${realAntes ? `<br><span title="Fechadas hoje, mas a WO já estava aberta antes de hoje: entram no D-1">inclui ${fmt(realAntes)} fechadas hoje</span>` : ''}${realHoje ? `<br><span title="Abertas e fechadas hoje: ainda não entram no D-1">+ ${fmt(realHoje)} abertas e fechadas hoje</span>` : ''}</div>
           <div></div>
           <div class="delta" style="color:${COR.muted};white-space:nowrap;">Planejado D-1<br><b style="color:#1b2440">${pct(planejado ? planD1 / planejado * 100 : 0)}</b></div>
         </div></div>
