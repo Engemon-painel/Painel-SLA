@@ -444,8 +444,11 @@
           <div class="panel">
             <h2>Causa</h2>
             <div id="causaTotalLabel" class="mono" style="font-size:12px; color:var(--muted); margin:2px 0 12px;"></div>
-            <div id="causaChartWrap" style="position:relative; height:180px;">
-              <canvas id="causaChart"></canvas>
+            <div style="display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap;">
+              <div id="causaChartWrap" style="position:relative; height:180px; flex:1; min-width:320px;">
+                <canvas id="causaChart"></canvas>
+              </div>
+              <div id="causaEserBox" style="width:230px; display:flex; flex-direction:column; gap:8px;"></div>
             </div>
           </div>
           <div class="panel" style="margin-bottom:16px;">
@@ -5205,6 +5208,27 @@ if(kpiRow){
     });
   }
 
+  // ALTERADO (28/10/2026): quadrinho "ESER sem os gargalos" — cada um separado: se os fora do prazo do 1º OU do 2º gargalo
+  // (as duas maiores causas do gráfico) tivessem ficado dentro do prazo
+  const eserBox = document.getElementById('causaEserBox');
+  if(eserBox){
+    const t = totais(mesObj);
+    const g1 = causaLabelsOrdenados[0], g2 = causaLabelsOrdenados[1];
+    const n1 = g1 ? (causaFicouCounts[g1] || 0) : 0, n2 = g2 ? (causaFicouCounts[g2] || 0) : 0;
+    const pctF = v => (v * 100).toFixed(1).replace('.', ',') + '%';
+    const nomeEser = (typeof DADOS_6H !== 'undefined' && DADOS === DADOS_6H) ? 'ESER 6h' : 'ESER 4h';
+    const linha = (rot, sub, v, destaque) => `<div style="border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:${destaque ? 'var(--panel-2)' : 'var(--panel)'};">
+        <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;">${rot}</div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:${statusColor(v)};">${pctF(v)}</div>
+        ${sub ? `<div style="font-size:11px; color:var(--muted);">${sub}</div>` : ''}</div>`;
+    eserBox.innerHTML = t.total ? (
+      linha(nomeEser + ' hoje', `${t.dentro.toLocaleString('pt-BR')} de ${t.total.toLocaleString('pt-BR')} dentro do prazo`, t.pct, false) +
+      (g1 ? linha('Sem o 1º gargalo', `${g1}: +${n1}`, (t.dentro + n1) / t.total, true) : '') +
+      (g2 ? linha('Sem o 2º gargalo', `${g2}: +${n2}`, (t.dentro + n2) / t.total, true) : '') +
+      `<div style="font-size:11px; color:var(--muted); line-height:1.4;">Simulação: os fora do prazo dessas causas (não reclassificados) contados como dentro do prazo.${supervisorFiltroAtual ? ' Com filtro de supervisor, as causas são só desse supervisor e o ESER é do total.' : ''}</div>`
+    ) : '';
+  }
+
   const acaoCounts = {};
   justificadosDoMes.forEach(p => {
     const a = p.acao || 'Não informado';
@@ -5368,7 +5392,7 @@ setInterval(carregarDados, 5 * 60 * 1000);
 <script src="gestao_preventiva.js?v=2"></script>
 <script src="gestao_afaz.js?v=37"></script>
 <script src="gestao_combustivel.js?v=9"></script>
-<script src="gestao_bh.js?v=50"></script>
+<script src="gestao_bh.js?v=44"></script>
 <script src="gestao_toa.js"></script>
 <script src="tela_inicial.js"></script>
 <script src="trava_senha.js"></script>
