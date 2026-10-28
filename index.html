@@ -5135,7 +5135,7 @@ if(kpiRow){
     const totalCausaGeral = totalNaoReclassificado + totalReclassificado;
     causaTotalLabelEl.textContent = 'Total analisado e preenchido: ' + totalCausaGeral.toLocaleString('pt-BR') +
       ' (' + totalNaoReclassificado.toLocaleString('pt-BR') + ' não reclassificação / ' + totalReclassificado.toLocaleString('pt-BR') + ' reclassificação)' +
-      ' · % = não reclassificação ÷ total fora do prazo (' + total.toLocaleString('pt-BR') + ')';
+      ' · % = (não reclassificação + reclassificação) ÷ total fora do prazo (' + total.toLocaleString('pt-BR') + ')';
   }
 
   if(causaChart) causaChart.destroy();
@@ -5168,10 +5168,10 @@ if(kpiRow){
       datalabels: {
         anchor:'end', align:'right', offset:4,
         color: '#000000', font:{size:11, family:'JetBrains Mono', weight:'700'},
-        // ALTERADO (28/10/2026): total da causa + % sobre o total fora do prazo (ex.: 96 ÷ 225)
+        // ALTERADO (28/10/2026): total da causa (não reclassificação + reclassificação) + % sobre o total fora do prazo (ex.: vandalismo 19 ÷ 225)
         formatter: (value, context) => {
           const c = causaLabelsOrdenados[context.dataIndex], fic = causaFicouCounts[c] || 0, tot = fic + (causaSaiuCounts[c] || 0);
-          return tot + (total > 0 ? ' · ' + (fic / total * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '');
+          return tot + (total > 0 ? ' de ' + total + ' · ' + (tot / total * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '');
         }
       }
     };
@@ -5184,14 +5184,14 @@ if(kpiRow){
       },
       plugins: [ChartDataLabels],
       options: {
-        indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 90 } },
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 130 } },
         plugins: {
           legend: {
             labels:{ color: cor.muted, font:{family:'Inter', size:11} },
             filter: (item) => item.text !== 'Total'
           },
-          tooltip: { callbacks: { afterBody: (its) => { const c = causaLabelsOrdenados[its[0].dataIndex], fic = causaFicouCounts[c] || 0;
-            return total > 0 ? fic + ' de ' + total + ' fora do prazo = ' + (fic / total * 100).toFixed(1).replace('.', ',') + '%' : ''; } } },
+          tooltip: { callbacks: { afterBody: (its) => { const c = causaLabelsOrdenados[its[0].dataIndex], tt = (causaFicouCounts[c] || 0) + (causaSaiuCounts[c] || 0);
+            return total > 0 ? tt + ' de ' + total + ' fora do prazo = ' + (tt / total * 100).toFixed(1).replace('.', ',') + '%' : ''; } } },
           datalabels: { display:true }
         },
         scales: {
@@ -5365,7 +5365,7 @@ setInterval(carregarDados, 5 * 60 * 1000);
 <script src="gestao_preventiva.js?v=2"></script>
 <script src="gestao_afaz.js?v=37"></script>
 <script src="gestao_combustivel.js?v=9"></script>
-<script src="gestao_bh.js?v=45"></script>
+<script src="gestao_bh.js?v=44"></script>
 <script src="gestao_toa.js"></script>
 <script src="tela_inicial.js"></script>
 <script src="trava_senha.js"></script>
