@@ -295,6 +295,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <button type="button" class="bh-limpar">Limpar filtros</button>
     </div>
 
+    <div id="bh-esp-alerta"></div>
+
     <!-- ================= ABA: VISÃO GERAL ================= -->
     <div class="bh-aba" data-p="geral">
     <div class="bh-g">
@@ -1285,6 +1287,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const [d, h] = await Promise.all([lerJson(ARQ_PEND), lerJson(ARQ_PEND_HIST).catch(() => null)]);
       pend = Array.isArray(d) ? d : (d.itens || []);
       pendAbs = (d && Array.isArray(d.absenteismo)) ? d.absenteismo : null;
+      pendEsp = (d && d.espelho && Array.isArray(d.espelho.mats)) ? d.espelho : null;
       // ALTERADO (27/10/2026): período coberto pela base atual (do início da folha da pendência aberta mais antiga
       // até a mais recente). Pendência justificada que não está mais na base, dentro desse período, foi tratada.
       {
@@ -1342,6 +1345,29 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }
     renderPend();
     renderAndamento();
+    alertaEspelho();
+  }
+
+  // ALTERADO (28/10/2026): funcionário Claro do Banco de Horas (dados_bh.json) que NÃO aparece no Espelho de ponto
+  // (lista de matrículas do espelho vem no dados_pend_bh.json → espelho.mats, gerada pelo script de pendências)
+  let pendEsp = null, espAberto = false;
+  function alertaEspelho() {
+    const box = $('#bh-esp-alerta');
+    if (!box) return;
+    if (!pendEsp || !pendEsp.mats.length || !dados) { box.innerHTML = ''; return; }
+    const noEsp = new Set(pendEsp.mats.map(mat6));
+    const faltam = dados.itens.filter(i => projDe(i.projeto) === 'CLARO' && i.st !== 'Demitido' && !noEsp.has(mat6(i.m)))
+      .sort((a, b) => String(a.sup || '').localeCompare(String(b.sup || ''), 'pt-BR') || String(a.n).localeCompare(String(b.n), 'pt-BR'));
+    if (!faltam.length) { box.innerHTML = ''; return; }
+    const per = pendEsp.ini ? ` (espelho de ${dataBr(pendEsp.ini)}${pendEsp.fim ? ' a ' + dataBr(pendEsp.fim) : ''})` : '';
+    box.innerHTML = `<div class="bh-aviso" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;margin-bottom:12px">
+      <span style="font-size:20px">🚨</span>
+      <span style="flex:1;min-width:260px"><b>${nf(faltam.length)} funcionário${faltam.length > 1 ? 's' : ''} da Claro no Banco de Horas não aparece${faltam.length > 1 ? 'm' : ''} no Espelho de ponto</b>${esc(per)} · confira cadastro, centro de custo ou matrícula no ponto.</span>
+      <button type="button" class="bh-pd-btn" id="bh-esp-ver">${espAberto ? 'Esconder' : 'Ver quem'}</button></div>
+      ${espAberto ? `<div class="bh-tab" style="max-height:320px;margin-bottom:12px"><table><thead><tr><th>Colaborador</th><th>Matrícula</th><th>Supervisor</th><th>Status no BH</th><th class="num">Saldo BH</th></tr></thead><tbody>
+        ${faltam.map(i => `<tr><td class="nm">${esc(i.n)}</td><td>${esc(i.m)}</td><td>${esc(i.sup || '—')}</td><td>${esc(i.st || '—')}</td><td class="num ${i.h < 0 ? 'neg' : 'pos'}">${hMin(+i.h || 0)}</td></tr>`).join('')}
+      </tbody></table></div>` : ''}`;
+    $('#bh-esp-ver').onclick = () => { espAberto = !espAberto; alertaEspelho(); };
   }
 
   let pendAbs = null;   // absenteísmo por colaborador e folha (dados_pend_bh.json → absenteismo)
