@@ -5115,7 +5115,10 @@ if(kpiRow){
     if(incidentesVistosFicou[chave]) return;
     if(incidentesVistosSaiu[chave]) return;
     incidentesVistosSaiu[chave] = true;
-    const c = p.causa || 'Não informado';
+    // ALTERADO (28/10/2026): reclassificado com causa "Indisponibilidade técnica" entra na barra de vandalismo
+    const cOrig = p.causa || 'Não informado';
+    const c = /^indisponibilidade t[ée]cnica$/i.test(cOrig.trim())
+      ? (Object.keys(causaFicouCounts).find(k => /^vandalismo$/i.test(k.trim())) || 'vandalismo') : cOrig;
     causaSaiuCounts[c] = (causaSaiuCounts[c] || 0) + 1;
   });
 
