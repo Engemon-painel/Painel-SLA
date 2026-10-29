@@ -41,7 +41,8 @@
     'INTERJORNADA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO'],
     'FOLGA NAO CUMPRIDA': ['APENAS JUSTIFICAR', 'AJUSTAR PONTO', 'AUSENTE'],
     'ATRASO': ['BANCO DE HORAS', 'APENAS JUSTIFICAR'],
-    'FALTA': ['AUSENTE', 'BANCO DE HORAS', 'APENAS JUSTIFICAR']   // AUSENTE = falta confirmada (RH desconta)   // BANCO DE HORAS sempre: desconta do saldo, mesmo que fique negativo
+    'FALTA': ['AUSENTE', 'FALTA INDEVIDA', 'BANCO DE HORAS', 'APENAS JUSTIFICAR']   // FALTA INDEVIDA (29/10/2026) = colaborador trabalhou, RH retira a falta
+      // AUSENTE = falta confirmada (RH desconta)   // BANCO DE HORAS sempre: desconta do saldo, mesmo que fique negativo
   };
   const TRAT_PADRAO = ['AJUSTAR PONTO', 'AUSENTE', 'APENAS JUSTIFICAR'];
   const TAREFAS_HE = [
@@ -1281,10 +1282,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       trat === 'PAGAMENTO HE' && up(hePerm) === 'NÃO' ? 'INVÁLIDO - BH NEGATIVO NÃO PERMITE PAGAMENTO' :
       trat === 'PAGAMENTO HE' && !String(j.tarefa || '').trim() ? 'INCOMPLETO - FALTA TAREFA HE' :
       trat === 'AJUSTAR PONTO' && (pend === 'PONTO ABERTO' || pend === 'SEM MARCACAO') && !String(j.horario || '').trim() ? 'INCOMPLETO - FALTA HORÁRIO/MARCAÇÃO' :
-      ['PAGAMENTO HE', 'AJUSTAR PONTO', 'AUSENTE'].includes(trat) && rh === 'AJUSTADO' ? 'CONCLUÍDO' :
+      ['PAGAMENTO HE', 'AJUSTAR PONTO', 'AUSENTE', 'FALTA INDEVIDA'].includes(trat) && rh === 'AJUSTADO' ? 'CONCLUÍDO' :
       trat === 'PAGAMENTO HE' ? 'PRONTO PARA RH - HE' :
       trat === 'AJUSTAR PONTO' ? 'AGUARDANDO RH - AJUSTE DE PONTO' :
       trat === 'AUSENTE' ? 'AGUARDANDO RH - AUSÊNCIA' :
+      trat === 'FALTA INDEVIDA' ? 'AGUARDANDO RH - FALTA INDEVIDA' :
       trat === 'BANCO DE HORAS' ? 'TRATADO - BANCO DE HORAS' :
       trat === 'APENAS JUSTIFICAR' ? 'TRATADO - JUSTIFICADO' : 'CONCLUÍDO';
     return [auto, statusPendencia(auto)];
@@ -1990,7 +1992,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <div class="bh-modal-topo"><h3>Justificar · ${esc(tipo)}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
       <div class="bh-modal-lista">${itens.slice(0, 8).map(i => `<div><b>${esc(i.n)}</b> · ${dataBr(i.d)} (${esc(i.dia || '')}) · <span>${esc(i.det)}</span></div>`).join('')}${itens.length > 8 ? `<div>… e mais ${itens.length - 8}</div>` : ''}</div>
       ${ehHE && !permitido ? '<div class="bh-aviso">⚠ BH negativo: a HE não pode ser paga. Use "BANCO DE HORAS" para compensar o débito.</div>' : ''}
-      ${tipo === 'FALTA' ? '<div class="bh-aviso">AUSENTE = falta confirmada (o RH desconta) · BANCO DE HORAS = as horas da falta saem do banco (pode ficar negativo) · APENAS JUSTIFICAR = só registra o motivo.</div>' : ''}
+      ${tipo === 'FALTA' ? '<div class="bh-aviso">AUSENTE = falta confirmada (o RH desconta) · FALTA INDEVIDA = o colaborador trabalhou, o RH retira a falta · BANCO DE HORAS = as horas da falta saem do banco (pode ficar negativo) · APENAS JUSTIFICAR = só registra o motivo.</div>' : ''}
       ${tipo === 'ATRASO' ? (temBanco ? '<div class="bh-aviso" style="background:#ecfdf5;color:#065f46">Colaborador com saldo positivo: o atraso pode ser descontado do banco de horas.</div>' : '<div class="bh-aviso">Colaborador sem saldo positivo: escolhendo "BANCO DE HORAS", o atraso é descontado e o banco fica (mais) negativo.</div>') : ''}
       <div class="bh-form">
 
