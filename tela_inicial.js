@@ -45,6 +45,7 @@ const BANNER = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEB
     'nav-vagas':       'Requisições e recrutamento',
     'nav-frota':       'Veículos, status e gastos',
     'nav-bancohoras':  'Banco de horas e extras',
+    'nav-kpis':        'Turnover, absenteísmo e banco de horas',
     'nav-nr':          'Cursos NR dos técnicos',
     'nav-aso':         'Vencimento dos ASOs',
     'nav-escala':      'Técnicos por dia, horário e supervisão'
