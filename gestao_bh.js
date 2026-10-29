@@ -282,7 +282,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <button type="button" data-aba="falta"><span class="ic">🚫</span>Faltas<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="rh"><span class="ic">🧾</span>Resposta do RH<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="andamento"><span class="ic">📋</span>Andamento por Supervisor</button>
-      <button type="button" data-aba="espelho"><span class="ic">🪪</span>No Espelho de Ponto<span class="bh-cont" hidden></span></button>
+      <button type="button" data-aba="espelho"><span class="ic">🪪</span>Absenteísmo<span class="bh-cont" hidden></span></button>
     </nav>
     <div class="bh-conteudo">
     <div class="bh-filtros">
@@ -473,9 +473,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <div class="bh-pd-kpis" id="bh-es-kpis"></div>
       <div class="bh-g">
         <div class="bh-c s12">
-          <h3>Batidas no Espelho de ponto × escala</h3>
+          <h3>Absenteísmo por colaborador (Espelho de ponto)</h3>
           <p class="sub" id="bh-es-sub">Carregando…</p>
-          <div class="bh-tab" style="max-height:640px"><table><thead><tr><th>Alerta</th><th>Nome</th><th>Supervisor</th><th>Turno</th><th class="num" title="Dias de trabalho pela escala que já passaram na folha (até ontem); D.S.R., compensado, férias e afastamento não entram">Dias da escala</th><th class="num">Dias com batida</th><th class="num" title="Dias da escala que já passaram sem nenhuma batida (inclui os marcados Ausente)">Faltas (sem batida)</th><th>Última batida</th></tr></thead><tbody id="bh-es-body"></tbody></table></div>
+          <div class="bh-tab" style="max-height:640px"><table><thead><tr><th>Alerta</th><th>Matrícula</th><th>Nome</th><th>Centro de Custo</th><th>Turno</th><th class="num" title="Dias corridos do período no espelho (do início da folha ou da admissão até o último dia com batida)">Dias no período</th><th class="num" title="Dias com &quot;Ausente&quot; registrado no espelho">Dias Ausente registrados</th><th class="num" title="Dias ausente ÷ dias no período">% Absenteísmo</th><th class="num">Horas absenteísmo acumuladas</th></tr></thead><tbody id="bh-es-body"></tbody></table></div>
         </div>
       </div>
     </div>
@@ -1422,40 +1422,45 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const temBat = (pendAbs || []).some(a => a.dEscP != null);
     const linhas = itens.map(i => {
       const a = abs[mat6(i.m)], fora = !noEsp.has(mat6(i.m));
-      const dEsc = a && a.dEscP != null ? a.dEscP : null, dBat = a && a.dBat != null ? a.dBat : null, dSem = a && a.dSem != null ? a.dSem : null;
-      const zero = !fora && dEsc > 0 && dBat === 0;
-      const sit = fora ? 'fora' : zero ? 'zero' : dSem > 0 ? 'falta' : 'ok';
-      return { i, a, fora, dEsc, dBat, dSem, sit, ult: a && a.ultBat || '', esc: (a && a.esc) || '' };
+      const cal = a && a.dCal != null;
+      const dPer = a ? (cal ? a.dCal : (a.dEscP != null ? a.dEscP : a.dPass)) : null;
+      const dAus = a ? (cal ? a.dAusReg : (a.dSem != null ? a.dSem : a.dAus)) : null;
+      const hAus = a ? (cal ? a.hAusReg : a.hAus) : null;
+      const zero = !fora && a && a.dEscP > 0 && a.dBat === 0;            // nenhuma batida nos dias da escala
+      const sit = fora ? 'fora' : zero ? 'zero' : dAus > 0 ? 'falta' : 'ok';
+      return { i, a, fora, dPer, dAus, hAus, pct: dPer ? dAus / dPer * 100 : 0, sit, cc: (a && a.cc) || '', esc: (a && a.esc) || '' };
     });
     const n = k => linhas.filter(l => l.sit === k).length;
     const nZero = n('zero'), nFalta = n('falta'), nFora = n('fora');
     if (nav) { nav.textContent = nZero + nFora; nav.hidden = !(nZero + nFora); }
     const per = pendEsp.ini ? `espelho de ${dataBr(pendEsp.ini)}${pendEsp.fim ? ' a ' + dataBr(pendEsp.fim) : ''}` : 'espelho de ponto';
-    $('#bh-es-sub').textContent = `Folha ${rotFolha(fo)} · ${per} · dias da escala até ontem · faltas = dias da escala sem batida` +
+    $('#bh-es-sub').textContent = `Folha ${rotFolha(fo)} · ${per} · dias no período = dias corridos no espelho · % = ausentes registrados ÷ dias no período` +
       (temBat ? '' : ' · ⚠ as colunas de dias aparecem depois que o script Pendencias (versão de 29/10) rodar');
     const cards = [['alerta', '🚨 Com alerta', nZero + nFalta + nFora, '#b45309', 'sem batida, com falta ou fora do espelho'],
       ['zero', '⛔ Nenhuma batida', nZero, '#dc2626', 'não bateu nenhum dia da escala'],
-      ['falta', '⚠ Com faltas', nFalta, '#f59e0b', 'algum dia da escala sem batida'],
+      ['falta', '⚠ Com faltas', nFalta, '#f59e0b', 'algum "Ausente" registrado'],
       ['fora', '❓ Fora do espelho', nFora, '#7c3aed', 'não aparece no espelho'],
       ['', 'Funcionários', linhas.length, '#334155', 'no filtro']];
     $('#bh-es-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${espSit === c[0] ? ' on' : ''}" data-s="${c[0]}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[4]}</span></button>`).join('');
     $('#bh-es-kpis').querySelectorAll('button').forEach(b => b.onclick = () => { espSit = b.dataset.s; renderEspelho(); });
     const ordem = { fora: 0, zero: 1, falta: 2, ok: 3 };
     const lista = linhas.filter(l => !espSit || (espSit === 'alerta' ? l.sit !== 'ok' : l.sit === espSit))
-      .sort((x, y) => ordem[x.sit] - ordem[y.sit] || (y.dSem || 0) - (x.dSem || 0) || String(x.i.n).localeCompare(String(y.i.n), 'pt-BR'));
+      .sort((x, y) => ordem[x.sit] - ordem[y.sit] || y.pct - x.pct || (y.dAus || 0) - (x.dAus || 0) || String(x.i.n).localeCompare(String(y.i.n), 'pt-BR'));
     const v = x => x == null ? '—' : nf(x);
+    const f1 = x => x.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
     body.innerHTML = lista.map(l => {
       const al = l.sit === 'fora' ? tag('Fora do espelho', '#7c3aed')
-        : l.sit === 'zero' ? tag(`⛔ Nenhuma batida · ${l.dSem} falta${l.dSem > 1 ? 's' : ''}`, '#dc2626')
-        : l.sit === 'falta' ? tag(`⚠ ${l.dSem} falta${l.dSem > 1 ? 's' : ''}`, '#f59e0b') : tag('OK', '#0f9d58');
+        : l.sit === 'zero' ? tag('⛔ Nenhuma batida', '#dc2626')
+        : l.sit === 'falta' ? tag(`⚠ ${l.dAus} falta${l.dAus > 1 ? 's' : ''}`, '#f59e0b') : tag('OK', '#0f9d58');
+      const c = l.pct >= 10 ? VERMELHO : l.pct >= 5 ? '#b45309' : '#0f9d58';
       return `<tr${l.sit === 'zero' || l.sit === 'fora' ? ' style="background:#fef2f2"' : ''}>
-        <td>${al}</td>
-        <td class="nm" title="${esc(l.i.n)} · ${esc(l.i.m)}">${esc(l.i.n)}<small>${esc(l.i.m)} · ${esc(l.i.st || '')}</small></td>
-        <td>${esc(l.i.sup || '—')}</td><td>${esc(l.esc || '—')}</td>
-        <td class="num">${v(l.dEsc)}</td><td class="num">${v(l.dBat)}</td>
-        <td class="num${l.dSem ? ' neg' : ''}" style="font-weight:700">${v(l.dSem)}</td>
-        <td>${l.ult ? dataBr(l.ult) : (l.sit === 'zero' ? 'nenhuma na folha' : '—')}</td></tr>`; }).join('') ||
-      `<tr><td colspan="8">${espSit ? 'Ninguém com esse alerta no filtro 🎉' : 'Nenhum funcionário nesse filtro'}</td></tr>`;
+        <td>${al}</td><td>${esc(l.i.m)}</td>
+        <td class="nm" title="${esc(l.i.n)}">${esc(l.i.n)}<small>${esc(l.i.sup || '')}</small></td>
+        <td>${esc(l.cc || '—')}</td><td>${esc(l.esc || '—')}</td>
+        <td class="num">${v(l.dPer)}</td><td class="num${l.dAus ? ' neg' : ''}">${v(l.dAus)}</td>
+        <td class="num" style="font-weight:700;color:${l.dPer ? c : '#94a3b8'}">${l.dPer ? f1(l.pct) + '%' : '—'}</td>
+        <td class="num">${l.hAus ? hMin(l.hAus).replace('+', '') : '—'}</td></tr>`; }).join('') ||
+      `<tr><td colspan="9">${espSit ? 'Ninguém com esse alerta no filtro 🎉' : 'Nenhum funcionário nesse filtro'}</td></tr>`;
   }
 
 
