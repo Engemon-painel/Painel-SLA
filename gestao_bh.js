@@ -439,6 +439,14 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         </div>
       </div>
       <div class="bh-c" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <h3 style="margin:0">Absenteísmo por colaborador</h3>
+          <label style="margin-left:auto;font-size:12px;color:#475569;display:flex;align-items:center;gap:6px"><input type="checkbox" id="bh-absc-so" checked> só quem tem falta</label>
+        </div>
+        <p class="sub" id="bh-absc-sub" style="margin:4px 0 6px"></p>
+        <div class="bh-tab" style="max-height:440px"><table><thead><tr><th>Matrícula</th><th>Nome</th><th>Centro de Custo</th><th>Turno</th><th class="num" title="Dias de trabalho pelo turno (escala) que já passaram na folha: trabalhados + ausentes">Dias no período</th><th class="num" title="Dias previstos pelo turno que já passaram e em que o colaborador trabalhou (tem batida)">Dias trabalhados</th><th class="num">Dias ausente registrados</th><th class="num" title="Dias ausente ÷ dias no período (dias que já passaram)">% Absenteísmo</th><th class="num" title="Soma das horas da jornada dos dias ausentes">Horas absenteísmo acumuladas</th></tr></thead><tbody id="bh-absc-body"></tbody></table></div>
+      </div>
+      <div class="bh-c" style="margin-bottom:12px">
         <h3>Faltas por supervisor</h3>
         <p class="sub" id="bh-ft-g-sub" style="margin:0 0 6px"></p>
         <div style="position:relative;height:260px"><canvas id="bh-g-ft"></canvas></div>
@@ -465,9 +473,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <div class="bh-pd-kpis" id="bh-es-kpis"></div>
       <div class="bh-g">
         <div class="bh-c s12">
-          <h3>Funcionários do Banco de Horas × Espelho de ponto</h3>
+          <h3>Batidas no Espelho de ponto × escala</h3>
           <p class="sub" id="bh-es-sub">Carregando…</p>
-          <div class="bh-tab" style="max-height:640px"><table><thead><tr><th>Nome</th><th>Supervisor</th><th>Tipo</th><th>Status</th><th class="num">Saldo</th><th>No espelho de ponto?</th></tr></thead><tbody id="bh-es-body"></tbody></table></div>
+          <div class="bh-tab" style="max-height:640px"><table><thead><tr><th>Alerta</th><th>Nome</th><th>Supervisor</th><th>Turno</th><th class="num" title="Dias de trabalho pela escala que já passaram na folha (até ontem); D.S.R., compensado, férias e afastamento não entram">Dias da escala</th><th class="num">Dias com batida</th><th class="num" title="Dias da escala que já passaram sem nenhuma batida (inclui os marcados Ausente)">Faltas (sem batida)</th><th>Última batida</th></tr></thead><tbody id="bh-es-body"></tbody></table></div>
         </div>
       </div>
     </div>
@@ -1391,8 +1399,10 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     $('#bh-esp-ver').onclick = () => { espAberto = !espAberto; alertaEspelho(); };
   }
 
-  // ALTERADO (28/10/2026): aba "No Espelho de Ponto" — cada funcionário do BH (respeita os filtros) com Sim / Não
-  let espSit = '';   // '' = todos · 'SIM' · 'NAO'
+  // ALTERADO (29/10/2026): aba "No Espelho de Ponto" — para cada funcionário do BH: dias da escala que já passaram,
+  // dias com batida e FALTAS (dias da escala sem batida). Alerta quem não bateu nenhum dia, quem tem falta e quem
+  // nem aparece no espelho. Dados: dados_pend_bh.json → absenteismo (dEscP, dBat, dSem) e espelho.mats
+  let espSit = 'alerta';   // 'alerta' (padrão) · 'zero' · 'falta' · 'fora' · '' = todos
   function renderEspelho() {
     const body = $('#bh-es-body');
     if (!body || !dados) return;
@@ -1400,33 +1410,54 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="espelho"] .bh-cont');
     if (!pendEsp || !pendEsp.mats.length) {
       $('#bh-es-kpis').innerHTML = '';
-      $('#bh-es-sub').textContent = 'A lista do espelho de ponto ainda não chegou: ela vem no dados_pend_bh.json, gerado pelo script de Pendências (versão de 28/10 em diante).';
-      body.innerHTML = `<tr><td colspan="6">Sem dados do espelho de ponto</td></tr>`;
+      $('#bh-es-sub').textContent = 'A lista do espelho de ponto ainda não chegou: ela vem no dados_pend_bh.json, gerado pelo script de Pendências (versão de 29/10 em diante).';
+      body.innerHTML = `<tr><td colspan="8">Sem dados do espelho de ponto</td></tr>`;
       if (nav) nav.hidden = true;
       return;
     }
     const noEsp = new Set(pendEsp.mats.map(mat6));
-    const esta = i => noEsp.has(mat6(i.m));
-    const nSim = itens.filter(esta).length, nNao = itens.length - nSim;
-    if (nav) { nav.textContent = nNao; nav.hidden = !nNao; }
+    const fo = folhaSel() || folhaIniDe(hojeIso());
+    const abs = {};
+    (pendAbs || []).filter(a => a.f === fo).forEach(a => { abs[mat6(a.m)] = a; });
+    const temBat = (pendAbs || []).some(a => a.dEscP != null);
+    const linhas = itens.map(i => {
+      const a = abs[mat6(i.m)], fora = !noEsp.has(mat6(i.m));
+      const dEsc = a && a.dEscP != null ? a.dEscP : null, dBat = a && a.dBat != null ? a.dBat : null, dSem = a && a.dSem != null ? a.dSem : null;
+      const zero = !fora && dEsc > 0 && dBat === 0;
+      const sit = fora ? 'fora' : zero ? 'zero' : dSem > 0 ? 'falta' : 'ok';
+      return { i, a, fora, dEsc, dBat, dSem, sit, ult: a && a.ultBat || '', esc: (a && a.esc) || '' };
+    });
+    const n = k => linhas.filter(l => l.sit === k).length;
+    const nZero = n('zero'), nFalta = n('falta'), nFora = n('fora');
+    if (nav) { nav.textContent = nZero + nFora; nav.hidden = !(nZero + nFora); }
     const per = pendEsp.ini ? `espelho de ${dataBr(pendEsp.ini)}${pendEsp.fim ? ' a ' + dataBr(pendEsp.fim) : ''}` : 'espelho de ponto';
-    $('#bh-es-sub').textContent = `${per} · comparado pela matrícula · respeita os filtros de cima (projeto, supervisor, status…)`;
-    const cards = [['', 'Funcionários', itens.length, '#334155', 'no filtro'], ['SIM', '✅ No espelho', nSim, '#0f9d58', pct(nSim, itens.length) + '% · Sim'],
-      ['NAO', '🚨 Fora do espelho', nNao, '#dc2626', pct(nNao, itens.length) + '% · Não']];
+    $('#bh-es-sub').textContent = `Folha ${rotFolha(fo)} · ${per} · dias da escala até ontem · faltas = dias da escala sem batida` +
+      (temBat ? '' : ' · ⚠ as colunas de dias aparecem depois que o script Pendencias (versão de 29/10) rodar');
+    const cards = [['alerta', '🚨 Com alerta', nZero + nFalta + nFora, '#b45309', 'sem batida, com falta ou fora do espelho'],
+      ['zero', '⛔ Nenhuma batida', nZero, '#dc2626', 'não bateu nenhum dia da escala'],
+      ['falta', '⚠ Com faltas', nFalta, '#f59e0b', 'algum dia da escala sem batida'],
+      ['fora', '❓ Fora do espelho', nFora, '#7c3aed', 'não aparece no espelho'],
+      ['', 'Funcionários', linhas.length, '#334155', 'no filtro']];
     $('#bh-es-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${espSit === c[0] ? ' on' : ''}" data-s="${c[0]}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[4]}</span></button>`).join('');
     $('#bh-es-kpis').querySelectorAll('button').forEach(b => b.onclick = () => { espSit = b.dataset.s; renderEspelho(); });
-    const lista = itens.filter(i => !espSit || (espSit === 'SIM') === esta(i))
-      .sort((a, b) => (esta(a) - esta(b)) || String(a.sup || '').localeCompare(String(b.sup || ''), 'pt-BR') || String(a.n).localeCompare(String(b.n), 'pt-BR'));
-    body.innerHTML = lista.map(i => { const neg = i.tp === 'NEGATIVO', ok = esta(i);
-      return `<tr${ok ? '' : ' style="background:#fef2f2"'}>
-        <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)}</small></td>
-        <td>${esc(i.sup || '—')}</td>
-        <td>${neg ? tag('▼ Negativo', VERMELHO) : tag('▲ Positivo', VERDE)}</td>
-        <td>${esc(i.st || '—')}</td>
-        <td class="num ${neg ? 'neg' : 'pos'}">${hMin(i.h)}</td>
-        <td>${ok ? tag('Sim', '#0f9d58') : tag('Não', '#dc2626')}</td></tr>`; }).join('') ||
-      `<tr><td colspan="6">Nenhum funcionário nesse filtro</td></tr>`;
+    const ordem = { fora: 0, zero: 1, falta: 2, ok: 3 };
+    const lista = linhas.filter(l => !espSit || (espSit === 'alerta' ? l.sit !== 'ok' : l.sit === espSit))
+      .sort((x, y) => ordem[x.sit] - ordem[y.sit] || (y.dSem || 0) - (x.dSem || 0) || String(x.i.n).localeCompare(String(y.i.n), 'pt-BR'));
+    const v = x => x == null ? '—' : nf(x);
+    body.innerHTML = lista.map(l => {
+      const al = l.sit === 'fora' ? tag('Fora do espelho', '#7c3aed')
+        : l.sit === 'zero' ? tag(`⛔ Nenhuma batida · ${l.dSem} falta${l.dSem > 1 ? 's' : ''}`, '#dc2626')
+        : l.sit === 'falta' ? tag(`⚠ ${l.dSem} falta${l.dSem > 1 ? 's' : ''}`, '#f59e0b') : tag('OK', '#0f9d58');
+      return `<tr${l.sit === 'zero' || l.sit === 'fora' ? ' style="background:#fef2f2"' : ''}>
+        <td>${al}</td>
+        <td class="nm" title="${esc(l.i.n)} · ${esc(l.i.m)}">${esc(l.i.n)}<small>${esc(l.i.m)} · ${esc(l.i.st || '')}</small></td>
+        <td>${esc(l.i.sup || '—')}</td><td>${esc(l.esc || '—')}</td>
+        <td class="num">${v(l.dEsc)}</td><td class="num">${v(l.dBat)}</td>
+        <td class="num${l.dSem ? ' neg' : ''}" style="font-weight:700">${v(l.dSem)}</td>
+        <td>${l.ult ? dataBr(l.ult) : (l.sit === 'zero' ? 'nenhuma na folha' : '—')}</td></tr>`; }).join('') ||
+      `<tr><td colspan="8">${espSit ? 'Ninguém com esse alerta no filtro 🎉' : 'Nenhum funcionário nesse filtro'}</td></tr>`;
   }
+
 
   let pendAbs = null;   // absenteísmo por colaborador e folha (dados_pend_bh.json → absenteismo)
   const TIPOS_PROPRIOS = ['ATRASO', 'FALTA'];   // têm aba própria: não entram em Pendências/Andamento
@@ -1731,9 +1762,39 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       }
     });
     gAbsFuncionario(base, f1);
+    tabelaAbsColab(base, f1);
   }
 
   // ALTERADO (22/10/2026): ranking dos funcionários que mais faltaram (dias de falta; desempate pelo %)
+  // ALTERADO (28/10/2026): quadro "Absenteísmo por colaborador" (Matrícula, Nome, C.C., Turno, dias, % e horas)
+  function tabelaAbsColab(base, f1) {
+    const body = $('#bh-absc-body');
+    if (!body) return;
+    const so = $('#bh-absc-so');
+    if (so && !so.dataset.ok) { so.dataset.ok = '1'; so.onchange = () => gAbsenteismo(); }
+    const p = {};
+    base.forEach(a => {   // junta as folhas quando o filtro é "todas"
+      const k = mat6(a.m);
+      const o = p[k] = p[k] || { m: a.m, n: a.n, cc: a.cc || '', esc: a.esc || '', d: 0, a: 0, ha: 0, t: 0 };
+      // ALTERADO (28/10/2026): dias no período = dias do turno que JÁ PASSARAM (não a folha inteira projetada)
+      o.d += a.dPass || 0; o.a += a.dAus || 0; o.ha += a.hAus || 0;
+      o.t += Math.max(0, (a.dPass || 0) - (a.dAus || 0));   // dias que já passaram − faltas = trabalhados
+      if (!o.cc && a.cc) o.cc = a.cc; if (!o.esc && a.esc) o.esc = a.esc;
+    });
+    const tx = o => o.d ? o.a / o.d * 100 : 0;
+    const todos = Object.values(p);
+    const lista = todos.filter(o => !(so && so.checked) || o.a > 0)
+      .sort((x, y) => tx(y) - tx(x) || y.a - x.a || String(x.n).localeCompare(String(y.n), 'pt-BR'));
+    const semCC = !todos.some(o => o.cc || o.esc);
+    $('#bh-absc-sub').textContent = `${nf(lista.length)} de ${nf(todos.length)} colaboradores · dias no período = dias do turno que já passaram · % = ausentes ÷ dias no período · ordenado pelo %` +
+      (semCC ? ' · centro de custo e turno aparecem depois que o script Pendencias (versão de 28/10) rodar' : '');
+    body.innerHTML = lista.map(o => { const t = tx(o), c = t >= 10 ? VERMELHO : t >= 5 ? '#b45309' : '#0f9d58';
+      return `<tr><td>${esc(matPadraoP(o.m))}</td><td class="nm">${esc(o.n)}</td><td>${esc(o.cc || '—')}</td><td>${esc(o.esc || '—')}</td>
+        <td class="num">${nf(o.d)}</td><td class="num">${nf(o.t)}</td><td class="num${o.a ? ' neg' : ''}">${nf(o.a)}</td>
+        <td class="num" style="font-weight:700;color:${c}">${f1(t)}%</td><td class="num">${o.ha ? hMin(o.ha).replace('+', '') : '—'}</td></tr>`; }).join('') ||
+      `<tr><td colspan="9">Nenhum colaborador nesse filtro</td></tr>`;
+  }
+  const matPadraoP = m => String(m || '');   // o script novo já manda no formato "02 - 006841"
   function gAbsFuncionario(base, f1) {
     if (!$('#bh-g-absf')) return;
     const p = {};
