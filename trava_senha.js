@@ -11,7 +11,8 @@
   // ---- páginas travadas: palavra que aparece no id da página : título da trava ----
   // (ex.: 'turnover' encontra o elemento id="pagina-turnover" e o card id="nav-turnover")
   const PAGINAS_COM_SENHA = {
-    turnover: 'Turnover'
+    turnover: 'Turnover',
+    kpis: 'KPIs de Pessoas'
     // vagas: 'Gestão de Vagas',
   };
 
