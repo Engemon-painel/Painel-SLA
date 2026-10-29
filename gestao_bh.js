@@ -444,7 +444,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
           <label style="margin-left:auto;font-size:12px;color:#475569;display:flex;align-items:center;gap:6px"><input type="checkbox" id="bh-absc-so" checked> só quem tem falta</label>
         </div>
         <p class="sub" id="bh-absc-sub" style="margin:4px 0 6px"></p>
-        <div class="bh-tab" style="max-height:440px"><table><thead><tr><th>Matrícula</th><th>Nome</th><th>Centro de Custo</th><th>Turno</th><th class="num" title="Dias de trabalho pelo turno (escala) que já passaram na folha: trabalhados + ausentes">Dias no período</th><th class="num" title="Dias previstos pelo turno que já passaram e em que o colaborador trabalhou (tem batida)">Dias trabalhados</th><th class="num">Dias ausente registrados</th><th class="num" title="Dias ausente ÷ dias no período (dias que já passaram)">% Absenteísmo</th><th class="num" title="Soma das horas da jornada dos dias ausentes">Horas absenteísmo acumuladas</th></tr></thead><tbody id="bh-absc-body"></tbody></table></div>
+        <div class="bh-tab" style="max-height:440px"><table><thead><tr><th>Matrícula</th><th>Nome</th><th>Centro de Custo</th><th>Turno</th><th class="num" title="Dias corridos do período no espelho de ponto (do início da folha até o último dia com batida)">Dias no período</th><th class="num" title="Dias com &quot;Ausente&quot; registrado no espelho">Dias ausente registrados</th><th class="num" title="Dias ausente ÷ dias no período">% Absenteísmo</th><th class="num" title="Soma das horas da jornada dos dias ausentes">Horas absenteísmo acumuladas</th></tr></thead><tbody id="bh-absc-body"></tbody></table></div>
       </div>
       <div class="bh-c" style="margin-bottom:12px">
         <h3>Faltas por supervisor</h3>
@@ -1775,10 +1775,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const p = {};
     base.forEach(a => {   // junta as folhas quando o filtro é "todas"
       const k = mat6(a.m);
-      const o = p[k] = p[k] || { m: a.m, n: a.n, cc: a.cc || '', esc: a.esc || '', d: 0, a: 0, ha: 0, t: 0 };
-      // ALTERADO (28/10/2026): dias no período = dias do turno que JÁ PASSARAM (não a folha inteira projetada)
-      o.d += a.dPass || 0; o.a += a.dAus || 0; o.ha += a.hAus || 0;
-      o.t += Math.max(0, (a.dPass || 0) - (a.dAus || 0));   // dias que já passaram − faltas = trabalhados
+      const o = p[k] = p[k] || { m: a.m, n: a.n, cc: a.cc || '', esc: a.esc || '', d: 0, a: 0, ha: 0 };
+      // ALTERADO (29/10/2026): como o relatório do RH — dias corridos do período e "Ausente" registrados
+      //   (dCal/dAusReg/hAusReg do script novo; sem eles, usa os dias da escala que já passaram)
+      const cal = a.dCal != null;
+      o.d += cal ? a.dCal : (a.dPass || 0); o.a += cal ? (a.dAusReg || 0) : (a.dAus || 0); o.ha += cal ? (a.hAusReg || 0) : (a.hAus || 0);
       if (!o.cc && a.cc) o.cc = a.cc; if (!o.esc && a.esc) o.esc = a.esc;
     });
     const tx = o => o.d ? o.a / o.d * 100 : 0;
@@ -1786,13 +1787,13 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const lista = todos.filter(o => !(so && so.checked) || o.a > 0)
       .sort((x, y) => tx(y) - tx(x) || y.a - x.a || String(x.n).localeCompare(String(y.n), 'pt-BR'));
     const semCC = !todos.some(o => o.cc || o.esc);
-    $('#bh-absc-sub').textContent = `${nf(lista.length)} de ${nf(todos.length)} colaboradores · dias no período = dias do turno que já passaram · % = ausentes ÷ dias no período · ordenado pelo %` +
+    $('#bh-absc-sub').textContent = `${nf(lista.length)} de ${nf(todos.length)} colaboradores · dias no período = dias corridos no espelho · % = ausentes registrados ÷ dias no período · ordenado pelo %` +
       (semCC ? ' · centro de custo e turno aparecem depois que o script Pendencias (versão de 28/10) rodar' : '');
     body.innerHTML = lista.map(o => { const t = tx(o), c = t >= 10 ? VERMELHO : t >= 5 ? '#b45309' : '#0f9d58';
       return `<tr><td>${esc(matPadraoP(o.m))}</td><td class="nm">${esc(o.n)}</td><td>${esc(o.cc || '—')}</td><td>${esc(o.esc || '—')}</td>
-        <td class="num">${nf(o.d)}</td><td class="num">${nf(o.t)}</td><td class="num${o.a ? ' neg' : ''}">${nf(o.a)}</td>
+        <td class="num">${nf(o.d)}</td><td class="num${o.a ? ' neg' : ''}">${nf(o.a)}</td>
         <td class="num" style="font-weight:700;color:${c}">${f1(t)}%</td><td class="num">${o.ha ? hMin(o.ha).replace('+', '') : '—'}</td></tr>`; }).join('') ||
-      `<tr><td colspan="9">Nenhum colaborador nesse filtro</td></tr>`;
+      `<tr><td colspan="8">Nenhum colaborador nesse filtro</td></tr>`;
   }
   const matPadraoP = m => String(m || '');   // o script novo já manda no formato "02 - 006841"
   function gAbsFuncionario(base, f1) {
