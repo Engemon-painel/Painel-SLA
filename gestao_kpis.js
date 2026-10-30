@@ -334,15 +334,18 @@
       ? `Voluntário = pedido de demissão · Involuntário = desligamento pela empresa e abandono · no período: <b>${tV} voluntários (${Math.round(tV / (tV + tI) * 100)}%)</b> e <b>${tI} involuntários (${Math.round(tI / (tV + tI) * 100)}%)</b>` +
         (comTipo.length ? ` · base do Turnover a partir de ${rotMes(comTipo[0].ym)}` : '')
       : 'Sem desligamentos classificados na base do Turnover para este filtro';
+    // só os meses que têm desligamentos classificados na base do Turnover
+    const ini = serie.findIndex(x => x.vol + x.inv > 0);
+    const sv = ini >= 0 ? serie.slice(ini) : [];
     novoChart('kxVolChart', {
       data: {
-        labels: serie.map(s => rotMes(s.ym)),
+        labels: sv.map(s => rotMes(s.ym)),
         datasets: [
-          { type:'bar', label:'Voluntário', data: serie.map(s => s.vol), backgroundColor:'rgba(217,119,6,.75)', borderRadius:4, stack:'d', yAxisID:'y' },
-          { type:'bar', label:'Involuntário', data: serie.map(s => s.inv), backgroundColor:'rgba(220,38,38,.75)', borderRadius:4, stack:'d', yAxisID:'y' },
-          { type:'bar', label:'Sem classificação', data: serie.map(s => s.semTipo), backgroundColor:'rgba(154,165,184,.45)', borderRadius:4, stack:'d', yAxisID:'y' },
-          { type:'line', label:'Turnover voluntário %', data: serie.map(s => +s.tVol.toFixed(2)), borderColor:'#b45309', backgroundColor:'#b45309', tension:.35, pointRadius:3, borderWidth:2, yAxisID:'y1' },
-          { type:'line', label:'Turnover involuntário %', data: serie.map(s => +s.tInv.toFixed(2)), borderColor:'#991b1b', backgroundColor:'#991b1b', tension:.35, pointRadius:3, borderWidth:2, borderDash:[4,3], yAxisID:'y1' }
+          { type:'bar', label:'Voluntário', data: sv.map(s => s.vol), backgroundColor:'rgba(217,119,6,.75)', borderRadius:4, stack:'d', yAxisID:'y' },
+          { type:'bar', label:'Involuntário', data: sv.map(s => s.inv), backgroundColor:'rgba(220,38,38,.75)', borderRadius:4, stack:'d', yAxisID:'y' },
+          { type:'bar', label:'Sem classificação', data: sv.map(s => s.semTipo), backgroundColor:'rgba(154,165,184,.45)', borderRadius:4, stack:'d', yAxisID:'y' },
+          { type:'line', label:'Turnover voluntário %', data: sv.map(s => +s.tVol.toFixed(2)), borderColor:'#b45309', backgroundColor:'#b45309', tension:.35, pointRadius:3, borderWidth:2, yAxisID:'y1' },
+          { type:'line', label:'Turnover involuntário %', data: sv.map(s => +s.tInv.toFixed(2)), borderColor:'#991b1b', backgroundColor:'#991b1b', tension:.35, pointRadius:3, borderWidth:2, borderDash:[4,3], yAxisID:'y1' }
         ]
       },
       options: {
