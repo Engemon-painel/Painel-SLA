@@ -1317,9 +1317,16 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   const locais = () => { try { return JSON.parse(localStorage.getItem(CH_LOCAL) || '{}'); } catch (e) { return {}; } };
   const salvarLocais = o => { try { localStorage.setItem(CH_LOCAL, JSON.stringify(o)); } catch (e) { } };
   function justDe(it) {
-    const l = locais()[it.id];
-    if (l && (!pendGerado || new Date(pendGerado) < new Date(l.em))) return Object.assign({}, l.j, { enviado: !l.rh });   // l.rh = resposta do RH (não é envio do gestor)
-    return it.just || {};
+    const l = locais()[it.id], base = it.just || {};
+    if (l && (!pendGerado || new Date(pendGerado) < new Date(l.em))) {
+      const j = Object.assign({}, l.j, { enviado: !l.rh });   // l.rh = resposta do RH (não é envio do gestor)
+      // ALTERADO (30/10/2026): se a base já trouxe a resposta do RH (feita no Excel ou em outro computador)
+      // depois do envio do gestor, ela vale — a cópia local do gestor não apaga o Status_RH
+      if (!l.rh && String(base.stRH || '').trim() && String(base.dataRH || '') >= String(l.em || '').slice(0, 10) &&
+          String(base.dataResp || '') >= String(j.dataResp || '')) return base;
+      return j;
+    }
+    return base;
   }
   const sitDe = it => { const j = justDe(it); const s = j.status; return COR_SIT[s] ? s : calcularStatus(j, it.hePerm, it.tipo)[1]; };
   // ALTERADO (27/10/2026): justificada e já saiu da base na atualização (dentro do período que a base cobre) = tratada
@@ -1716,8 +1723,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       `<option value="">Pendência: todas (${nf(base.length)})</option>${tiposRH.map(t => `<option value="${esc(t)}"${t === rhTipo ? ' selected' : ''}>${esc(t)} (${nf(contTipo[t])})</option>`).join('')}</select>` +
       `<button type="button" class="bh-pd-btn on" id="bh-rh-lote"${rhSel.size ? '' : ' disabled'}>Responder selecionadas (${rhSel.size})</button>` +
       (rhSel.size ? '<button type="button" class="bh-pd-btn" id="bh-rh-limpa">Limpar seleção</button>' : '') + '</span>';
-    $('#bh-rh-head').innerHTML = '<tr><th style="width:28px"><input type="checkbox" id="bh-rh-todos" title="Marcar todas as aguardando RH da lista"></th><th>Colaborador</th><th>Pendência</th><th>Data</th><th>Supervisor</th><th>Tratativa do gestor</th><th>Respondido em</th>' +
-      '<th>Pagamento HE permitido</th><th>Status RH</th><th>Observação RH</th><th>Data ajuste RH</th></tr>';
+    $('#bh-rh-head').innerHTML = '<tr><th style="width:28px"><input type="checkbox" id="bh-rh-todos" title="Marcar todas as aguardando RH da lista"></th><th>Colaborador</th><th>Pendência</th><th>Data</th><th>Supervisor</th><th>Tratativa do gestor</th><th>Gestor respondeu em</th>' +
+      '<th>Pagamento HE permitido</th><th>Status RH</th><th>Observação RH</th><th>RH respondeu em</th></tr>';
     const corRH = j => ({ aguardando: '#f59e0b', AJUSTADO: COR_SIT['Justificado'], devolvido: VERMELHO, outros: '#64748b' })[grupoRH(j)];
     const MAX = 600;
     $('#bh-rh-body').innerHTML = lista.slice(0, MAX).map(i => {
@@ -1731,7 +1738,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <td class="bh-pd-just"><b>${esc(j.trat)}</b><small>${esc(j.texto || '')}</small></td>
         <td>${j.dataResp ? esc(dataBr(j.dataResp)) : '—'}</td>
         <td>${i.tipo !== 'HORA EXTRA' ? '<span style="color:#cbd5e1">—</span>' : tag(perm || '—', perm === 'NÃO' || perm === 'NAO' ? VERMELHO : perm ? COR_SIT['Justificado'] : '#94a3b8')}</td>
-        <td style="white-space:nowrap">${tag(j.stRH || 'Aguardando RH', corRH(j))}<br><button type="button" class="bh-pd-btn bh-rh-resp" data-id="${esc(i.id)}" style="margin-top:4px;padding:3px 10px">${j.stRH ? '✎ Alterar' : '✎ Responder'}</button></td>
+        <td style="white-space:nowrap">${tag(j.stRH || 'Aguardando RH', corRH(j))}${j.stRH && j.dataRH ? `<small style="display:block;color:#64748b;margin-top:2px">respondido em ${esc(dataBr(j.dataRH))}</small>` : '<br>'}<button type="button" class="bh-pd-btn bh-rh-resp" data-id="${esc(i.id)}" style="margin-top:4px;padding:3px 10px">${j.stRH ? '✎ Alterar' : '✎ Responder'}</button></td>
         <td style="white-space:normal;max-width:260px">${esc(j.obsRH || '') || '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${j.dataRH ? esc(dataBr(j.dataRH)) : '—'}</td></tr>`;
     }).join('') || '<tr><td colspan="11">Nenhuma resposta nesse filtro</td></tr>';
@@ -2437,6 +2444,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     atualizar();
     if (!dados.itens.length) diagnostico(el, ARQUIVO, dadosBrutos);
     carregarPend();
+    setInterval(() => { if (!document.querySelector('#' + CONTAINER + ' .bh-modal')) carregarPend(); }, 5 * 60 * 1000);   // pega a base nova sem recarregar a página
     if (dados.geradoEm) $('#bh-rod').textContent = 'Atualizado em ' + new Date(dados.geradoEm).toLocaleString('pt-BR');
   }
 
