@@ -1723,8 +1723,17 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       `<option value="">Pendência: todas (${nf(base.length)})</option>${tiposRH.map(t => `<option value="${esc(t)}"${t === rhTipo ? ' selected' : ''}>${esc(t)} (${nf(contTipo[t])})</option>`).join('')}</select>` +
       `<button type="button" class="bh-pd-btn on" id="bh-rh-lote"${rhSel.size ? '' : ' disabled'}>Responder selecionadas (${rhSel.size})</button>` +
       (rhSel.size ? '<button type="button" class="bh-pd-btn" id="bh-rh-limpa">Limpar seleção</button>' : '') + '</span>';
-    $('#bh-rh-head').innerHTML = '<tr><th style="width:28px"><input type="checkbox" id="bh-rh-todos" title="Marcar todas as aguardando RH da lista"></th><th>Colaborador</th><th>Pendência</th><th>Data</th><th>Supervisor</th><th>Tratativa do gestor</th><th>Gestor respondeu em</th>' +
+    $('#bh-rh-head').innerHTML = '<tr><th style="width:28px"><input type="checkbox" id="bh-rh-todos" title="Marcar todas as aguardando RH da lista"></th><th>Colaborador</th><th>Pendência</th><th>Data</th><th>Supervisor</th><th>Detalhe / o que verificar</th><th class="num">Quantidade</th><th>Tratativa do gestor</th><th>Gestor respondeu em</th>' +
       '<th>Pagamento HE permitido</th><th>Status RH</th><th>Observação RH</th><th>RH respondeu em</th></tr>';
+    // ALTERADO (30/10/2026): quantidade da pendência, igual às abas Atrasos e Faltas
+    const qtdRH = i => {
+      const h = +i.horas || 0;
+      if (!h && i.tipo !== 'HORA EXTRA') return '<span style="color:#cbd5e1">—</span>';
+      if (i.tipo === 'ATRASO') return `<b class="neg">${hMin(-h)}</b><small style="display:block;color:#64748b;font-weight:500">início ${esc(minDet(i.det, 'Início do turno'))} · entrada ${esc(minDet(i.det, 'Entrada'))}</small>`;
+      if (i.tipo === 'FALTA') return `<b class="neg">${hMin(-h)}</b><small style="display:block;color:#64748b;font-weight:500">horas ausentes</small>`;
+      if (i.tipo === 'HORA EXTRA') { const he = minDet(i.det, 'HE'); return he === '—' ? '<span style="color:#cbd5e1">—</span>' : `<b class="pos">+${esc(he.replace(':', 'h'))}</b><small style="display:block;color:#64748b;font-weight:500">hora extra</small>`; }
+      return `<b>${tempoPend(i.horas)}</b>`;
+    };
     const corRH = j => ({ aguardando: '#f59e0b', AJUSTADO: COR_SIT['Justificado'], devolvido: VERMELHO, outros: '#64748b' })[grupoRH(j)];
     const MAX = 600;
     $('#bh-rh-body').innerHTML = lista.slice(0, MAX).map(i => {
@@ -1735,13 +1744,15 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <td><b>${esc(i.tipo)}</b></td>
         <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
         <td>${esc(i.sup || '—')}</td>
+        <td class="bh-pd-det" style="white-space:normal;max-width:260px;font-size:12px" title="${esc(i.det)}">${esc(i.det || '—')}</td>
+        <td class="num">${qtdRH(i)}</td>
         <td class="bh-pd-just"><b>${esc(j.trat)}</b><small>${esc(j.texto || '')}</small></td>
         <td>${j.dataResp ? esc(dataBr(j.dataResp)) : '—'}</td>
         <td>${i.tipo !== 'HORA EXTRA' ? '<span style="color:#cbd5e1">—</span>' : tag(perm || '—', perm === 'NÃO' || perm === 'NAO' ? VERMELHO : perm ? COR_SIT['Justificado'] : '#94a3b8')}</td>
         <td style="white-space:nowrap">${tag(j.stRH || 'Aguardando RH', corRH(j))}${j.stRH && j.dataRH ? `<small style="display:block;color:#64748b;margin-top:2px">respondido em ${esc(dataBr(j.dataRH))}</small>` : '<br>'}<button type="button" class="bh-pd-btn bh-rh-resp" data-id="${esc(i.id)}" style="margin-top:4px;padding:3px 10px">${j.stRH ? '✎ Alterar' : '✎ Responder'}</button></td>
         <td style="white-space:normal;max-width:260px">${esc(j.obsRH || '') || '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${j.dataRH ? esc(dataBr(j.dataRH)) : '—'}</td></tr>`;
-    }).join('') || '<tr><td colspan="11">Nenhuma resposta nesse filtro</td></tr>';
+    }).join('') || '<tr><td colspan="13">Nenhuma resposta nesse filtro</td></tr>';
     const porId = {}; lista.forEach(i => porId[i.id] = i);
     $('#bh-rh-body').querySelectorAll('.bh-rh-resp').forEach(bt => bt.onclick = () => abrirRespostaRH([porId[bt.dataset.id]]));
     $('#bh-rh-body').querySelectorAll('.bh-rh-ck').forEach(ck => ck.onchange = () => { if (ck.checked) rhSel.add(ck.dataset.id); else rhSel.delete(ck.dataset.id); renderRH(); });
@@ -1752,7 +1763,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     $('#bh-rh-tipo').onchange = e => { rhTipo = e.target.value; rhSel.clear(); renderRH(); };
     const btL = $('#bh-rh-lote'); if (btL) btL.onclick = () => abrirRespostaRH(lista.filter(i => rhSel.has(i.id)));
     const btC = $('#bh-rh-limpa'); if (btC) btC.onclick = () => { rhSel.clear(); renderRH(); };
-    if (lista.length > MAX) $('#bh-rh-body').insertAdjacentHTML('beforeend', `<tr><td colspan="11" style="color:#64748b">Mostrando ${MAX} de ${nf(lista.length)} · use os filtros</td></tr>`);
+    if (lista.length > MAX) $('#bh-rh-body').insertAdjacentHTML('beforeend', `<tr><td colspan="13" style="color:#64748b">Mostrando ${MAX} de ${nf(lista.length)} · use os filtros</td></tr>`);
   }
 
   // ALTERADO (30/10/2026): o RH responde pelo painel → grava Status_RH, Observacao_RH e Data_Ajuste_RH
