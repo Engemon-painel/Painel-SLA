@@ -1742,6 +1742,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
   // ALTERADO (30/10/2026): o RH responde pelo painel → grava Status_RH, Observacao_RH e Data_Ajuste_RH
   //   na JUSTIFICATIVAS_PAINEL (mesmo fluxo das justificativas, com acao: "RH")
+  // horário vindo do Excel como fração do dia (0.2916… = 07:00)
+  const horaTxt = v => { const n = Number(v); if (String(v).trim() !== '' && isFinite(n) && n >= 0 && n < 1) { const m = Math.round(n * 1440); return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60); } return String(v); };
   function abrirRespostaRH(itens) {
     itens = itens.filter(Boolean);
     if (!itens.length) return;
@@ -1751,22 +1753,26 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     modal.className = 'bh-modal';
     modal.innerHTML = `<div class="bh-modal-box" role="dialog" aria-modal="true">
       <div class="bh-modal-topo"><h3>Resposta do RH${itens.length > 1 ? ' · ' + itens.length + ' pendências' : ''}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
-      <div class="bh-modal-lista">${itens.slice(0, 8).map(i => { const j = justDe(i); return `<div><b>${esc(i.n)}</b> · ${esc(i.tipo)} · ${dataBr(i.d)} · <span>${esc(j.trat || '')}${j.texto ? ' — ' + esc(j.texto) : ''}</span></div>`; }).join('')}${itens.length > 8 ? `<div>… e mais ${itens.length - 8}</div>` : ''}</div>
+      <div class="bh-modal-lista" style="max-height:260px">${itens.slice(0, 8).map(i => { const j = justDe(i); return `<div style="padding:6px 0;border-bottom:1px solid #e2e8f0">
+          <b>${esc(i.n)}</b> · ${esc(i.tipo)} · ${dataBr(i.d)}${i.dia ? ' (' + esc(i.dia) + ')' : ''}<br>
+          <span><b style="color:#334155">Turno:</b> ${esc(i.turno || '—')}</span><br>
+          <span><b style="color:#334155">Detalhe / o que verificar:</b> ${esc(i.det || '—')}</span><br>
+          <span><b style="color:#334155">Tratativa do gestor:</b> ${esc(j.trat || '—')}${j.texto ? ' — ' + esc(j.texto) : ''}${j.horario ? ' · horário informado: ' + esc(horaTxt(j.horario)) : ''}</span></div>`; }).join('')}${itens.length > 8 ? `<div style="padding-top:6px">… e mais ${itens.length - 8}</div>` : ''}</div>
       <div class="bh-form">
         <label>Status RH<select data-c="st">
           <option value="">— escolha —</option>
           <option value="AJUSTADO"${stAt === 'AJUSTADO' ? ' selected' : ''}>AJUSTADO</option>
           <option value="DEVOLVIDO"${stAt === 'DEVOLVIDO' ? ' selected' : ''}>DEVOLVIDO AO GESTOR</option>
         </select></label>
-        <label style="justify-content:flex-end;font-weight:400;color:#64748b">A data do ajuste é gravada sozinha (hoje).</label>
+        <label style="justify-content:flex-end;font-weight:400;color:#64748b;font-size:12px">A data do ajuste é gravada sozinha (hoje).</label>
         <label class="largo">Observação do RH<textarea data-c="obs" rows="3" placeholder="Obrigatória quando devolver: diga o que o gestor precisa corrigir">${esc(atual.obsRH || '')}</textarea></label>
       </div>
       <div class="bh-prev" id="bh-rh-prev"></div>
-      <div class="bh-modal-pe">
+      <div class="bh-modal-pe" style="justify-content:flex-end">
         <button type="button" class="bh-pd-btn" data-a="cancelar">Cancelar</button>
         <button type="button" class="bh-pd-btn on" data-a="enviar">Gravar resposta${itens.length > 1 ? ' (' + itens.length + ')' : ''}</button>
       </div></div>`;
-    document.body.appendChild(modal);
+    document.getElementById(CONTAINER).appendChild(modal);   // dentro do painel para pegar o mesmo estilo da janela do gestor
     const fechar = () => modal.remove();
     modal.querySelector('.bh-x').onclick = fechar;
     modal.querySelector('[data-a="cancelar"]').onclick = fechar;
