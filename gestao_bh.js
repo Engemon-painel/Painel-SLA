@@ -839,11 +839,21 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       (ehNeg(a) - ehNeg(b)) ||
       (ehNeg(a) ? a.h - b.h : (FX_POS.indexOf(b.fx) - FX_POS.indexOf(a.fx)) || b.h - a.h));
     const somaH = lista.reduce((s, i) => s + i.h, 0);
-    $('#bh-fx-sub').textContent = `${nf(lista.length)} funcionários · saldo ${hTot(somaH)} · positivo: faixa = idade das horas mais antigas · negativo: faixa = tamanho do débito`;
+    $('#bh-fx-sub').textContent = `${nf(lista.length)} funcionários · saldo ${hTot(somaH)} · positivo: faixa = idade das horas mais antigas` +
+      (idadeReal ? ' (idade real: dias desde o fechamento da folha em que as horas entraram, débitos saem das mais antigas)' : '') +
+      ' · negativo: faixa = tamanho do débito · passe o mouse na "Próxima mudança" para ver todas as datas';
 
     const mostrarIdade = tipoSel !== 'NEGATIVO';
+    const dCurta = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+    const proxCel = (i, neg) => {
+      if (neg || !i.prox || !i.prox.length) return '<td style="color:#cbd5e1">—</td>';
+      const p = i.prox[0], dias = Math.ceil((p.dt - new Date().setHours(0, 0, 0, 0)) / 86400000);
+      const todas = i.prox.map(x => `${dCurta(x.dt)}: ${hMin(x.h).replace('+', '')} de ${ROT_POS[x.de]} → ${ROT_POS[x.para]} (horas da folha que fechou em ${dCurta(x.lote)})`).join('\n');
+      return `<td style="white-space:nowrap" title="${esc(todas)}"><b>${dCurta(p.dt)}</b> <small style="color:#64748b">(${dias <= 0 ? 'hoje' : 'em ' + dias + ' d'})</small><br>` +
+        `<small>${hMin(p.h).replace('+', '')} → <span style="color:${COR_FX_POS[p.para]};font-weight:700">${esc(ROT_POS[p.para])}</span>${i.prox.length > 1 ? ` · +${i.prox.length - 1}` : ''}</small></td>`;
+    };
     $('#bh-fx-head').innerHTML = `<tr><th>Nome</th><th>Supervisor</th><th>Tipo</th><th class="num">Saldo</th><th>Faixa</th>` +
-      (mostrarIdade ? ROT_POS.map(r => `<th class="num" title="Horas no banco com essa idade (só saldo positivo)">${esc(r)}</th>`).join('') : '') + '</tr>';
+      (mostrarIdade ? '<th title="Próxima data em que horas deste funcionário passam para a faixa seguinte">Próxima mudança de faixa</th>' + ROT_POS.map(r => `<th class="num" title="Horas no banco com essa idade (só saldo positivo)">${esc(r)}</th>`).join('') : '') + '</tr>';
 
     $('#bh-fx-body').innerHTML = lista.map(i => {
       const neg = ehNeg(i);
@@ -856,8 +866,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <td>${esc(i.sup || '—')}</td>
         <td>${neg ? tag('▼ Negativo', VERMELHO) : tag('▲ Positivo', VERDE)}</td>
         <td class="num ${neg ? 'neg' : 'pos'}">${hMin(i.h)}</td>
-        <td><span class="bh-dot" style="background:${corFx(i)}"></span>${esc(rotFx(i))}</td>${idade}</tr>`;
-    }).join('') || `<tr><td colspan="${mostrarIdade ? FX_POS.length + 5 : 5}">Nenhum funcionário nesse filtro</td></tr>`;
+        <td><span class="bh-dot" style="background:${corFx(i)}"></span>${esc(rotFx(i))}</td>${mostrarIdade ? proxCel(i, neg) : ''}${idade}</tr>`;
+    }).join('') || `<tr><td colspan="${mostrarIdade ? FX_POS.length + 6 : 5}">Nenhum funcionário nesse filtro</td></tr>`;
   }
 
   // =====================================================================
@@ -2207,6 +2217,49 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     if (pend) { renderPend(); renderAndamento(); }
   }
 
+  // ALTERADO (30/10/2026): idade REAL das horas (antes era uma proporção fixa vinda da consulta do Excel).
+  // Usa o histórico mensal do banco (dados.json → bancoHoras): cada folha que fechou com crédito vira um
+  // "lote" de horas com a data do fechamento; os débitos consomem os lotes mais antigos primeiro (FIFO).
+  // Idade do lote = dias desde o fechamento da folha. Os valores do histórico estão em hh.mm (44.39 = 44h39).
+  const LIM_FX = [0, 31, 61, 91, 121, 151, 181];   // primeiro dia de cada faixa (índices = FX_POS)
+  const idxFx = dias => { let k = 0; LIM_FX.forEach((l, j) => { if (dias >= l) k = j; }); return k; };
+  const hhmmMin = v => { const n = Number(v) || 0, a = Math.abs(n), h = Math.trunc(a); return Math.sign(n) * (h * 60 + Math.round((a - h) * 100)); };
+  const dataFimPer = p => { const m = String(p || '').split(' a ')[1]; const x = m && m.match(/(\d{2})\/(\d{2})\/(\d{4})/); return x ? new Date(+x[3], +x[2] - 1, +x[1]) : null; };
+  const digMat = m => String(m || '').replace(/\D/g, '').replace(/^0+/, '').slice(-6);
+  function aplicarIdadeReal(itens, hist) {
+    if (!Array.isArray(hist) || !hist.length) return 0;
+    const porMat = {};
+    hist.forEach(b => { const k = digMat(b.matricula), d = dataFimPer(b.periodo); if (k && d) (porMat[k] = porMat[k] || []).push({ d, b }); });
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    let n = 0;
+    itens.forEach(i => {
+      const linhas = porMat[digMat(i.m)];
+      if (!linhas || !(i.h > 0)) { i.prox = null; return; }
+      linhas.sort((a, b) => a.d - b.d);
+      const lotes = [];
+      linhas.forEach(({ d, b }) => {
+        const cr = hhmmMin(b.creditoNum), de = hhmmMin(b.debitoNum), va = hhmmMin(b.variacaoNum);
+        const aj = va - (cr - de);                       // ajuste lançado fora de crédito/débito
+        const entra = cr + Math.max(aj, 0); let sai = de + Math.max(-aj, 0);
+        if (entra > 0) lotes.push({ d, m: entra });
+        while (sai > 0 && lotes.length) { const t = Math.min(sai, lotes[0].m); lotes[0].m -= t; sai -= t; if (!lotes[0].m) lotes.shift(); }
+      });
+      const tot = lotes.reduce((s, l) => s + l.m, 0);
+      if (!tot) { i.prox = null; return; }
+      const bh = FX_POS.map(() => 0), mudancas = [];
+      let maisVelho = 0;
+      lotes.forEach(l => {
+        const dias = Math.floor((hoje - l.d) / 86400000), k = idxFx(dias), hrs = i.h * l.m / tot;   // proporcional ao saldo atual
+        bh[k] += hrs; maisVelho = Math.max(maisVelho, k);
+        if (k < 6) { const dt = new Date(l.d); dt.setDate(dt.getDate() + LIM_FX[k + 1]); mudancas.push({ dt, h: hrs, de: k, para: k + 1, lote: l.d }); }
+      });
+      i.bh = bh; i.fx = FX_POS[maisVelho];
+      i.prox = mudancas.sort((a, b) => a.dt - b.dt);
+      n++;
+    });
+    return n;
+  }
+
   // Lê o JSON mesmo quando o Power Automate grava embrulhado: {"result":"{...}"}, {"body":...} ou texto
   async function lerJson(url) {
     const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now(), { cache: 'no-store' });
@@ -2236,6 +2289,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       Mande um print desta mensagem para ajustar.</div>`);
   }
 
+  let idadeReal = 0;   // quantos funcionários tiveram a idade das horas calculada pelo histórico
   async function iniciar() {
     let el = document.getElementById(CONTAINER);
     if (!el) {
@@ -2266,6 +2320,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       return;
     }
     dados.itens.forEach(i => { if (!Array.isArray(i.bh)) i.bh = []; });
+    try { const dj = await lerJson('dados.json'); idadeReal = aplicarIdadeReal(dados.itens, dj && dj.bancoHoras); }
+    catch (e) { console.warn('[BH] sem histórico para a idade das horas:', e); }
     css();
     layout(el);
     atualizar();
