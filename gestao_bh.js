@@ -1611,7 +1611,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   }
 
   // =====================================================================
-  // ABA: ATRASOS (pendências tipo ATRASO: entrada mais de 5 min depois do início do turno)
+  // ABA: ATRASOS (pendências tipo ATRASO: entrada mais de 10 min depois do início do turno · a partir de 11 min)
   // =====================================================================
   const minDet = (det, rot) => { const m = String(det || '').match(new RegExp(rot + ':\\s*(\\d{1,2}:\\d{2})', 'i')); return m ? m[1] : '—'; };
   function renderTipo(T) {
@@ -1671,8 +1671,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   const TIPOS_ABA = {
     atraso: { tipo: 'ATRASO', pre: 'at', aba: 'atraso', nome: 'Atrasos',
       media: (m, n) => 'média de ' + Math.round(m / n) + ' min por atraso',
-      regra: 'entrada mais de 5 min depois do início do turno · só dias com entrada e saída marcadas',
-      regraTab: 'tolerância de 5 minutos',
+      regra: 'entrada a partir de 11 min depois do início do turno · só dias com entrada e saída marcadas',
+      regraTab: 'tolerância de 10 minutos (conta a partir de 11 min)',
       cols: [['Início', i => minDet(i.det, 'Início do turno')], ['Entrada', i => minDet(i.det, 'Entrada')], ['Atraso', i => hMin(-(+i.horas || 0)), 'neg']] },
     falta: { tipo: 'FALTA', pre: 'ft', aba: 'falta', nome: 'Faltas',
       media: (m, n) => 'média de ' + hMin(m / 60 / n).replace('+', '') + ' por falta',
