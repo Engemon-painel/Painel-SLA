@@ -1673,6 +1673,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
   // ALTERADO (23/10/2026): aba RESPOSTA DO RH — pendências já respondidas pelo gestor com o que o RH preencheu
   //   na JUSTIFICATIVAS_PAINEL (Pagamento_HE_Permitido, Status_RH, Observacao_RH, Data_Ajuste_RH)
+  const rhSel = new Set();   // ALTERADO (30/10/2026): pendências marcadas para o RH responder em lote
+  let rhTipo = '';     // ALTERADO (30/10/2026): filtro por tipo de pendência na aba Resposta do RH
   let rhFiltro = '';   // '' = todas · 'aguardando' · 'AJUSTADO' · 'devolvido' · 'outros'
   const grupoRH = j => { const t = up(j.stRH); return !t ? 'aguardando' : t === 'AJUSTADO' ? 'AJUSTADO' : /DEVOLV/.test(t) ? 'devolvido' : 'outros'; };
   function renderRH() {
@@ -1681,27 +1683,39 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const base = pend.filter(i => { const j = justDe(i); return j.trat && (!fo || folhaIniDe(i.d) === fo) && noPeriodo(i) && passaProj(i) &&
       (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
       (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)); });
+    const tiposRH = [...new Set(base.map(i => i.tipo).filter(Boolean))].sort();
+    if (rhTipo && !tiposRH.includes(rhTipo)) rhTipo = '';
+    const contTipo = {}; base.forEach(i => contTipo[i.tipo] = (contTipo[i.tipo] || 0) + 1);
+    const baseT = rhTipo ? base.filter(i => i.tipo === rhTipo) : base;
     const cont = { aguardando: 0, AJUSTADO: 0, devolvido: 0, outros: 0 };
-    base.forEach(i => cont[grupoRH(justDe(i))]++);
+    baseT.forEach(i => cont[grupoRH(justDe(i))]++);
     const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="rh"] .bh-cont');
     if (nav) { nav.textContent = cont.aguardando; nav.hidden = !cont.aguardando; }
     const cards = [['aguardando', 'Aguardando RH', cont.aguardando, '#b45309', 'gestor respondeu, RH ainda não'],
-      ['AJUSTADO', 'Ajustado pelo RH', cont.AJUSTADO, COR_SIT['Justificado'], pct(cont.AJUSTADO, base.length) + '% do total'],
+      ['AJUSTADO', 'Ajustado pelo RH', cont.AJUSTADO, COR_SIT['Justificado'], pct(cont.AJUSTADO, baseT.length) + '% do total'],
       ['devolvido', 'Devolvido ao gestor', cont.devolvido, VERMELHO, 'RH pediu correção'],
-      ['', 'Respondidas', base.length, '#334155', folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'todas as folhas']];
+      ['', 'Respondidas', baseT.length, '#334155', folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'todas as folhas']];
     $('#bh-rh-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${rhFiltro === c[0] ? ' on' : ''}" data-r="${c[0]}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[4]}</span></button>`).join('');
     $('#bh-rh-kpis').querySelectorAll('button').forEach(bt => bt.onclick = () => { rhFiltro = rhFiltro === bt.dataset.r ? '' : bt.dataset.r; renderRH(); });
 
-    const lista = base.filter(i => !rhFiltro || grupoRH(justDe(i)) === rhFiltro)
+    const lista = baseT.filter(i => !rhFiltro || grupoRH(justDe(i)) === rhFiltro)
       .sort((a, c) => (justDe(c).dataResp || '').localeCompare(justDe(a).dataResp || '') || String(c.d).localeCompare(String(a.d)));
-    $('#bh-rh-sub').textContent = `${nf(lista.length)} pendências respondidas pelo gestor · o RH preenche Pagamento_HE_Permitido, Status_RH, Observacao_RH e Data_Ajuste_RH na aba JUSTIFICATIVAS_PAINEL · atualiza no fluxo diário`;
-    $('#bh-rh-head').innerHTML = '<tr><th>Colaborador</th><th>Pendência</th><th>Data</th><th>Supervisor</th><th>Tratativa do gestor</th><th>Respondido em</th>' +
+    const vis = new Set(lista.slice(0, 600).map(i => i.id));
+    [...rhSel].forEach(id => { if (!vis.has(id)) rhSel.delete(id); });
+    $('#bh-rh-sub').innerHTML = `${nf(lista.length)} pendências respondidas pelo gestor · clique em <b>Responder</b> (ou marque várias) para gravar Status_RH e Observacao_RH na planilha` +
+      `<span style="display:inline-flex;gap:8px;margin-left:10px;vertical-align:middle;align-items:center">` +
+      `<select id="bh-rh-tipo" title="Tipo de pendência" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:12px;background:#fff">` +
+      `<option value="">Pendência: todas (${nf(base.length)})</option>${tiposRH.map(t => `<option value="${esc(t)}"${t === rhTipo ? ' selected' : ''}>${esc(t)} (${nf(contTipo[t])})</option>`).join('')}</select>` +
+      `<button type="button" class="bh-pd-btn on" id="bh-rh-lote"${rhSel.size ? '' : ' disabled'}>Responder selecionadas (${rhSel.size})</button>` +
+      (rhSel.size ? '<button type="button" class="bh-pd-btn" id="bh-rh-limpa">Limpar seleção</button>' : '') + '</span>';
+    $('#bh-rh-head').innerHTML = '<tr><th style="width:28px"><input type="checkbox" id="bh-rh-todos" title="Marcar todas as aguardando RH da lista"></th><th>Colaborador</th><th>Pendência</th><th>Data</th><th>Supervisor</th><th>Tratativa do gestor</th><th>Respondido em</th>' +
       '<th>Pagamento HE permitido</th><th>Status RH</th><th>Observação RH</th><th>Data ajuste RH</th></tr>';
     const corRH = j => ({ aguardando: '#f59e0b', AJUSTADO: COR_SIT['Justificado'], devolvido: VERMELHO, outros: '#64748b' })[grupoRH(j)];
     const MAX = 600;
     $('#bh-rh-body').innerHTML = lista.slice(0, MAX).map(i => {
       const j = justDe(i), perm = up(i.hePerm);
-      return `<tr>
+      return `<tr${rhSel.has(i.id) ? ' style="background:#eff6ff"' : ''}>
+        <td><input type="checkbox" class="bh-rh-ck" data-id="${esc(i.id)}"${rhSel.has(i.id) ? ' checked' : ''}></td>
         <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)}</small></td>
         <td><b>${esc(i.tipo)}</b></td>
         <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
@@ -1709,11 +1723,92 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <td class="bh-pd-just"><b>${esc(j.trat)}</b><small>${esc(j.texto || '')}</small></td>
         <td>${j.dataResp ? esc(dataBr(j.dataResp)) : '—'}</td>
         <td>${i.tipo !== 'HORA EXTRA' ? '<span style="color:#cbd5e1">—</span>' : tag(perm || '—', perm === 'NÃO' || perm === 'NAO' ? VERMELHO : perm ? COR_SIT['Justificado'] : '#94a3b8')}</td>
-        <td>${tag(j.stRH || 'Aguardando RH', corRH(j))}</td>
+        <td style="white-space:nowrap">${tag(j.stRH || 'Aguardando RH', corRH(j))}<br><button type="button" class="bh-pd-btn bh-rh-resp" data-id="${esc(i.id)}" style="margin-top:4px;padding:3px 10px">${j.stRH ? '✎ Alterar' : '✎ Responder'}</button></td>
         <td style="white-space:normal;max-width:260px">${esc(j.obsRH || '') || '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${j.dataRH ? esc(dataBr(j.dataRH)) : '—'}</td></tr>`;
-    }).join('') || '<tr><td colspan="10">Nenhuma resposta nesse filtro</td></tr>';
-    if (lista.length > MAX) $('#bh-rh-body').insertAdjacentHTML('beforeend', `<tr><td colspan="10" style="color:#64748b">Mostrando ${MAX} de ${nf(lista.length)} · use os filtros</td></tr>`);
+    }).join('') || '<tr><td colspan="11">Nenhuma resposta nesse filtro</td></tr>';
+    const porId = {}; lista.forEach(i => porId[i.id] = i);
+    $('#bh-rh-body').querySelectorAll('.bh-rh-resp').forEach(bt => bt.onclick = () => abrirRespostaRH([porId[bt.dataset.id]]));
+    $('#bh-rh-body').querySelectorAll('.bh-rh-ck').forEach(ck => ck.onchange = () => { if (ck.checked) rhSel.add(ck.dataset.id); else rhSel.delete(ck.dataset.id); renderRH(); });
+    const todos = $('#bh-rh-todos');
+    const aguard = lista.slice(0, MAX).filter(i => grupoRH(justDe(i)) === 'aguardando');
+    todos.checked = aguard.length > 0 && aguard.every(i => rhSel.has(i.id));
+    todos.onchange = () => { aguard.forEach(i => todos.checked ? rhSel.add(i.id) : rhSel.delete(i.id)); renderRH(); };
+    $('#bh-rh-tipo').onchange = e => { rhTipo = e.target.value; rhSel.clear(); renderRH(); };
+    const btL = $('#bh-rh-lote'); if (btL) btL.onclick = () => abrirRespostaRH(lista.filter(i => rhSel.has(i.id)));
+    const btC = $('#bh-rh-limpa'); if (btC) btC.onclick = () => { rhSel.clear(); renderRH(); };
+    if (lista.length > MAX) $('#bh-rh-body').insertAdjacentHTML('beforeend', `<tr><td colspan="11" style="color:#64748b">Mostrando ${MAX} de ${nf(lista.length)} · use os filtros</td></tr>`);
+  }
+
+  // ALTERADO (30/10/2026): o RH responde pelo painel → grava Status_RH, Observacao_RH e Data_Ajuste_RH
+  //   na JUSTIFICATIVAS_PAINEL (mesmo fluxo das justificativas, com acao: "RH")
+  function abrirRespostaRH(itens) {
+    itens = itens.filter(Boolean);
+    if (!itens.length) return;
+    const atual = itens.length === 1 ? justDe(itens[0]) : {};
+    const stAt = /DEVOLV/i.test(atual.stRH || '') ? 'DEVOLVIDO' : (up(atual.stRH) === 'AJUSTADO' ? 'AJUSTADO' : '');
+    const modal = document.createElement('div');
+    modal.className = 'bh-modal';
+    modal.innerHTML = `<div class="bh-modal-box" role="dialog" aria-modal="true">
+      <div class="bh-modal-topo"><h3>Resposta do RH${itens.length > 1 ? ' · ' + itens.length + ' pendências' : ''}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
+      <div class="bh-modal-lista">${itens.slice(0, 8).map(i => { const j = justDe(i); return `<div><b>${esc(i.n)}</b> · ${esc(i.tipo)} · ${dataBr(i.d)} · <span>${esc(j.trat || '')}${j.texto ? ' — ' + esc(j.texto) : ''}</span></div>`; }).join('')}${itens.length > 8 ? `<div>… e mais ${itens.length - 8}</div>` : ''}</div>
+      <div class="bh-form">
+        <label>Status RH<select data-c="st">
+          <option value="">— escolha —</option>
+          <option value="AJUSTADO"${stAt === 'AJUSTADO' ? ' selected' : ''}>AJUSTADO</option>
+          <option value="DEVOLVIDO"${stAt === 'DEVOLVIDO' ? ' selected' : ''}>DEVOLVIDO AO GESTOR</option>
+        </select></label>
+        <label style="justify-content:flex-end;font-weight:400;color:#64748b">A data do ajuste é gravada sozinha (hoje).</label>
+        <label class="largo">Observação do RH<textarea data-c="obs" rows="3" placeholder="Obrigatória quando devolver: diga o que o gestor precisa corrigir">${esc(atual.obsRH || '')}</textarea></label>
+      </div>
+      <div class="bh-prev" id="bh-rh-prev"></div>
+      <div class="bh-modal-pe">
+        <button type="button" class="bh-pd-btn" data-a="cancelar">Cancelar</button>
+        <button type="button" class="bh-pd-btn on" data-a="enviar">Gravar resposta${itens.length > 1 ? ' (' + itens.length + ')' : ''}</button>
+      </div></div>`;
+    document.body.appendChild(modal);
+    const fechar = () => modal.remove();
+    modal.querySelector('.bh-x').onclick = fechar;
+    modal.querySelector('[data-a="cancelar"]').onclick = fechar;
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+    const prev = modal.querySelector('#bh-rh-prev');
+    const bt = modal.querySelector('[data-a="enviar"]');
+    bt.onclick = async () => {
+      const st = modal.querySelector('[data-c="st"]').value, obs = modal.querySelector('[data-c="obs"]').value.trim();
+      if (!st) { prev.innerHTML = `<span style="color:${VERMELHO}">● Escolha AJUSTADO ou DEVOLVIDO.</span>`; return; }
+      if (st === 'DEVOLVIDO' && !obs) { prev.innerHTML = `<span style="color:${VERMELHO}">● Para devolver, escreva na observação o que o gestor precisa corrigir.</span>`; return; }
+      if (!FLUXO_JUSTIFICATIVA) { prev.innerHTML = `<span style="color:${VERMELHO}">● O envio não está configurado.</span>`; return; }
+      const stRH = st === 'DEVOLVIDO' ? 'NÃO REALIZADO - DEVOLVIDO' : 'AJUSTADO';
+      bt.disabled = true; bt.textContent = 'Gravando…';
+      try {
+        const corpo = { acao: 'RH', itens: itens.map(i => ({ ID: i.id, Status_RH: stRH, Observacao_RH: obs })) };
+        const r = await fetch(FLUXO_JUSTIFICATIVA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(corpo) });
+        const txt = await r.text();
+        let resp = null; try { resp = JSON.parse(txt); } catch (e) { }
+        if (!r.ok) throw new Error('o fluxo respondeu ' + r.status);
+        if (resp && !('gravadas' in resp) && ('itens' in resp || 'geradoEm' in resp))
+          throw new Error('o fluxo rodou mas NÃO gravou: atualize o script Pendencias no Excel (versão com a resposta do RH)');
+        const okIds = new Set(resp && Array.isArray(resp.resultados) ? resp.resultados.filter(x => x.ok).map(x => x.ID) : itens.map(i => i.id));
+        if (!okIds.size) throw new Error((resp && resp.resultados && resp.resultados[0] && resp.resultados[0].erro) || 'nenhuma linha gravada');
+        const l = locais(), em = new Date().toISOString();
+        itens.filter(i => okIds.has(i.id)).forEach(i => {
+          const j = Object.assign({}, justDe(i), { stRH, obsRH: obs, dataRH: hojeIso() });
+          const [auto, status] = calcularStatus(j, i.hePerm, i.tipo);
+          j.auto = auto; j.status = status; delete j.enviado;
+          l[i.id] = { em, j };
+          rhSel.delete(i.id);
+        });
+        salvarLocais(l);
+        const falhas = itens.length - okIds.size;
+        fechar();
+        renderRH(); renderPend(); renderAndamento();
+        if (falhas) alert(falhas + ' pendência(s) não foram gravadas (não encontradas na JUSTIFICATIVAS_PAINEL).');
+      } catch (e) {
+        bt.disabled = false; bt.textContent = 'Tentar de novo';
+        prev.innerHTML = `<span style="color:${VERMELHO}">● Não foi possível gravar: ${esc(e.message)}</span>`;
+      }
+    };
+    setTimeout(() => modal.querySelector('[data-c="st"]').focus(), 50);
   }
 
   // ALTERADO (22/10/2026): absenteísmo por supervisor = dias de falta ÷ dias previstos (trabalhou ou faltou)
