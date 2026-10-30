@@ -462,6 +462,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     <!-- ================= ABA: RESPOSTA DO RH ================= -->
     <div class="bh-aba" data-p="rh" hidden>
       <div class="bh-pd-kpis" id="bh-rh-kpis"></div>
+      <div class="bh-c" id="bh-rh-resumo" style="margin-bottom:12px"></div>
       <div class="bh-c">
         <h3>Resposta do RH</h3>
         <p class="sub" id="bh-rh-sub" style="margin:0">Carregando…</p>
@@ -1701,6 +1702,42 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       ['', 'Respondidas', baseT.length, '#334155', folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'todas as folhas']];
     $('#bh-rh-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${rhFiltro === c[0] ? ' on' : ''}" data-r="${c[0]}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[4]}</span></button>`).join('');
     $('#bh-rh-kpis').querySelectorAll('button').forEach(bt => bt.onclick = () => { rhFiltro = rhFiltro === bt.dataset.r ? '' : bt.dataset.r; renderRH(); });
+
+    // ALTERADO (30/10/2026): quadro "O que o RH está respondendo" (respostas já dadas, com os filtros da aba)
+    {
+      const resp = baseT.filter(i => String(justDe(i).stRH || '').trim());
+      const box = $('#bh-rh-resumo');
+      if (!resp.length) {
+        box.innerHTML = '<h3>O que o RH está respondendo</h3><p class="sub" style="margin:0">O RH ainda não respondeu nenhuma pendência nesse filtro.</p>';
+      } else {
+        const grupos = {};
+        resp.forEach(i => {
+          const j = justDe(i), g = grupoRH(j), obs = (String(j.obsRH || '').trim() || '(sem observação)').replace(/\s+em \d{2}\/\d{2}\/\d{4}\s*$/, '');
+          const k = g + '|' + obs.toUpperCase();
+          const o = grupos[k] = grupos[k] || { g, obs, n: 0, tipos: {} };
+          o.n++; o.tipos[i.tipo] = (o.tipos[i.tipo] || 0) + 1;
+        });
+        const lg = Object.values(grupos).sort((a, b) => b.n - a.n).slice(0, 8);
+        const ehAuto = i => /automático/i.test(String(justDe(i).obsRH || ''));
+        const nAuto = resp.filter(ehAuto).length;
+        const manuais = resp.filter(i => !ehAuto(i));
+        const ult = (manuais.length ? manuais : resp).slice().sort((a, b) => String(justDe(b).dataRH || '').localeCompare(String(justDe(a).dataRH || ''))).slice(0, 6);
+        const corG = g => g === 'AJUSTADO' ? COR_SIT['Justificado'] : g === 'devolvido' ? VERMELHO : '#64748b';
+        const rotG = g => g === 'AJUSTADO' ? 'Ajustado' : g === 'devolvido' ? 'Devolvido' : 'Outro';
+        box.innerHTML = `<h3>O que o RH está respondendo</h3>
+          <p class="sub">${nf(resp.length)} respostas${rhTipo ? ' · ' + esc(rhTipo) : ''} · <b>${nf(resp.length - nAuto)} respondidas pelo RH</b> · ${nf(nAuto)} automáticas (a pendência saiu da base, o script marcou AJUSTADO)</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px">
+            <div>${lg.map(o => `<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:12.5px">
+                <b style="min-width:30px;text-align:right;font-size:15px;color:${corG(o.g)}">${nf(o.n)}</b>
+                <div style="flex:1;min-width:0">${tag(rotG(o.g), corG(o.g))} <span style="color:#0f172a">${/automático/i.test(o.obs) ? '🤖 ' : ''}${esc(o.obs)}</span>
+                  <small style="display:block;color:#64748b;margin-top:2px">${Object.entries(o.tipos).sort((a, b) => b[1] - a[1]).map(([t, q]) => esc(t) + ' ' + q).join(' · ')}</small></div></div>`).join('')}</div>
+            <div><div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin:6px 0 4px">${manuais.length ? 'Últimas respostas do RH' : 'Últimas respostas (automáticas · o RH ainda não respondeu pelo painel)'}</div>
+              ${ult.map(i => { const j = justDe(i); return `<div style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:12px">
+                ${tag(rotG(grupoRH(j)), corG(grupoRH(j)))} <b>${esc(i.n)}</b> · ${esc(i.tipo)} · ${dataBr(i.d).slice(0, 5)}
+                <small style="display:block;color:#64748b">${j.dataRH ? 'em ' + esc(dataBr(j.dataRH)) + ' · ' : ''}${esc(j.obsRH || 'sem observação')}</small></div>`; }).join('')}</div>
+          </div>`;
+      }
+    }
 
     const lista = baseT.filter(i => !rhFiltro || grupoRH(justDe(i)) === rhFiltro)
       .sort((a, c) => (justDe(c).dataResp || '').localeCompare(justDe(a).dataResp || '') || String(c.d).localeCompare(String(a.d)));
