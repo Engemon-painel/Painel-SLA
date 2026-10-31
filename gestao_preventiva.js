@@ -299,9 +299,12 @@
     // ALTERADO (28/10/2026): Realizado / Entrega D-1 / Aderência / Saldo contam o executado ATÉ ONTEM (D-1)
     // + o que foi fechado hoje mas já estava aberto antes de hoje (início da WO até ontem = estava aberta de manhã).
     // Só fica de fora o que abriu e fechou hoje — aparece à parte ("+ hoje")
-    const entraD1 = r => !r.d || r.d <= ref || (r.ini && String(r.ini).slice(0, 10) <= ref);
+    // ALTERADO (31/10/2026): sem dia útil restante no mês (ex.: sábado 31/10), o D-1 não corta mais nada:
+    // entra tudo que está executado na base (Realizado = Planejado - Pendentes).
+    const fimDeMes = duRef >= duMes;
+    const entraD1 = r => fimDeMes || !r.d || r.d <= ref || (r.ini && String(r.ini).slice(0, 10) <= ref);
     const realD1 = regs.filter(r => r.st === 'Executada' && entraD1(r)).length;
-    const realAntes = regs.filter(r => r.st === 'Executada' && r.d && r.d > ref && r.ini && String(r.ini).slice(0, 10) <= ref).length;
+    const realAntes = fimDeMes ? 0 : regs.filter(r => r.st === 'Executada' && r.d && r.d > ref && r.ini && String(r.ini).slice(0, 10) <= ref).length;
     const realHoje = realizado - realD1;
     const pendentes = planejado - realizado;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
