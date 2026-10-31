@@ -282,6 +282,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <button type="button" data-aba="atraso"><span class="ic">⏰</span>Atrasos<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="falta"><span class="ic">🚫</span>Faltas<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="rh"><span class="ic">🧾</span>Resposta do RH<span class="bh-cont" hidden></span></button>
+      <button type="button" data-aba="vtvr"><span class="ic">🚌</span>VT / VR · fora da escala<span class="bh-cont" hidden></span></button>
       <button type="button" data-aba="andamento"><span class="ic">📋</span>Andamento por Supervisor</button>
       <button type="button" data-aba="espelho"><span class="ic">🪪</span>Absenteísmo<span class="bh-cont" hidden></span></button>
     </nav>
@@ -466,6 +467,16 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <h3>Resposta do RH</h3>
         <p class="sub" id="bh-rh-sub" style="margin:0">Carregando…</p>
         <div class="bh-tab" style="max-height:640px;margin-top:10px"><table><thead id="bh-rh-head"></thead><tbody id="bh-rh-body"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ================= ABA: VT / VR (trabalho em feriado ou fora da escala) ================= -->
+    <div class="bh-aba" data-p="vtvr" hidden>
+      <div class="bh-pd-kpis" id="bh-vt-kpis"></div>
+      <div class="bh-c">
+        <h3>VT / VR · trabalho em feriado ou fora da escala</h3>
+        <p class="sub" id="bh-vt-sub" style="margin:0">Carregando…</p>
+        <div class="bh-tab" style="max-height:640px;margin-top:10px"><table><thead id="bh-vt-head"></thead><tbody id="bh-vt-body"></tbody></table></div>
       </div>
     </div>
 
@@ -1339,6 +1350,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       pend = Array.isArray(d) ? d : (d.itens || []);
       pendAbs = (d && Array.isArray(d.absenteismo)) ? d.absenteismo : null;
       pendEsp = (d && d.espelho && Array.isArray(d.espelho.mats)) ? d.espelho : null;
+      pendVT = (d && d.vtvr && typeof d.vtvr === 'object') ? d.vtvr : {};
       // ALTERADO (27/10/2026): período coberto pela base atual (do início da folha da pendência aberta mais antiga
       // até a mais recente). Pendência justificada que não está mais na base, dentro desse período, foi tratada.
       {
@@ -1593,7 +1605,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <td>${esc(i.sup || '—')}</td>
         <td class="num ${i.saldo < 0 ? 'neg' : 'pos'}">${hMin(+i.saldo || 0)}<small style="display:block;font-weight:500;color:#64748b">HE paga: ${esc(i.hePerm)}</small></td>
         <td class="num" title="${i.horas ? esc(hMin(+i.horas).replace('+', '')) + ' em aberto' : ''}">${tempoPend(i.horas)}</td>
-        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? 'Erro de parametrização do almoço: descontada 1h de intervalo (o sistema considerou o almoço como hora extra)' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}${i.tipo === 'HORA EXTRA' ? '<span style="display:block">' + tagPerc(i) + '</span>' : ''}${i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? '<small style="display:block;font-weight:500;color:#b45309">erro de parametrização do almoço</small>' : ''}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
+        <td class="num ${saldoDia(i) == null ? '' : saldoDia(i) < 0 ? 'neg' : 'pos'}" title="${saldoDia(i) == null ? 'Batidas incompletas: não dá para calcular' : i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? 'Erro de parametrização do almoço: descontada 1h de intervalo (o sistema considerou o almoço como hora extra)' : saldoDia(i) < 0 ? 'Ficou devendo no dia' : 'Hora extra feita no dia'}">${saldoDia(i) == null ? '—' : hMin(saldoDia(i))}${i.tipo === 'HORA EXTRA' ? '<span style="display:block">' + tagPerc(i) + '</span>' : ''}${motivoVT(i) ? (() => { const st = sitVT(vtDe(i)); return `<small style="display:inline-block;margin-top:2px;padding:0 6px;border-radius:999px;font-weight:700;color:#fff;background:${ROT_VT[st][1]}" title="${esc(motivoVT(i))} · VT/VR: ${esc(ROT_VT[st][0])} (aba VT / VR)">🚌 VT/VR</small>`; })() : ''}${i.tipo === 'HORA EXTRA' && heSemAlmoco(i) != null ? '<small style="display:block;font-weight:500;color:#b45309">erro de parametrização do almoço</small>' : ''}<small style="display:block;font-weight:500;color:#64748b">folha ${esc(rotFolha(folhaIniDe(i.d)).replace(/\/\d{4}/g, ''))}</small></td>
         <td class="bh-pd-just">${j.trat ? `<b>${esc(j.trat)}</b>${j.tarefa ? ' · ' + esc(String(j.tarefa).split('—')[0].trim()) : ''}${j.chamado ? ' · ch. ' + esc(j.chamado) : ''}<small>${esc(j.texto || '')}</small>${j.dataResp ? `<small>respondido em ${esc(dataBr(j.dataResp))}</small>` : ''}${j.obsRH ? `<small>RH: ${esc(j.obsRH)}</small>` : ''}` : '<span style="color:#cbd5e1">—</span>'}</td>
         <td>${fechado ? '' : `<button type="button" class="bh-pd-btn">${j.trat ? 'Editar' : 'Justificar'}</button>`}</td></tr>`;
     }).join('') || '<tr><td colspan="12">Nenhuma pendência nesse filtro 🎉</td></tr>';
@@ -1680,7 +1692,192 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       regraTab: 'observacao = Ausente no Espelho de ponto',
       cols: [['Horas ausentes', i => hMin(-(+i.horas || 0)), 'neg']] }
   };
-  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); gAbsenteismo(); renderRH(); };
+  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); gAbsenteismo(); renderRH(); renderVT(); };
+
+  // =====================================================================
+  // ALTERADO (31/10/2026): ABA VT / VR — o ponto mostra trabalho em FERIADO ou FORA DA ESCALA (hora extra
+  //   em domingo, folga da escala, sábado fora da escala ou feriado) → abre sozinho o pedido de VT e VR.
+  //   1) Supervisor preenche VT e VR e aprova  2) RH lança (ou devolve) e faz a devolutiva aqui mesmo.
+  //   Grava na tabela tbVTVRPainel (aba VT_VR_PAINEL) pelo mesmo fluxo das justificativas.
+  // =====================================================================
+  // feriados nacionais + estado de SP + cidade de SP (troque/complete aqui)
+  const FERIADOS = {
+    '2025-11-02': 'Finados', '2025-11-15': 'Proclamação da República', '2025-11-20': 'Consciência Negra', '2025-12-25': 'Natal',
+    '2026-01-01': 'Confraternização Universal', '2026-01-25': 'Aniversário de São Paulo', '2026-02-16': 'Carnaval', '2026-02-17': 'Carnaval',
+    '2026-04-03': 'Sexta-feira Santa', '2026-04-21': 'Tiradentes', '2026-05-01': 'Dia do Trabalho', '2026-06-04': 'Corpus Christi',
+    '2026-07-09': 'Revolução Constitucionalista', '2026-09-07': 'Independência', '2026-10-12': 'Nossa Senhora Aparecida',
+    '2026-11-02': 'Finados', '2026-11-15': 'Proclamação da República', '2026-11-20': 'Consciência Negra', '2026-12-25': 'Natal',
+    '2027-01-01': 'Confraternização Universal', '2027-01-25': 'Aniversário de São Paulo'
+  };
+  let pendVT = {};
+  const CH_VT = 'bhVTVREnviados';
+  const vtLocais = () => { try { return JSON.parse(localStorage.getItem(CH_VT) || '{}'); } catch (e) { return {}; } };
+  const vtSalvar = o => { try { localStorage.setItem(CH_VT, JSON.stringify(o)); } catch (e) { } };
+  const chaveVT = i => String(i.m || '').replace(/\D/g, '').slice(-6).padStart(6, '0') + '|' + String(i.d || '').slice(0, 10);
+  function motivoVT(i) {
+    if (i.tipo !== 'HORA EXTRA') return '';
+    const d = String(i.d || '').slice(0, 10);
+    if (FERIADOS[d]) return 'Feriado · ' + FERIADOS[d];
+    if (/\d+\s*X\s*\d+/i.test(String(i.turno || ''))) return '';   // 12x36: o turno do dia não diz se era folga
+    const p = percHE(i);
+    if (p && p.p === 100) return p.motivo.charAt(0).toUpperCase() + p.motivo.slice(1);
+    const w = new Date(d + 'T12:00:00Z').getUTCDay();
+    if (w === 6 && jornadaDia(String(i.det || ''), i.turno, i.dia) == null) return 'Sábado (fora da escala)';
+    return '';
+  }
+  function vtDe(i) {
+    const k = chaveVT(i), l = vtLocais()[k];
+    if (l && (!pendGerado || new Date(pendGerado) < new Date(l.em))) return Object.assign({}, l.v, { enviado: true });
+    return pendVT[k] || {};
+  }
+  const sitVT = v => /DEVOLV/i.test(v.stRH || '') ? 'devolvido' : /LAN/i.test(v.stRH || '') ? 'lancado' : (v.vt || v.vr) ? 'rh' : 'sup';
+  const ROT_VT = { sup: ['Aguardando supervisor', '#b45309'], rh: ['Aguardando RH', '#2563eb'], lancado: ['Lançado pelo RH', '#0f9d58'], devolvido: ['Devolvido ao supervisor', '#dc2626'] };
+  const vtSel = new Set();
+  let vtFiltro = '';
+  function baseVT() {
+    const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim(), fo = folhaSel();
+    const vistos = new Set();
+    return (pend || []).filter(i => {
+      if (!motivoVT(i)) return false;
+      const k = chaveVT(i); if (vistos.has(k)) return false; vistos.add(k);
+      return (!fo || folhaIniDe(i.d) === fo) && noPeriodo(i) && passaProj(i) &&
+        (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
+        (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b));
+    });
+  }
+  function renderVT() {
+    if (!$('#bh-vt-kpis') || !pend) return;
+    const base = baseVT();
+    const cont = { sup: 0, rh: 0, lancado: 0, devolvido: 0 };
+    base.forEach(i => cont[sitVT(vtDe(i))]++);
+    const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="vtvr"] .bh-cont');
+    const nNav = cont.sup + cont.devolvido;
+    if (nav) { nav.textContent = nNav; nav.hidden = !nNav; }
+    const cards = [['sup', 'Aguardando supervisor', cont.sup, '#b45309', 'preencher VT e VR e aprovar'],
+      ['rh', 'Aguardando RH', cont.rh, '#2563eb', 'supervisor aprovou, RH lança'],
+      ['lancado', 'Lançado pelo RH', cont.lancado, '#0f9d58', pct(cont.lancado, base.length) + '% do total'],
+      ['devolvido', 'Devolvido ao supervisor', cont.devolvido, VERMELHO, 'RH pediu correção'],
+      ['', 'Dias fora da escala', base.length, '#334155', folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'todas as folhas']];
+    $('#bh-vt-kpis').innerHTML = cards.map(c => `<button type="button" class="bh-k${vtFiltro === c[0] ? ' on' : ''}" data-v="${c[0]}" style="background:${c[3]}"><small>${c[1]}</small><b>${nf(c[2])}</b><span>${c[4]}</span></button>`).join('');
+    $('#bh-vt-kpis').querySelectorAll('button').forEach(bt => bt.onclick = () => { vtFiltro = vtFiltro === bt.dataset.v ? '' : bt.dataset.v; vtSel.clear(); renderVT(); });
+
+    const ordem = { devolvido: 0, sup: 1, rh: 2, lancado: 3 };
+    const lista = base.filter(i => !vtFiltro || sitVT(vtDe(i)) === vtFiltro)
+      .sort((a, c) => ordem[sitVT(vtDe(a))] - ordem[sitVT(vtDe(c))] || String(c.d).localeCompare(String(a.d)) || String(a.n).localeCompare(String(c.n), 'pt-BR'));
+    const MAX = 600, vis = lista.slice(0, MAX), porK = {};
+    vis.forEach(i => porK[chaveVT(i)] = i);
+    [...vtSel].forEach(k => { if (!porK[k]) vtSel.delete(k); });
+    const selItens = [...vtSel].map(k => porK[k]).filter(Boolean);
+    const podeRH = selItens.length && selItens.every(i => sitVT(vtDe(i)) !== 'sup');
+    $('#bh-vt-sub').innerHTML = `${nf(lista.length)} ${lista.length === 1 ? 'dia' : 'dias'} com hora extra em feriado ou fora da escala · o supervisor preenche VT e VR e aprova · o RH lança e faz a devolutiva` +
+      `<span style="display:inline-flex;gap:8px;margin-left:10px;vertical-align:middle;align-items:center">` +
+      `<button type="button" class="bh-pd-btn on" id="bh-vt-lsup"${selItens.length ? '' : ' disabled'}>Supervisor: preencher selecionados (${selItens.length})</button>` +
+      `<button type="button" class="bh-pd-btn" id="bh-vt-lrh"${podeRH ? '' : ' disabled'} title="Só para os que o supervisor já aprovou">RH: lançar selecionados</button>` +
+      (selItens.length ? '<button type="button" class="bh-pd-btn" id="bh-vt-limpa">Limpar seleção</button>' : '') + '</span>';
+    $('#bh-vt-head').innerHTML = '<tr><th style="width:28px"><input type="checkbox" id="bh-vt-todos" title="Marcar todos da lista"></th><th>Situação</th><th>Colaborador</th><th>Data</th><th>Motivo</th><th>Turno</th>' +
+      '<th class="num">HE do dia</th><th>Supervisor</th><th>VT</th><th>VR</th><th>Observação do supervisor</th><th>Devolutiva do RH</th><th></th></tr>';
+    const simNao = v => !v ? '<span style="color:#cbd5e1">—</span>' : tag(v, /^S/i.test(v) ? COR_SIT['Justificado'] : '#64748b');
+    $('#bh-vt-body').innerHTML = vis.map(i => {
+      const k = chaveVT(i), v = vtDe(i), st = sitVT(v), he = minDet(i.det, 'HE'), bat = (String(i.det || '').match(/Batidas:\s*([^|]*)/i) || [])[1] || '';
+      return `<tr${vtSel.has(k) ? ' style="background:#eff6ff"' : st === 'devolvido' ? ' style="background:#fff5f5"' : ''}>
+        <td><input type="checkbox" class="bh-vt-ck" data-k="${esc(k)}"${vtSel.has(k) ? ' checked' : ''}></td>
+        <td>${tag(ROT_VT[st][0], ROT_VT[st][1])}${v.enviado ? '<small class="bh-pd-env">enviado · aguardando atualização</small>' : ''}</td>
+        <td class="nm" title="${esc(i.n)} · ${esc(i.m)}">${esc(i.n)}<small>${esc(i.m)}</small></td>
+        <td>${dataBr(i.d).slice(0, 5)}<small style="display:block;color:#64748b">${esc(i.dia || '')}</small></td>
+        <td style="white-space:normal;min-width:150px;max-width:200px;font-weight:600;color:#9a3412">${esc(motivoVT(i))}</td>
+        <td style="white-space:normal;min-width:170px;max-width:220px;font-size:12px">${esc(i.turno || '')}</td>
+        <td class="num">${he === '—' ? '—' : '<b>' + esc(he.replace(':', 'h')) + '</b>'}<small style="display:block;color:#64748b;font-weight:500">${esc(bat.trim())}</small></td>
+        <td>${esc(i.sup || '—')}</td>
+        <td>${simNao(v.vt)}</td><td>${simNao(v.vr)}</td>
+        <td style="white-space:normal;max-width:220px;font-size:12px">${esc(v.obsSup || '') || '<span style="color:#cbd5e1">—</span>'}${v.dataSup ? `<small style="display:block;color:#64748b">aprovado em ${esc(dataBr(v.dataSup))}</small>` : ''}</td>
+        <td style="white-space:normal;max-width:220px;font-size:12px">${v.stRH ? `<b style="color:${ROT_VT[st][1]}">${esc(v.stRH)}</b>${v.dataRH ? ' em ' + esc(dataBr(v.dataRH)) : ''}<br>` : ''}${esc(v.obsRH || '') || (v.stRH ? '' : '<span style="color:#cbd5e1">—</span>')}</td>
+        <td style="white-space:nowrap"><button type="button" class="bh-pd-btn bh-vt-sup" data-k="${esc(k)}" style="padding:3px 10px">${st === 'sup' ? '✎ Preencher' : st === 'devolvido' ? '✎ Corrigir' : '✎ Editar'}</button>${st !== 'sup' ? `<br><button type="button" class="bh-pd-btn bh-vt-rh" data-k="${esc(k)}" style="padding:3px 10px;margin-top:4px">${st === 'rh' ? 'RH: lançar' : 'RH: alterar'}</button>` : ''}</td></tr>`;
+    }).join('') || '<tr><td colspan="13">Nenhum dia fora da escala nesse filtro</td></tr>';
+    if (lista.length > MAX) $('#bh-vt-body').insertAdjacentHTML('beforeend', `<tr><td colspan="13" style="color:#64748b">Mostrando ${MAX} de ${nf(lista.length)} · use os filtros</td></tr>`);
+    $('#bh-vt-body').querySelectorAll('.bh-vt-sup').forEach(bt => bt.onclick = () => abrirVT([porK[bt.dataset.k]], 'sup'));
+    $('#bh-vt-body').querySelectorAll('.bh-vt-rh').forEach(bt => bt.onclick = () => abrirVT([porK[bt.dataset.k]], 'rh'));
+    $('#bh-vt-body').querySelectorAll('.bh-vt-ck').forEach(ck => ck.onchange = () => { ck.checked ? vtSel.add(ck.dataset.k) : vtSel.delete(ck.dataset.k); renderVT(); });
+    const todos = $('#bh-vt-todos');
+    todos.checked = vis.length > 0 && vis.every(i => vtSel.has(chaveVT(i)));
+    todos.onchange = () => { vis.forEach(i => todos.checked ? vtSel.add(chaveVT(i)) : vtSel.delete(chaveVT(i))); renderVT(); };
+    const b1 = $('#bh-vt-lsup'); if (b1) b1.onclick = () => abrirVT(selItens, 'sup');
+    const b2 = $('#bh-vt-lrh'); if (b2) b2.onclick = () => abrirVT(selItens, 'rh');
+    const b3 = $('#bh-vt-limpa'); if (b3) b3.onclick = () => { vtSel.clear(); renderVT(); };
+  }
+  function abrirVT(itens, modo) {
+    itens = itens.filter(Boolean);
+    if (!itens.length) return;
+    const atual = itens.length === 1 ? vtDe(itens[0]) : {};
+    const ehRH = modo === 'rh';
+    const opt = (v, sel) => `<option value="${v}"${String(sel || '').toUpperCase() === v.toUpperCase() ? ' selected' : ''}>${v}</option>`;
+    const modal = document.createElement('div');
+    modal.className = 'bh-modal';
+    modal.innerHTML = `<div class="bh-modal-box" role="dialog" aria-modal="true">
+      <div class="bh-modal-topo"><h3>${ehRH ? 'RH · lançamento de VT / VR' : 'Supervisor · VT / VR'}${itens.length > 1 ? ' · ' + itens.length + ' dias' : ''}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
+      <div class="bh-modal-lista" style="max-height:240px">${itens.slice(0, 8).map(i => { const v = vtDe(i); return `<div style="padding:6px 0;border-bottom:1px solid #e2e8f0">
+        <b>${esc(i.n)}</b> · ${dataBr(i.d)} (${esc(i.dia || '')}) · <span style="color:#9a3412;font-weight:700">${esc(motivoVT(i))}</span><br>
+        <span><b style="color:#334155">Turno:</b> ${esc(i.turno || '—')} · <b style="color:#334155">Detalhe:</b> ${esc(i.det || '—')}</span>
+        ${ehRH ? `<br><span><b style="color:#334155">Supervisor:</b> VT ${esc(v.vt || '—')} · VR ${esc(v.vr || '—')}${v.obsSup ? ' — ' + esc(v.obsSup) : ''}</span>` : ''}
+        ${!ehRH && /DEVOLV/i.test(v.stRH || '') ? `<br><span style="color:#991b1b;font-weight:700">↩ Devolvido pelo RH: ${esc(v.obsRH || 'sem observação')}</span>` : ''}</div>`; }).join('')}${itens.length > 8 ? `<div style="padding-top:6px">… e mais ${itens.length - 8}</div>` : ''}</div>
+      <div class="bh-form">
+        ${ehRH ? `<label>Status RH<select data-c="st"><option value="">— escolha —</option>${opt('LANÇADO', atual.stRH)}${opt('DEVOLVIDO', atual.stRH)}</select></label>
+          <label style="justify-content:flex-end;font-weight:400;color:#64748b;font-size:12px">A data do lançamento é gravada sozinha (hoje).</label>
+          <label class="largo">Devolutiva do RH<textarea data-c="obs" rows="3" placeholder="Ex.: lançado na folha de novembro · obrigatória quando devolver">${esc(atual.obsRH || '')}</textarea></label>`
+        : `<label>VT (vale-transporte)<select data-c="vt"><option value="">— escolha —</option>${opt('SIM', atual.vt)}${opt('NÃO', atual.vt)}</select></label>
+          <label>VR (vale-refeição)<select data-c="vr"><option value="">— escolha —</option>${opt('SIM', atual.vr)}${opt('NÃO', atual.vr)}</select></label>
+          <label class="largo">Observação do supervisor<textarea data-c="obs" rows="3" placeholder="Ex.: atendimento emergencial no site X · plantão do feriado">${esc(atual.obsSup || '')}</textarea></label>`}
+      </div>
+      <div class="bh-prev" id="bh-vt-prev"></div>
+      <div class="bh-modal-pe" style="justify-content:flex-end">
+        <button type="button" class="bh-pd-btn" data-a="cancelar">Cancelar</button>
+        <button type="button" class="bh-pd-btn on" data-a="enviar">${ehRH ? 'Gravar devolutiva' : 'Aprovar e enviar ao RH'}${itens.length > 1 ? ' (' + itens.length + ')' : ''}</button>
+      </div></div>`;
+    document.getElementById(CONTAINER).appendChild(modal);
+    const fechar = () => modal.remove();
+    modal.querySelector('.bh-x').onclick = fechar;
+    modal.querySelector('[data-a="cancelar"]').onclick = fechar;
+    modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+    const prev = modal.querySelector('#bh-vt-prev'), bt = modal.querySelector('[data-a="enviar"]');
+    const val = c => { const e = modal.querySelector(`[data-c="${c}"]`); return e ? e.value.trim() : ''; };
+    bt.onclick = async () => {
+      const erro = m => { prev.innerHTML = `<span style="color:${VERMELHO}">● ${m}</span>`; };
+      if (ehRH) {
+        if (!val('st')) return erro('Escolha LANÇADO ou DEVOLVIDO.');
+        if (val('st') === 'DEVOLVIDO' && !val('obs')) return erro('Para devolver, escreva o que o supervisor precisa corrigir.');
+        if (itens.some(i => sitVT(vtDe(i)) === 'sup')) return erro('Há dias que o supervisor ainda não aprovou.');
+      } else if (!val('vt') || !val('vr')) return erro('Preencha VT e VR.');
+      if (!FLUXO_JUSTIFICATIVA) return erro('O envio não está configurado.');
+      bt.disabled = true; bt.textContent = 'Gravando…';
+      try {
+        const hojeI = hojeIso();
+        const corpo = ehRH
+          ? { acao: 'VTVR_RH', itens: itens.map(i => ({ Chave: chaveVT(i), Status_RH: val('st'), Observacao_RH: val('obs') })) }
+          : { acao: 'VTVR_SUP', itens: itens.map(i => ({ Chave: chaveVT(i), Matricula_6: i.m, Nome: i.n, Data: String(i.d).slice(0, 10), Dia: i.dia || '',
+              Motivo: motivoVT(i), Turno: i.turno || '', Supervisor: String(i.sup || '').trim(), Horas_HE: minDet(i.det, 'HE'),
+              VT: val('vt'), VR: val('vr'), Observacao_Supervisor: val('obs') })) };
+        const r = await fetch(FLUXO_JUSTIFICATIVA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(corpo) });
+        const txt = await r.text();
+        let resp = null; try { resp = JSON.parse(txt); } catch (e) { }
+        if (!r.ok) throw new Error('o fluxo respondeu ' + r.status);
+        if (resp && !('gravadas' in resp)) throw new Error('o fluxo rodou mas NÃO gravou: atualize o script Pendencias no Excel (versão com VT / VR)');
+        const okK = new Set(resp && Array.isArray(resp.resultados) ? resp.resultados.filter(x => x.ok).map(x => x.ID) : itens.map(chaveVT));
+        if (!okK.size) throw new Error((resp && resp.resultados && resp.resultados[0] && resp.resultados[0].erro) || 'nada foi gravado');
+        const l = vtLocais(), em = new Date().toISOString();
+        itens.filter(i => okK.has(chaveVT(i))).forEach(i => {
+          const v = Object.assign({}, vtDe(i)); delete v.enviado;
+          if (ehRH) Object.assign(v, { stRH: val('st') === 'DEVOLVIDO' ? 'DEVOLVIDO' : 'LANÇADO', obsRH: val('obs'), dataRH: hojeI });
+          else { Object.assign(v, { vt: val('vt'), vr: val('vr'), obsSup: val('obs'), dataSup: hojeI, motivo: motivoVT(i) }); if (/DEVOLV/i.test(v.stRH || '')) { v.stRH = ''; v.obsRH = ''; v.dataRH = ''; } }
+          l[chaveVT(i)] = { em, v };
+          vtSel.delete(chaveVT(i));
+        });
+        vtSalvar(l);
+        fechar(); renderVT(); renderPend();
+      } catch (e) {
+        bt.disabled = false; bt.textContent = 'Tentar de novo';
+        erro('Não foi possível gravar: ' + esc(e.message));
+      }
+    };
+  }
 
   // ALTERADO (23/10/2026): aba RESPOSTA DO RH — pendências já respondidas pelo gestor com o que o RH preencheu
   //   na JUSTIFICATIVAS_PAINEL (Pagamento_HE_Permitido, Status_RH, Observacao_RH, Data_Ajuste_RH)
@@ -2129,6 +2326,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <div class="bh-modal-topo"><h3>Justificar · ${esc(tipo)}</h3><button type="button" class="bh-x" title="Fechar">✕</button></div>
       <div class="bh-modal-lista">${itens.slice(0, 8).map(i => `<div><b>${esc(i.n)}</b> · ${dataBr(i.d)} (${esc(i.dia || '')}) · <span>${esc(i.det)}</span></div>`).join('')}${itens.length > 8 ? `<div>… e mais ${itens.length - 8}</div>` : ''}</div>
       ${(() => { const dv = itens.map(justDe).filter(devRH); return dv.length ? `<div class="bh-aviso" style="background:#fee2e2;color:#991b1b">↩ <b>Devolvido pelo RH</b>${dv.length > 1 ? ' (' + dv.length + ')' : ''}: ${[...new Set(dv.map(x => x.obsRH).filter(Boolean))].map(esc).join(' · ') || 'sem observação'}. Corrija e envie de novo.</div>` : ''; })()}
+      ${itens.some(i => motivoVT(i)) ? `<div class="bh-aviso" style="background:#eff6ff;color:#1e3a8a">🚌 ${esc(motivoVT(itens.find(i => motivoVT(i))))}: o dia é fora da escala. Além da justificativa, preencha VT e VR na aba <b>VT / VR · fora da escala</b>.</div>` : ''}
       ${ehHE && !permitido ? '<div class="bh-aviso">⚠ BH negativo: a HE não pode ser paga. Use "BANCO DE HORAS" para compensar o débito.</div>' : ''}
       ${tipo === 'FALTA' ? '<div class="bh-aviso">AUSENTE = falta confirmada (o RH desconta) · FALTA INDEVIDA = o colaborador trabalhou, o RH retira a falta · BANCO DE HORAS = as horas da falta saem do banco (pode ficar negativo) · APENAS JUSTIFICAR = só registra o motivo.</div>' : ''}
       ${tipo === 'ATRASO' ? (temBanco ? '<div class="bh-aviso" style="background:#ecfdf5;color:#065f46">Colaborador com saldo positivo: o atraso pode ser descontado do banco de horas.</div>' : '<div class="bh-aviso">Colaborador sem saldo positivo: escolhendo "BANCO DE HORAS", o atraso é descontado e o banco fica (mais) negativo.</div>') : ''}
