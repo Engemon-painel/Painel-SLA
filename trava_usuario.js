@@ -45,6 +45,11 @@
   const NAV = 'nav-bancohoras';
   const TITULO = 'Banco de Horas';
   const CHAVE = 'bhUsuarioLogado';
+  // ALTERADO (03/11/2026): DERRUBAR TODO MUNDO — o painel lê o sessao_bh.json a cada minuto.
+  // Para tirar todos que estão na página, troque o número de "versao" nesse arquivo (ex.: 1 → 2) e suba no GitHub:
+  // em até 1 minuto todos saem e precisam entrar de novo com e-mail e senha.
+  const ARQ_SESSAO = 'sessao_bh.json';
+  let versaoSessao = null;   // versão lida do sessao_bh.json
 
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const normUser = u => String(u || '').trim().toLowerCase();
@@ -134,7 +139,7 @@
       const usr = normUser(iu.value);
       const kUsr = usr ? await sha256(usr) : '';
       if(usr && is.value && USUARIOS[kUsr] && await sha256(usr + ':' + is.value) === USUARIOS[kUsr]){
-        try{ sessionStorage.setItem(CHAVE, usr); sessionStorage.setItem(CHAVE + 'K', kUsr); }catch(e){}
+        try{ sessionStorage.setItem(CHAVE, usr); sessionStorage.setItem(CHAVE + 'K', kUsr); sessionStorage.setItem(CHAVE + 'V', String(versaoSessao ?? '')); }catch(e){}
         is.value = '';
         aplicar(); marcarCard();
         window.dispatchEvent(new Event('resize'));
@@ -172,7 +177,26 @@
     };
   }
 
+  async function conferirSessao(){
+    try{
+      const r = await fetch(ARQ_SESSAO + '?_=' + Date.now(), { cache: 'no-store' });
+      if(!r.ok) return;
+      const j = await r.json();
+      versaoSessao = String(j && j.versao != null ? j.versao : '');
+      if(!logado()) return;
+      const minha = sessionStorage.getItem(CHAVE + 'V');
+      if(minha !== versaoSessao){
+        sessionStorage.removeItem(CHAVE); sessionStorage.removeItem(CHAVE + 'K'); sessionStorage.removeItem(CHAVE + 'V');
+        aplicar(); marcarCard();
+        const er = document.querySelector('#' + PAGINA + ' .trava-usuario .tu-erro');
+        if(er){ er.style.color = '#64748b'; er.textContent = 'Sessão encerrada. Entre de novo com seu e-mail e senha.'; }
+      }
+    }catch(e){}
+  }
+
   function iniciar(){
+    conferirSessao();
+    setInterval(conferirSessao, 60 * 1000);
     let n = 0;
     const tentar = () => { const ok = aplicar(); marcarCard(); return ok; };
     if(!tentar()){ const t = setInterval(() => { if(tentar() || ++n > 40) clearInterval(t); }, 250); }
