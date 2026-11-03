@@ -70,7 +70,9 @@
     { mes: '2026-07', programadas: 1327, executadas: 1264 },
     { mes: '2026-08', programadas: 1267, executadas: 1216 },
     // fixo: true = número oficial de fechamento; vale mesmo que o mês exista na base
-    { mes: '2026-09', programadas: 1392, executadas: 1288, fixo: true }
+    { mes: '2026-09', programadas: 1392, executadas: 1288, fixo: true },
+    // ALTERADO (03/11/2026): fechamento de outubro (base de 03/11 08:02): 1.448 programadas, 1.445 executadas (99,8%)
+    { mes: '2026-10', programadas: 1448, executadas: 1445, fixo: true }
   ];
 
   // ---- EQUIPES MOP · MÓVEL (aba "Capacidade MOP Móvel") — edite aqui ----
