@@ -1467,6 +1467,23 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const abs = {};
     (pendAbs || []).filter(a => a.f === fo).forEach(a => { abs[mat6(a.m)] = a; });
     const temBat = (pendAbs || []).some(a => a.dEscP != null);
+    // ALTERADO (03/11/2026): quem está no espelho/absenteísmo mas ainda não está no relatório de BH
+    //   (ex.: admitido recente) também entra na lista — com os mesmos filtros de projeto, coordenador, supervisor e busca
+    {
+      const jaTem = new Set(itens.map(i => mat6(i.m)));
+      const b = filtro.busca.toLowerCase();
+      const semBH = !filtro.tp && !filtro.cr && (!filtro.st || /^ativo/i.test(filtro.st));
+      if (semBH) Object.keys(abs).forEach(k => {
+        if (jaTem.has(k)) return;
+        const a = abs[k];
+        const x = { n: a.n, m: a.m, sup: a.sup, co: a.co, cc: a.cc, novoBH: true };
+        if (!passaProj(x)) return;
+        if (filtro.co && String(x.co || '').trim() !== String(filtro.co).trim()) return;
+        if (filtro.sup && String(x.sup || '').trim() !== String(filtro.sup).trim()) return;
+        if (b && !String(x.n).toLowerCase().includes(b) && !String(x.m).includes(b)) return;
+        itens.push(x);
+      });
+    }
     const linhas = itens.map(i => {
       const a = abs[mat6(i.m)], fora = !noEsp.has(mat6(i.m));
       const cal = a && a.dCal != null;
@@ -1502,7 +1519,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const c = l.pct >= 10 ? VERMELHO : l.pct >= 5 ? '#b45309' : '#0f9d58';
       return `<tr${l.sit === 'zero' || l.sit === 'fora' ? ' style="background:#fef2f2"' : ''}>
         <td>${al}</td><td>${esc(l.i.m)}</td>
-        <td class="nm" title="${esc(l.i.n)}">${esc(l.i.n)}<small>${esc(l.i.sup || '')}</small></td>
+        <td class="nm" title="${esc(l.i.n)}">${esc(l.i.n)}<small>${esc(l.i.sup || '')}${l.i.novoBH ? ' · <span style="color:#7c3aed" title="Está no espelho de ponto, mas ainda não aparece no relatório de banco de horas">ainda fora do relatório de BH</span>' : ''}</small></td>
         <td>${esc(l.cc || '—')}</td><td>${esc(l.esc || '—')}</td>
         <td class="num">${v(l.dPer)}</td><td class="num${l.dAus ? ' neg' : ''}">${v(l.dAus)}</td>
         <td class="num" style="font-weight:700;color:${l.dPer ? c : '#94a3b8'}">${l.dPer ? f1(l.pct) + '%' : '—'}</td>
