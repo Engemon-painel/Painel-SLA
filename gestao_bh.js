@@ -1729,13 +1729,18 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   function motivoVT(i) {
     if (i.tipo !== 'HORA EXTRA') return '';
     const d = String(i.d || '').slice(0, 10);
+    // ALTERADO (03/11/2026): escala 12x36 não abre VT/VR (o feriado faz parte da escala).
+    //   Escala fixa (SEG A SEX...) que trabalhou em feriado abre. Fora do feriado, só abre em dia fora da escala.
+    if (/\d+\s*X\s*\d+/i.test(String(i.turno || ''))) return '';   // 12x36: dia da escala
+    // feriado para quem é de escala fixa (SEG A SEX, SEG A SAB...): trabalhou no feriado → paga VT/VR
     if (FERIADOS[d]) return 'Feriado · ' + FERIADOS[d];
-    if (/\d+\s*X\s*\d+/i.test(String(i.turno || ''))) return '';   // 12x36: o turno do dia não diz se era folga
     const p = percHE(i);
-    if (p && p.p === 100) return p.motivo.charAt(0).toUpperCase() + p.motivo.slice(1);
     const w = new Date(d + 'T12:00:00Z').getUTCDay();
-    if (w === 6 && jornadaDia(String(i.det || ''), i.turno, i.dia) == null) return 'Sábado (fora da escala)';
-    return '';
+    let fora = '';
+    if (p && p.p === 100) fora = p.motivo.charAt(0).toUpperCase() + p.motivo.slice(1);
+    else if (w === 6 && jornadaDia(String(i.det || ''), i.turno, i.dia) == null) fora = 'Sábado (fora da escala)';
+    if (!fora) return '';
+    return FERIADOS[d] ? 'Feriado · ' + FERIADOS[d] + ' · ' + fora : fora;
   }
   function vtDe(i) {
     const k = chaveVT(i), l = vtLocais()[k];
