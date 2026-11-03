@@ -1307,6 +1307,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       trat === 'PAGAMENTO HE' && up(hePerm) === 'NÃO' ? 'INVÁLIDO - BH NEGATIVO NÃO PERMITE PAGAMENTO' :
       trat === 'PAGAMENTO HE' && !String(j.tarefa || '').trim() ? 'INCOMPLETO - FALTA TAREFA HE' :
       trat === 'AJUSTAR PONTO' && (pend === 'PONTO ABERTO' || pend === 'SEM MARCACAO') && !String(j.horario || '').trim() ? 'INCOMPLETO - FALTA HORÁRIO/MARCAÇÃO' :
+      /^OK\b/.test(rh) ? 'CONCLUÍDO' :   // ALTERADO (03/11/2026): RH "OK - Sem necessidade de ajuste" fecha a pendência
       ['PAGAMENTO HE', 'AJUSTAR PONTO', 'AUSENTE', 'FALTA INDEVIDA'].includes(trat) && rh === 'AJUSTADO' ? 'CONCLUÍDO' :
       trat === 'PAGAMENTO HE' ? 'PRONTO PARA RH - HE' :
       trat === 'AJUSTAR PONTO' ? 'AGUARDANDO RH - AJUSTE DE PONTO' :
@@ -1888,7 +1889,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   const rhSel = new Set();   // ALTERADO (30/10/2026): pendências marcadas para o RH responder em lote
   let rhTipo = '';     // ALTERADO (30/10/2026): filtro por tipo de pendência na aba Resposta do RH
   let rhFiltro = '';   // '' = todas · 'aguardando' · 'AJUSTADO' · 'devolvido' · 'outros'
-  const grupoRH = j => { const t = up(j.stRH); return !t ? 'aguardando' : t === 'AJUSTADO' ? 'AJUSTADO' : /DEVOLV/.test(t) ? 'devolvido' : 'outros'; };
+  const grupoRH = j => { const t = up(j.stRH); return !t ? 'aguardando' : (t === 'AJUSTADO' || /^OK\b/.test(t)) ? 'AJUSTADO' : /DEVOLV/.test(t) ? 'devolvido' : 'outros'; };
   function renderRH() {
     if (!$('#bh-rh-kpis') || !pend) return;
     const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim(), fo = folhaSel();
@@ -1907,7 +1908,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const nav = document.querySelector('#' + CONTAINER + ' .bh-nav button[data-aba="rh"] .bh-cont');
     if (nav) { nav.textContent = cont.aguardando; nav.hidden = !cont.aguardando; }
     const cards = [['aguardando', 'Aguardando RH', cont.aguardando, '#b45309', 'gestor respondeu, RH ainda não'],
-      ['AJUSTADO', 'Ajustado pelo RH', cont.AJUSTADO, COR_SIT['Justificado'], pct(cont.AJUSTADO, baseT.length) + '% do total'],
+      ['AJUSTADO', 'Ajustado / OK pelo RH', cont.AJUSTADO, COR_SIT['Justificado'], pct(cont.AJUSTADO, baseT.length) + '% do total'],
       ['devolvido', 'Devolvido ao gestor', cont.devolvido, VERMELHO, 'RH pediu correção'],
       ['rhresp', 'Respondidas pelo RH', respRH.length, '#0b3a75', `${nf(respRHaj)} ajustadas · ${nf(respRH.length - respRHaj)} devolvidas`],
       ['', 'Respondidas', baseT.length, '#334155', folhaSel() ? 'folha ' + rotFolha(folhaSel()) : 'todas as folhas']];
@@ -1975,7 +1976,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     itens = itens.filter(Boolean);
     if (!itens.length) return;
     const atual = itens.length === 1 ? justDe(itens[0]) : {};
-    const stAt = /DEVOLV/i.test(atual.stRH || '') ? 'DEVOLVIDO' : (up(atual.stRH) === 'AJUSTADO' ? 'AJUSTADO' : '');
+    const stAt = /DEVOLV/i.test(atual.stRH || '') ? 'DEVOLVIDO' : /^OK\b/i.test(atual.stRH || '') ? 'OK' : (up(atual.stRH) === 'AJUSTADO' ? 'AJUSTADO' : '');
     const modal = document.createElement('div');
     modal.className = 'bh-modal';
     modal.innerHTML = `<div class="bh-modal-box" role="dialog" aria-modal="true">
@@ -1989,6 +1990,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <label>Status RH<select data-c="st">
           <option value="">— escolha —</option>
           <option value="AJUSTADO"${stAt === 'AJUSTADO' ? ' selected' : ''}>AJUSTADO</option>
+          <option value="OK"${stAt === 'OK' ? ' selected' : ''}>OK - SEM NECESSIDADE DE AJUSTE</option>
           <option value="DEVOLVIDO"${stAt === 'DEVOLVIDO' ? ' selected' : ''}>DEVOLVIDO AO GESTOR</option>
         </select></label>
         <label style="justify-content:flex-end;font-weight:400;color:#64748b;font-size:12px">A data do ajuste é gravada sozinha (hoje).</label>
@@ -2008,10 +2010,10 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const bt = modal.querySelector('[data-a="enviar"]');
     bt.onclick = async () => {
       const st = modal.querySelector('[data-c="st"]').value, obs = modal.querySelector('[data-c="obs"]').value.trim();
-      if (!st) { prev.innerHTML = `<span style="color:${VERMELHO}">● Escolha AJUSTADO ou DEVOLVIDO.</span>`; return; }
+      if (!st) { prev.innerHTML = `<span style="color:${VERMELHO}">● Escolha AJUSTADO, OK - SEM NECESSIDADE DE AJUSTE ou DEVOLVIDO.</span>`; return; }
       if (st === 'DEVOLVIDO' && !obs) { prev.innerHTML = `<span style="color:${VERMELHO}">● Para devolver, escreva na observação o que o gestor precisa corrigir.</span>`; return; }
       if (!FLUXO_JUSTIFICATIVA) { prev.innerHTML = `<span style="color:${VERMELHO}">● O envio não está configurado.</span>`; return; }
-      const stRH = st === 'DEVOLVIDO' ? 'NÃO REALIZADO - DEVOLVIDO' : 'AJUSTADO';
+      const stRH = st === 'DEVOLVIDO' ? 'NÃO REALIZADO - DEVOLVIDO' : st === 'OK' ? 'OK - SEM NECESSIDADE DE AJUSTE' : 'AJUSTADO';
       bt.disabled = true; bt.textContent = 'Gravando…';
       try {
         const corpo = { acao: 'RH', itens: itens.map(i => ({ ID: i.id, Status_RH: stRH, Observacao_RH: obs })) };
