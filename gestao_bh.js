@@ -1284,11 +1284,13 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (!m) return '';
     const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
-    while (n > 0) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) n--; }
+    // ALTERADO (03/11/2026): feriado não conta como dia útil (lista FERIADOS, na aba VT / VR)
+    while (n > 0) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6 && !FERIADOS[d.toISOString().slice(0, 10)]) n--; }
     return d.toISOString().slice(0, 10);
   };
   // ALTERADO (28/10/2026): a espera de 2 dias úteis vale só para PONTO ABERTO; as outras pendências aparecem na hora
-  const liberada = i => String(i.tipo || '').trim().toUpperCase() !== 'PONTO ABERTO' || (i.just && i.just.trat) || hojeIso() > somarDiasUteis(i.d, 2);
+  // ALTERADO (03/11/2026): PONTO ABERTO e FALTA esperam 2 dias úteis da data (se o gestor já respondeu, aparece)
+  const liberada = i => !['PONTO ABERTO', 'FALTA'].includes(String(i.tipo || '').trim().toUpperCase()) || (i.just && i.just.trat) || hojeIso() > somarDiasUteis(i.d, 2);
 
   const up = v => String(v == null ? '' : v).trim().toUpperCase();
   const dataBr = iso => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3] + '/' + m[2] + '/' + m[1] : String(iso || ''); };
