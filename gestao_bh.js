@@ -1857,9 +1857,13 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
               VT: val('vt'), VR: val('vr'), Observacao_Supervisor: val('obs') })) };
         const r = await fetch(FLUXO_JUSTIFICATIVA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(corpo) });
         const txt = await r.text();
-        let resp = null; try { resp = JSON.parse(txt); } catch (e) { }
+        const resp = lerResposta(txt);
         if (!r.ok) throw new Error('o fluxo respondeu ' + r.status);
-        if (resp && !('gravadas' in resp)) throw new Error('o fluxo rodou mas NÃO gravou: atualize o script Pendencias no Excel (versão com VT / VR)');
+        if (resp && !('gravadas' in resp) && ('itens' in resp || 'geradoEm' in resp)) throw new Error('o fluxo rodou mas NÃO gravou: atualize o script Pendencias no Excel (versão com VT / VR)');
+        if (resp && resp.ok === false && !(resp.resultados || []).some(x => x.ok)) {
+          const er = (resp.erro) || (resp.resultados && resp.resultados[0] && resp.resultados[0].erro) || 'o script recusou a gravação';
+          throw new Error(/sem chave|Nenhuma justificativa/i.test(er) ? 'o Excel ainda está com o script Pendencias antigo: cole a versão com VT / VR' : er);
+        }
         const okK = new Set(resp && Array.isArray(resp.resultados) ? resp.resultados.filter(x => x.ok).map(x => x.ID) : itens.map(chaveVT));
         if (!okK.size) throw new Error((resp && resp.resultados && resp.resultados[0] && resp.resultados[0].erro) || 'nada foi gravado');
         const l = vtLocais(), em = new Date().toISOString();
@@ -2013,7 +2017,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         const corpo = { acao: 'RH', itens: itens.map(i => ({ ID: i.id, Status_RH: stRH, Observacao_RH: obs })) };
         const r = await fetch(FLUXO_JUSTIFICATIVA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(corpo) });
         const txt = await r.text();
-        let resp = null; try { resp = JSON.parse(txt); } catch (e) { }
+        const resp = lerResposta(txt);
         if (!r.ok) throw new Error('o fluxo respondeu ' + r.status);
         if (resp && !('gravadas' in resp) && ('itens' in resp || 'geradoEm' in resp))
           throw new Error('o fluxo rodou mas NÃO gravou: atualize o script Pendencias no Excel (versão com a resposta do RH)');
@@ -2405,7 +2409,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         const corpo = { itens: itens.map(i => linha(i, j)) };
         const r = await fetch(FLUXO_JUSTIFICATIVA, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(corpo) });
         const txt = await r.text();
-        let resp = null; try { resp = JSON.parse(txt); } catch (e) { }
+        const resp = lerResposta(txt);
         if (!r.ok || (resp && resp.ok === false)) throw new Error((resp && resp.erro) || ('o fluxo respondeu ' + r.status));
         // ALTERADO (21/10/2026): o script só grava quando recebe o campo "dados"; sem ele, devolve a exportação
         // (com "itens" e sem "gravadas") e nada é gravado. Confere a resposta antes de dar como enviado.
@@ -2586,6 +2590,20 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     return n;
   }
 
+  // ALTERADO (03/11/2026): resposta do fluxo pode vir embrulhada ({"result":"{...}"}, {"body":...}) — desembrulha
+  function lerResposta(txt) {
+    let d = null;
+    try { d = JSON.parse(String(txt || '').replace(/^\uFEFF/, '')); } catch (e) { return null; }
+    for (let i = 0; i < 4; i++) {
+      if (typeof d === 'string') { try { d = JSON.parse(d); continue; } catch (e) { return null; } }
+      if (d && typeof d === 'object' && !Array.isArray(d) && !('gravadas' in d) && !('ok' in d)) {
+        const emb = ['result', 'body', 'Result', 'Body', 'resultado', 'content', 'value', 'outputs'].find(k => k in d);
+        if (emb) { d = d[emb]; continue; }
+      }
+      break;
+    }
+    return d && typeof d === 'object' ? d : null;
+  }
   // Lê o JSON mesmo quando o Power Automate grava embrulhado: {"result":"{...}"}, {"body":...} ou texto
   async function lerJson(url) {
     const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now(), { cache: 'no-store' });
