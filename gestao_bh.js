@@ -100,7 +100,7 @@
   const passaProj = i => !filtro.pj || projItem(i) === filtro.pj;
 
   // estado das abas novas
-  let aba = 'geral';
+  let aba = 'jornada';
   let tipoSel = '';             // '' | POSITIVO | NEGATIVO (aba por faixa)
   let faixaSel = '';            // '' = todas · 'P:0-30' / 'N:0 A -8H'
   let ultimosItens = [];
@@ -180,6 +180,14 @@ ${C} .bh-c .sub{margin:0 0 10px;font-size:12px;color:var(--bh-sub)}
 ${C} .s3{grid-column:span 3}${C} .s4{grid-column:span 4}${C} .s5{grid-column:span 5}${C} .s6{grid-column:span 6}${C} .s7{grid-column:span 7}${C} .s8{grid-column:span 8}${C} .s12{grid-column:span 12}
 ${C} .bh-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 ${C} .bh-k{border-radius:14px;padding:14px 16px;color:#fff;min-width:0}
+${C} .bh-jk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+${C} .bh-jk .bh-k b{font-size:26px}
+@media (max-width:1100px){${C} .bh-jk{grid-template-columns:repeat(2,minmax(0,1fr))}}
+${C} .bh-rank ol{list-style:none;margin:6px 0 0;padding:0}
+${C} .bh-rank li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12.5px}
+${C} .bh-rank li .r{font-weight:700;color:#94a3b8;text-align:right}
+${C} .bh-rank li .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+${C} .bh-rank li .nm small{display:block;color:#64748b;font-size:11px}
 ${C} .bh-k small{display:block;font-size:13px;opacity:.9;font-weight:600}
 ${C} .bh-k b{display:block;font-size:30px;line-height:1.15;margin:4px 0 2px;white-space:nowrap}
 ${C} .bh-k span{font-size:12px;opacity:.85}
@@ -275,7 +283,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     <div class="bh-layout">
     <nav class="bh-nav">
       <div class="rot">Banco de Horas</div>
-      <button type="button" data-aba="geral" class="on"><span class="ic">📊</span>Visão Geral</button>
+      <button type="button" data-aba="jornada" class="on"><span class="ic">🎯</span>Gestão de Jornada e Conformidade</button>
+      <button type="button" data-aba="geral"><span class="ic">📊</span>Saldo do Banco de Horas</button>
       <button type="button" data-aba="faixa"><span class="ic">👥</span>Funcionários por Faixa</button>
       <button type="button" data-aba="evol"><span class="ic">📈</span>Evolução por Supervisor</button>
       <button type="button" data-aba="pend"><span class="ic">📝</span>Pendências<span class="bh-cont" hidden></span></button>
@@ -291,23 +300,42 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       <select data-f="pj" data-nao="evol"><option value="">Projeto: todos</option><option value="CLARO">Claro</option><option value="CIRION">Cirion</option></select>
       <select data-f="co"><option value="">Coordenador: todos</option></select>
       <select data-f="sup"><option value="">Supervisor: todos</option></select>
-      <select data-f="tp" data-nao="pend andamento atraso falta rh"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
-      <select data-f="cr" data-nao="pend andamento atraso falta rh"><option value="">Criticidade: todas</option></select>
-      <select data-f="st" data-nao="pend andamento atraso falta rh"><option value="">Status: todos</option></select>
+      <select data-f="tp" data-nao="pend andamento atraso falta rh jornada"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
+      <select data-f="cr" data-nao="pend andamento atraso falta rh jornada"><option value="">Criticidade: todas</option></select>
+      <select data-f="st" data-nao="pend andamento atraso falta rh jornada"><option value="">Status: todos</option></select>
       <select data-pf="tipo" data-so="pend andamento" hidden><option value="">Pendência: todas</option></select>
       <select data-pf="sit" data-so="pend" hidden></select>
-      <select data-pf="folha" data-so="pend andamento atraso falta rh" hidden title="Folha (dia 15 a 14)"></select>
-      <select data-pf="sem" data-so="pend andamento atraso falta rh" hidden title="Atalho: escolhe uma semana (segunda a domingo) e preenche De / Até"></select>
-      <label class="bh-dt" data-so="pend andamento atraso falta rh" hidden title="Pendências a partir desta data">De <input type="date" data-pf="de"></label>
-      <label class="bh-dt" data-so="pend andamento atraso falta rh" hidden title="Pendências até esta data">Até <input type="date" data-pf="ate"></label>
+      <select data-pf="folha" data-so="pend andamento atraso falta rh jornada" hidden title="Folha (dia 15 a 14)"></select>
+      <select data-pf="sem" data-so="pend andamento atraso falta rh jornada" hidden title="Atalho: escolhe uma semana (segunda a domingo) e preenche De / Até"></select>
+      <label class="bh-dt" data-so="pend andamento atraso falta rh jornada" hidden title="Pendências a partir desta data">De <input type="date" data-pf="de"></label>
+      <label class="bh-dt" data-so="pend andamento atraso falta rh jornada" hidden title="Pendências até esta data">Até <input type="date" data-pf="ate"></label>
       <input data-f="busca" type="search" placeholder="Buscar nome ou matrícula">
       <button type="button" class="bh-limpar">Limpar filtros</button>
     </div>
 
     <div id="bh-esp-alerta"></div>
 
-    <!-- ================= ABA: VISÃO GERAL ================= -->
-    <div class="bh-aba" data-p="geral">
+    <!-- ================= ABA: GESTÃO DE JORNADA E CONFORMIDADE ================= -->
+    <div class="bh-aba" data-p="jornada">
+      <div class="bh-filtros" id="bh-j-filtros" style="margin-top:-4px"></div>
+      <div class="bh-jk" id="bh-j-cards"></div>
+      <div class="bh-g" style="margin-top:12px">
+        <div class="bh-c s5"><h3>Irregularidades</h3><p class="sub">Ocorrências no período do filtro</p><div id="bh-j-irr"></div></div>
+        <div class="bh-c s7"><h3>Pareto dos motivos de pendência</h3><p class="sub">Barras = quantidade · linha = % acumulado</p><div class="bh-box"><canvas id="bh-j-pareto"></canvas></div></div>
+        <div id="bh-j-rank" class="s12 bh-g" style="padding:0"></div>
+        <div class="bh-c s6"><h3>Evolução mensal das pendências</h3><p class="sub">Últimas folhas disponíveis (15 a 14) · por tipo</p><div class="bh-box"><canvas id="bh-j-evol"></canvas></div></div>
+        <div class="bh-c s6"><h3>Horas extras e banco de horas por mês</h3><p class="sub">Crédito e débito do BH por competência · linha = HE das pendências</p><div class="bh-box"><canvas id="bh-j-hebh"></canvas></div></div>
+        <div class="bh-c s7"><h3>Pendências por supervisor</h3><p class="sub">Em aberto x regularizadas</p><div class="bh-box" id="bh-j-box-sup"><canvas id="bh-j-sup"></canvas></div></div>
+        <div class="bh-c s5"><h3>Por contrato e equipe</h3><p class="sub">Equipe = área técnica</p><div class="bh-tab" style="max-height:340px"><table id="bh-j-grp"></table></div></div>
+        <div class="bh-c s6"><h3>Pendências por dia da semana</h3><p class="sub">Data da ocorrência</p><div class="bh-box p"><canvas id="bh-j-dow"></canvas></div></div>
+        <div class="bh-c s6"><h3>Geradas x regularizadas</h3><p class="sub">Por semana · regularizada na semana da resposta</p><div class="bh-box p"><canvas id="bh-j-gr"></canvas></div></div>
+        <div class="bh-c s12"><h3>Conformidade por colaborador</h3><p class="sub" id="bh-j-tab-sub"></p>
+          <div class="bh-tab" style="max-height:600px;margin-top:8px"><table id="bh-j-tab"></table></div></div>
+      </div>
+    </div>
+
+    <!-- ================= ABA: SALDO DO BANCO DE HORAS (antiga Visão Geral) ================= -->
+    <div class="bh-aba" data-p="geral" hidden>
     <div class="bh-g">
       <div class="s8"><div class="bh-kpis" id="bh-kpis"></div></div>
       <div class="bh-c s4">
@@ -1360,6 +1388,14 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         const completar = x => { const o = ORG[kMat(x.m)]; if (!o) return; if (!String(x.sup || '').trim() && o.sup) x.sup = o.sup; if (!String(x.co || '').trim() && o.co) x.co = o.co; };
         pend.forEach(completar);
         if (pendAbs) pendAbs.forEach(completar);
+        // ALTERADO (03/11/2026): quem não está no relatório de BH só entra se estiver ATIVO no Organograma
+        //   (o script passou a ler todo o espelho do contrato; desligados e quem não é da operação ficam de fora)
+        if (Object.keys(ORG).length && dados && Array.isArray(dados.itens)) {
+          const noBH = new Set(dados.itens.map(i => kMat(i.m)));
+          const vale = x => noBH.has(kMat(x.m)) || !!ORG[kMat(x.m)];
+          pend = pend.filter(vale);
+          if (pendAbs) pendAbs = pendAbs.filter(vale);
+        }
       }
       pendEsp = (d && d.espelho && Array.isArray(d.espelho.mats)) ? d.espelho : null;
       pendVT = (d && d.vtvr && typeof d.vtvr === 'object') ? d.vtvr : {};
@@ -1725,7 +1761,220 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       regraTab: 'observacao = Ausente no Espelho de ponto',
       cols: [['Horas ausentes', i => hMin(-(+i.horas || 0)), 'neg']] }
   };
-  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); gAbsenteismo(); renderRH(); renderVT(); };
+  const renderAtraso = () => { renderTipo(TIPOS_ABA.atraso); renderTipo(TIPOS_ABA.falta); gAbsenteismo(); renderRH(); renderVT(); renderJornada(); };
+
+  // =====================================================================
+  // ALTERADO (03/11/2026): ABA "GESTÃO DE JORNADA E CONFORMIDADE" (antiga porta de entrada do Banco de Horas)
+  //   Cards · rankings · irregularidades · gráficos · tabela por colaborador · Índice de Conformidade de Ponto
+  //   Base: pendências do ponto (dados_pend_bh.json + histórico), absenteísmo do espelho, saldo do BH (dados_bh.json)
+  //   e movimentação mensal do BH (dados.json → bancoHoras).
+  // =====================================================================
+  let BH_HIST = [];
+  const jf = { area: '', esc: '', tipo: '', st: '' };
+  const TIPOS_J = { 'FALTA': 'Falta (dia sem marcação)', 'SEM MARCACAO': 'Sem marcação', 'PONTO ABERTO': 'Ponto aberto / incompleto',
+    'INTERJORNADA': 'Interjornada', 'FOLGA NAO CUMPRIDA': 'Folga não cumprida', 'ATRASO': 'Atraso', 'HORA EXTRA': 'Hora extra' };
+  const COR_TJ = { 'FALTA': '#dc2626', 'SEM MARCACAO': '#7c3aed', 'PONTO ABERTO': '#f59e0b', 'INTERJORNADA': '#0e7490',
+    'FOLGA NAO CUMPRIDA': '#be185d', 'ATRASO': '#b45309', 'HORA EXTRA': '#2563eb' };
+  const heMinJ = i => { const m = /(\d+):(\d{2})/.exec(minDet(i.det, 'HE')); return m ? +m[1] * 60 + +m[2] : 0; };
+  const ehAusJ = i => i.tipo === 'FALTA' || i.tipo === 'SEM MARCACAO';
+  const ehIntraJ = i => ehSemAlmoco(i);
+  const heSemAutJ = i => i.tipo === 'HORA EXTRA' && /NAO AUTORIZ/.test(semAc((justDe(i).texto || '') + ' ' + (justDe(i).trat || '')));
+  const irregJ = i => i.tipo !== 'HORA EXTRA' || ehIntraJ(i);          // dia sem cumprir as marcações obrigatórias
+  const stJ = i => ehTratada(i) ? 'tratada' : sitDe(i) === 'Justificado' ? 'regularizada' : 'aberta';
+  const regularJ = i => stJ(i) !== 'aberta';
+  const hhmmH = v => { const n = Number(v) || 0, a = Math.abs(n), h = Math.trunc(a); return Math.sign(n) * (h + Math.round((a - h) * 100) / 60); };
+  const wSem = d => new Date(String(d).slice(0, 10) + 'T12:00:00Z').getUTCDay();
+  const DIAS_TXT = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const escDe = i => String(i.turno || '').replace(/^\s*F\d\|\s*/i, '').split('|')[0].trim();
+  // filtros comuns (projeto, coordenador, supervisor, busca, área, escala, tipo, status) — sem a folha
+  function passaJ(i) {
+    const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
+    return liberada(i) && passaProj(i) && (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
+      (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)) &&
+      (!jf.area || tr(i.area) === jf.area) && (!jf.esc || escDe(i) === jf.esc) &&
+      (!jf.tipo || (jf.tipo === 'INTRAJORNADA' ? ehIntraJ(i) : i.tipo === jf.tipo)) && (!jf.st || stJ(i) === jf.st);
+  }
+  function baseJ() { const fo = folhaSel(); return (pend || []).filter(i => passaJ(i) && (!fo || folhaIniDe(i.d) === fo) && noPeriodo(i)); }
+  // colaboradores do BH (saldo) dentro dos filtros de projeto / coordenador / supervisor / busca / área
+  function bhJ() {
+    const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
+    return (dados.itens || []).filter(i => passaProj(i) && (!filtro.co || tr(i.co) === tr(filtro.co)) && (!filtro.sup || tr(i.sup) === tr(filtro.sup)) &&
+      (!b || String(i.n).toLowerCase().includes(b) || String(i.m).includes(b)) && String(i.st || i.status || 'Ativo').toUpperCase().startsWith('ATIVO'));
+  }
+  // movimentação do BH por competência (crédito / débito), só de quem passa nos filtros
+  function bhMovJ() {
+    const ok = new Set(bhJ().map(i => mat6(i.m)));
+    const por = {};
+    (BH_HIST || []).forEach(r => {
+      if (!ok.has(mat6(r.matricula))) return;
+      const p = String(r.periodo || '').match(/(\d{2})\/(\d{2})\/(\d{4})\s*a\s*(\d{2})\/(\d{2})\/(\d{4})/);
+      if (!p) return;
+      const fo = folhaIniDe(p[3] + '-' + p[2] + '-' + p[1]);
+      const o = por[fo] = por[fo] || { cr: 0, de: 0, porMat: {} };
+      const cr = hhmmH(r.creditoNum), de = hhmmH(r.debitoNum);
+      o.cr += cr; o.de += de; o.porMat[mat6(r.matricula)] = { cr, de };
+    });
+    return por;
+  }
+
+  function renderJornada() {
+    const box = $('#bh-j-cards');
+    if (!box || !pend || !dados) return;
+    const fo = folhaSel();
+    const B = baseJ();
+    const colab = {};
+    B.forEach(i => { const k = mat6(i.m); (colab[k] = colab[k] || { i, l: [] }).l.push(i); });
+    // ---- filtros próprios (área, escala, tipo, status)
+    const todos = (pend || []).filter(liberada);
+    const op = (arr, sel, rot) => `<option value="">${rot}</option>` + arr.map(v => `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(v)}</option>`).join('');
+    const areas = [...new Set(todos.map(i => String(i.area || '').trim()).filter(Boolean))].sort();
+    const escs = [...new Set(todos.map(escDe).filter(Boolean))].sort();
+    $('#bh-j-filtros').innerHTML =
+      `<select data-j="area">${op(areas, jf.area, 'Área: todas')}</select>` +
+      `<select data-j="esc">${op(escs, jf.esc, 'Escala: todas')}</select>` +
+      `<select data-j="tipo"><option value="">Tipo de pendência: todos</option>${Object.keys(TIPOS_J).concat(['INTRAJORNADA']).map(t => `<option value="${t}"${t === jf.tipo ? ' selected' : ''}>${esc(TIPOS_J[t] || 'Intrajornada (intervalo não registrado)')}</option>`).join('')}</select>` +
+      `<select data-j="st">${[['', 'Status: todos'], ['aberta', 'Em aberto (não tratada)'], ['regularizada', 'Regularizada (justificada)'], ['tratada', 'Tratada · saiu da base']].map(([v, r]) => `<option value="${v}"${v === jf.st ? ' selected' : ''}>${r}</option>`).join('')}</select>`;
+    $('#bh-j-filtros').querySelectorAll('select').forEach(s => s.onchange = () => { jf[s.dataset.j] = s.value; renderJornada(); });
+
+    // ---- cards
+    const nAus = B.filter(ehAusJ).length;
+    const nReg = B.filter(regularJ).length;
+    const heMin = B.filter(i => i.tipo === 'HORA EXTRA').reduce((s, i) => s + heMinJ(i), 0);
+    const mov = bhMovJ();
+    const movFo = mov[fo || folhaIniDe(hojeIso())] || mov[Object.keys(mov).sort().pop()] || { cr: 0, de: 0, porMat: {} };
+    const foMov = mov[fo || folhaIniDe(hojeIso())] ? (fo || folhaIniDe(hojeIso())) : Object.keys(mov).sort().pop();
+    const bh = bhJ();
+    const saldo = bh.reduce((s, i) => s + (+i.h || 0), 0);
+    // Índice de Conformidade de Ponto: dias sem pendência de marcação ÷ dias de escala no período
+    const absFo = {};
+    (pendAbs || []).filter(a => a.f === (fo || folhaIniDe(hojeIso()))).forEach(a => { absFo[mat6(a.m)] = a; });
+    const conf = k => { const a = absFo[k]; if (!a || !(a.dEscP > 0)) return null;
+      const dias = new Set((colab[k] ? colab[k].l : []).filter(irregJ).map(i => String(i.d).slice(0, 10))).size;
+      return { dias: a.dEscP, irr: Math.min(dias, a.dEscP), pct: Math.max(0, 1 - dias / a.dEscP) * 100 }; };
+    let totD = 0, totI = 0;
+    const kConf = new Set(Object.keys(absFo).filter(k => { const a = absFo[k]; const x = { n: a.n, m: a.m, sup: a.sup, co: a.co, cc: a.cc, area: '' };
+      const b = filtro.busca.toLowerCase(), tr = v => String(v || '').trim();
+      return passaProj(x) && (!filtro.co || tr(x.co) === tr(filtro.co)) && (!filtro.sup || tr(x.sup) === tr(filtro.sup)) && (!b || String(x.n).toLowerCase().includes(b) || String(x.m).includes(b)); }));
+    kConf.forEach(k => { const c = conf(k); if (c) { totD += c.dias; totI += c.irr; } });
+    const icp = totD ? (1 - totI / totD) * 100 : null;
+    const corIcp = icp == null ? '#334155' : icp >= 95 ? '#0f9d58' : icp >= 85 ? '#b45309' : '#dc2626';
+    const f1 = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const cards = [
+      ['📝 Pendências de ponto', nf(B.length), fo ? 'folha ' + rotFolha(fo) : 'todas as folhas', '#0b2545'],
+      ['⛔ Marcações ausentes', nf(nAus), 'faltas + sem marcação', '#dc2626'],
+      ['👥 Colaboradores com pendência', nf(Object.keys(colab).length), 'no filtro', '#334155'],
+      ['✅ Regularização', (B.length ? f1(nReg / B.length * 100) : '0,0') + '%', nf(nReg) + ' de ' + nf(B.length) + ' tratadas', nReg / (B.length || 1) >= .8 ? '#0f9d58' : '#b45309'],
+      ['⏱️ Horas extras no mês', hMin(heMin / 60).replace('+', ''), nf(B.filter(i => i.tipo === 'HORA EXTRA').length) + ' lançamentos de HE', '#2563eb'],
+      ['🏦 BH gerado no mês', `<span style="font-size:20px">+${hMin(movFo.cr).replace('+', '')} / −${hMin(movFo.de).replace('+', '')}</span>`, foMov ? 'competência ' + rotFolha(foMov) : 'sem movimentação', '#0e7490'],
+      ['💰 Saldo acumulado do BH', hMin(saldo), nf(bh.length) + ' colaboradores ativos', saldo >= 0 ? '#065f46' : '#991b1b'],
+      ['🎯 Conformidade do ponto', icp == null ? '—' : f1(icp) + '%', icp == null ? 'sem dados do espelho para a folha' : `${nf(totD - totI)} de ${nf(totD)} dias sem pendência`, corIcp]];
+    box.innerHTML = cards.map(c => `<div class="bh-k" style="background:${c[3]}"><small>${c[0]}</small><b>${c[1]}</b><span>${c[2]}</span></div>`).join('');
+
+    // ---- irregularidades
+    const irr = [['⛔ Marcações de ponto ausentes', nAus, '#dc2626', 'FALTA'], ['🕗 Pontos abertos ou incompletos', B.filter(i => i.tipo === 'PONTO ABERTO').length, '#f59e0b', 'PONTO ABERTO'],
+      ['🌙 Interjornada', B.filter(i => i.tipo === 'INTERJORNADA').length, '#0e7490', 'INTERJORNADA'], ['🍽️ Intrajornada (intervalo não registrado)', B.filter(ehIntraJ).length, '#7c3aed', 'INTRAJORNADA'],
+      ['📅 Folgas não cumpridas', B.filter(i => i.tipo === 'FOLGA NAO CUMPRIDA').length, '#be185d', 'FOLGA NAO CUMPRIDA'], ['🚫 HE sem autorização', B.filter(heSemAutJ).length, '#991b1b', ''],
+      ['⏳ Pendências ainda não tratadas', B.filter(i => stJ(i) === 'aberta').length, '#b45309', '']];
+    const mxI = Math.max(1, ...irr.map(x => x[1]));
+    $('#bh-j-irr').innerHTML = irr.map(x => `<div class="bh-bar" style="grid-template-columns:260px 1fr 60px"><span>${x[0]}</span><i><em style="width:${x[1] / mxI * 100}%;background:${x[2]}"></em></i><b style="text-align:right">${nf(x[1])}</b></div>`).join('') +
+      '<p class="sub" style="margin-top:8px">HE sem autorização = hora extra com justificativa "não autorizada" · intrajornada = jornada acima de 6h sem o intervalo registrado</p>';
+
+    // ---- rankings
+    const top = (arr, val, fmt, n = 10) => arr.filter(x => val(x) > 0).sort((a, b) => val(b) - val(a)).slice(0, n)
+      .map((x, k) => `<li><span class="r">${k + 1}</span><span class="nm">${esc(x.i.n)}<small>${esc(x.i.sup || '')}</small></span><b>${fmt(val(x))}</b></li>`).join('') || '<li style="color:#94a3b8">—</li>';
+    const C = Object.values(colab);
+    const negTop = bh.filter(i => (+i.h || 0) < 0).sort((a, b) => a.h - b.h).slice(0, 10).map((i, k) => `<li><span class="r">${k + 1}</span><span class="nm">${esc(i.n)}<small>${esc(i.sup || '')}</small></span><b class="neg">${hMin(i.h)}</b></li>`).join('') || '<li style="color:#94a3b8">—</li>';
+    const posTop = bh.filter(i => (+i.h || 0) > 0).sort((a, b) => b.h - a.h).slice(0, 10).map((i, k) => `<li><span class="r">${k + 1}</span><span class="nm">${esc(i.n)}<small>${esc(i.sup || '')}</small></span><b class="pos">${hMin(i.h)}</b></li>`).join('') || '<li style="color:#94a3b8">—</li>';
+    // reincidência: folhas seguidas com pendência de marcação (ignora o filtro de folha)
+    const porMatF = {};
+    (pend || []).filter(i => passaJ(i) && irregJ(i)).forEach(i => { const k = mat6(i.m); (porMatF[k] = porMatF[k] || { i, f: new Set() }).f.add(folhaIniDe(i.d)); });
+    const proxF = f => { const [a, m] = f.split('-').map(Number); const d = new Date(Date.UTC(a, m, 15)); return d.toISOString().slice(0, 10); };
+    const reinc = Object.values(porMatF).map(o => { const fs = [...o.f].sort(); let best = 1, run = 1;
+      for (let k = 1; k < fs.length; k++) { run = proxF(fs[k - 1]) === fs[k] ? run + 1 : 1; best = Math.max(best, run); } return { i: o.i, v: fs.length > 1 ? best : 1, fs }; })
+      .filter(o => o.v >= 2);
+    $('#bh-j-rank').innerHTML = [
+      ['⛔ Mais marcações ausentes', top(C, x => x.l.filter(ehAusJ).length, nf)],
+      ['📝 Mais pendências de ponto', top(C, x => x.l.length, nf)],
+      ['⏱️ Maior volume de HE', top(C, x => x.l.filter(i => i.tipo === 'HORA EXTRA').reduce((s, i) => s + heMinJ(i), 0) / 60, v => hMin(v).replace('+', ''))],
+      ['💰 Maiores saldos positivos de BH', posTop],
+      ['🔻 Maiores saldos negativos de BH', negTop],
+      ['🔁 Reincidência em folhas seguidas', reinc.sort((a, b) => b.v - a.v || b.fs.length - a.fs.length).slice(0, 10).map((o, k) => `<li><span class="r">${k + 1}</span><span class="nm">${esc(o.i.n)}<small>${esc(o.i.sup || '')}</small></span><b>${o.v} folhas</b></li>`).join('') || '<li style="color:#94a3b8">ninguém com pendência em 2 folhas seguidas</li>']
+    ].map(([t, h]) => `<div class="bh-c s4 bh-rank"><h3>${t}</h3><ol>${h}</ol></div>`).join('');
+
+    // ---- gráficos
+    const folhas = [...new Set((pend || []).map(i => folhaIniDe(i.d)).filter(Boolean))].sort().slice(-6);
+    const pendF = (pend || []).filter(i => passaJ(i));
+    const tiposOrd = Object.keys(TIPOS_J);
+    desenhar('bh-j-evol', { type: 'bar',
+      data: { labels: folhas.map(rotFolha), datasets: tiposOrd.map(t => ({ label: TIPOS_J[t], data: folhas.map(f => pendF.filter(i => i.tipo === t && folhaIniDe(i.d) === f).length), backgroundColor: COR_TJ[t], stack: 'p' })) },
+      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } }, datalabels: { display: false } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true } } } });
+    // pareto por tipo
+    const cnt = {}; B.forEach(i => { const t = ehIntraJ(i) ? 'INTRAJORNADA' : i.tipo; cnt[t] = (cnt[t] || 0) + 1; });
+    const par = Object.entries(cnt).sort((a, b) => b[1] - a[1]); let ac = 0;
+    desenhar('bh-j-pareto', { type: 'bar',
+      data: { labels: par.map(p => TIPOS_J[p[0]] || 'Intrajornada'), datasets: [
+        { type: 'line', label: '% acumulado', data: par.map(p => { ac += p[1]; return Math.round(ac / (B.length || 1) * 1000) / 10; }), yAxisID: 'y1', borderColor: '#0b2545', backgroundColor: '#0b2545', pointRadius: 3, tension: .2, datalabels: { display: false } },
+        { label: 'Pendências', data: par.map(p => p[1]), backgroundColor: par.map(p => COR_TJ[p[0]] || '#7c3aed'), borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'end', color: '#334155', font: { size: 10, weight: '700' } } },
+        scales: { y: { beginAtZero: true, grace: '10%' }, y1: { position: 'right', min: 0, max: 100, grid: { display: false }, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } } } });
+    // por supervisor
+    const porSup = {}; B.forEach(i => { const s = String(i.sup || '—').trim(); const o = porSup[s] = porSup[s] || { a: 0, r: 0 }; regularJ(i) ? o.r++ : o.a++; });
+    const sups = Object.keys(porSup).sort((a, b) => (porSup[b].a + porSup[b].r) - (porSup[a].a + porSup[a].r)).slice(0, 14);
+    $('#bh-j-box-sup').style.height = Math.max(240, sups.length * 26 + 60) + 'px';
+    desenhar('bh-j-sup', { type: 'bar',
+      data: { labels: sups, datasets: [{ label: 'Em aberto', data: sups.map(s => porSup[s].a), backgroundColor: '#f59e0b', stack: 's' }, { label: 'Regularizadas', data: sups.map(s => porSup[s].r), backgroundColor: '#0f9d58', stack: 's' }] },
+      options: { indexAxis: 'y', plugins: { legend: { position: 'bottom' }, datalabels: { color: '#fff', font: { size: 10, weight: '700' }, formatter: v => v || '' } }, scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true, grid: { display: false } } } } });
+    // contrato e área (tabela)
+    const grp = f => { const o = {}; B.forEach(i => { const k = f(i) || '—'; const g = o[k] = o[k] || { n: 0, a: 0, c: new Set() }; g.n++; if (!regularJ(i)) g.a++; g.c.add(mat6(i.m)); }); return Object.entries(o).sort((a, b) => b[1].n - a[1].n); };
+    const linhaG = (k, g) => `<tr><td>${esc(k)}</td><td class="num">${nf(g.c.size)}</td><td class="num">${nf(g.n)}</td><td class="num">${nf(g.a)}</td><td class="num">${pct(g.n - g.a, g.n)}%</td></tr>`;
+    $('#bh-j-grp').innerHTML = `<thead><tr><th>Contrato / equipe</th><th class="num">Colab.</th><th class="num">Pendências</th><th class="num">Em aberto</th><th class="num">Regularizado</th></tr></thead><tbody>` +
+      grp(i => projItem(i) === 'CIRION' ? 'Cirion' : 'Claro').map(([k, g]) => linhaG('Contrato · ' + k, g)).join('') +
+      grp(i => String(i.area || '').trim()).map(([k, g]) => linhaG('Equipe · ' + k, g)).join('') + '</tbody>';
+    // HE e BH por mês
+    const heF = folhas.map(f => pendF.filter(i => i.tipo === 'HORA EXTRA' && folhaIniDe(i.d) === f).reduce((s, i) => s + heMinJ(i), 0) / 60);
+    const fMov = [...new Set(folhas.concat(Object.keys(mov)))].sort().slice(-6);
+    desenhar('bh-j-hebh', { type: 'bar',
+      data: { labels: fMov.map(rotFolha), datasets: [
+        { label: 'BH crédito (h)', data: fMov.map(f => mov[f] ? Math.round(mov[f].cr) : null), backgroundColor: '#0f9d58', borderRadius: 4 },
+        { label: 'BH débito (h)', data: fMov.map(f => mov[f] ? -Math.round(mov[f].de) : null), backgroundColor: '#dc2626', borderRadius: 4 },
+        { type: 'line', label: 'HE das pendências (h)', data: fMov.map(f => { const k = folhas.indexOf(f); return k >= 0 ? Math.round(heF[k]) : null; }), borderColor: '#2563eb', backgroundColor: '#2563eb', tension: .25, pointRadius: 4 }] },
+      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, datalabels: { display: false } }, scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => v + 'h' } } } } });
+    // dia da semana
+    const ws = [1, 2, 3, 4, 5, 6, 0];
+    desenhar('bh-j-dow', { type: 'bar',
+      data: { labels: ws.map(w => DIAS_TXT[w]), datasets: [{ label: 'Pendências', data: ws.map(w => B.filter(i => wSem(i.d) === w).length), backgroundColor: ws.map(w => w === 0 || w === 6 ? '#94a3b8' : '#0b2545'), borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'end', color: '#334155', font: { size: 10, weight: '700' } } }, scales: { y: { beginAtZero: true, grace: '12%' }, x: { grid: { display: false } } } } });
+    // geradas x regularizadas por semana
+    const segDe = d => { const x = new Date(String(d).slice(0, 10) + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
+    const ger = {}, reg = {};
+    B.forEach(i => { const s = segDe(i.d); ger[s] = (ger[s] || 0) + 1; if (regularJ(i)) { const dr = justDe(i).dataResp || justDe(i).dataRH || i.d; const s2 = segDe(dr); reg[s2] = (reg[s2] || 0) + 1; } });
+    const semanas = [...new Set(Object.keys(ger).concat(Object.keys(reg)))].sort().slice(-10);
+    desenhar('bh-j-gr', { type: 'bar',
+      data: { labels: semanas.map(s => s.slice(8, 10) + '/' + s.slice(5, 7)), datasets: [{ label: 'Geradas', data: semanas.map(s => ger[s] || 0), backgroundColor: '#f59e0b', borderRadius: 4 }, { label: 'Regularizadas', data: semanas.map(s => reg[s] || 0), backgroundColor: '#0f9d58', borderRadius: 4 }] },
+      options: { plugins: { legend: { position: 'bottom' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } } });
+
+    // ---- tabela analítica por colaborador
+    const linhas = C.map(x => {
+      const k = mat6(x.i.m), l = x.l, bi = bh.find(i => mat6(i.m) === k), mv = movFo.porMat[k] || null, c = conf(k);
+      return { x, k, n: l.length, aus: l.filter(ehAusJ).length, inter: l.filter(i => i.tipo === 'INTERJORNADA').length, intra: l.filter(ehIntraJ).length,
+        he: l.filter(i => i.tipo === 'HORA EXTRA').reduce((s, i) => s + heMinJ(i), 0) / 60, mv, saldo: bi ? +bi.h || 0 : null, ab: l.filter(i => !regularJ(i)).length, c };
+    }).sort((a, b) => b.ab - a.ab || b.n - a.n);
+    const MAX = 400;
+    $('#bh-j-tab-sub').textContent = `${nf(linhas.length)} colaboradores com pendência no filtro · conformidade = dias de escala sem pendência de marcação ÷ dias de escala já passados (folha atual, pelo espelho)`;
+    $('#bh-j-tab').innerHTML = `<thead><tr><th>Colaborador</th><th>Contrato · área · supervisor</th><th>Escala</th><th class="num">Pendências</th><th class="num">Marc. ausentes</th><th class="num">Inter / intra</th><th class="num">HE no mês</th><th class="num">BH gerado (+ / −)</th><th class="num">Saldo BH</th><th class="num">Em aberto</th><th class="num">Conformidade</th></tr></thead><tbody>` +
+      linhas.slice(0, MAX).map(r => { const i = r.x.i, cp = r.c ? r.c.pct : null;
+        return `<tr><td class="nm" title="${esc(i.n)}">${esc(i.n)}<small>${esc(i.m)}</small></td>
+          <td style="font-size:12px">${projItem(i) === 'CIRION' ? 'Cirion' : 'Claro'} · ${esc(i.area || '—')}<small style="display:block;color:#64748b">${esc(i.sup || '—')}</small></td>
+          <td style="font-size:12px;white-space:normal;max-width:200px">${esc(escDe(i) || '—')}</td>
+          <td class="num"><b>${nf(r.n)}</b></td><td class="num${r.aus ? ' neg' : ''}">${nf(r.aus)}</td><td class="num">${nf(r.inter)} / ${nf(r.intra)}</td>
+          <td class="num">${r.he ? hMin(r.he).replace('+', '') : '—'}</td>
+          <td class="num">${r.mv ? `<span class="pos">+${hMin(r.mv.cr).replace('+', '')}</span> / <span class="neg">−${hMin(r.mv.de).replace('+', '')}</span>` : '—'}</td>
+          <td class="num ${r.saldo == null ? '' : r.saldo < 0 ? 'neg' : 'pos'}">${r.saldo == null ? '—' : hMin(r.saldo)}</td>
+          <td class="num${r.ab ? ' neg' : ''}"><b>${nf(r.ab)}</b></td>
+          <td class="num" style="font-weight:700;color:${cp == null ? '#94a3b8' : cp >= 95 ? '#0f9d58' : cp >= 85 ? '#b45309' : '#dc2626'}" title="${r.c ? r.c.dias - r.c.irr + ' de ' + r.c.dias + ' dias sem pendência' : 'sem dados do espelho'}">${cp == null ? '—' : f1(cp) + '%'}</td></tr>`; }).join('') +
+      (linhas.length ? '' : '<tr><td colspan="11">Nenhuma pendência nesse filtro 🎉</td></tr>') +
+      (linhas.length > MAX ? `<tr><td colspan="11" style="color:#64748b">Mostrando ${MAX} de ${nf(linhas.length)} · use os filtros</td></tr>` : '') + '</tbody>';
+  }
 
   // =====================================================================
   // ALTERADO (31/10/2026): ABA VT / VR — o ponto mostra trabalho em FERIADO ou FORA DA ESCALA (hora extra
@@ -2712,6 +2961,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     dados.itens.forEach(i => { if (!Array.isArray(i.bh)) i.bh = []; });
     try {
       const dj = await lerJson('dados.json'); idadeReal = aplicarIdadeReal(dados.itens, dj && dj.bancoHoras);
+      BH_HIST = (dj && dj.bancoHoras) || [];
       // ALTERADO (03/11/2026): supervisor e coordenador pelo Organograma (para quem ainda não está no relatório de BH)
       ORG = {};
       ((dj && dj.colaboradores) || []).forEach(c => { const k = String(c.matricula || '').replace(/\D/g, '').replace(/^0+/, ''); if (k && c.ativo !== false) ORG[k] = { sup: String(c.supervisor || '').trim(), co: String(c.coordenador || '').trim() }; });
@@ -2720,6 +2970,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     css();
     layout(el);
     atualizar();
+    irAba('jornada');   // ALTERADO (03/11/2026): abre na Gestão de Jornada e Conformidade
     if (!dados.itens.length) diagnostico(el, ARQUIVO, dadosBrutos);
     carregarPend();
     setInterval(() => { if (!document.querySelector('#' + CONTAINER + ' .bh-modal')) carregarPend(); }, 5 * 60 * 1000);   // pega a base nova sem recarregar a página
