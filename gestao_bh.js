@@ -1354,6 +1354,13 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       // ALTERADO (03/11/2026): falta e atraso só até ontem (o espelho traz "Ausente" nos dias futuros da folha)
       { const hj = hojeIso(); pend = pend.filter(i => !((i.tipo === 'FALTA' || i.tipo === 'ATRASO') && String(i.d || '').slice(0, 10) >= hj)); }
       pendAbs = (d && Array.isArray(d.absenteismo)) ? d.absenteismo : null;
+      // ALTERADO (03/11/2026): sem supervisor/coordenador na base (ex.: admitido recente fora do relatório de BH) → pega do Organograma
+      {
+        const kMat = m => String(m || '').replace(/\D/g, '').slice(-6).replace(/^0+/, '');
+        const completar = x => { const o = ORG[kMat(x.m)]; if (!o) return; if (!String(x.sup || '').trim() && o.sup) x.sup = o.sup; if (!String(x.co || '').trim() && o.co) x.co = o.co; };
+        pend.forEach(completar);
+        if (pendAbs) pendAbs.forEach(completar);
+      }
       pendEsp = (d && d.espelho && Array.isArray(d.espelho.mats)) ? d.espelho : null;
       pendVT = (d && d.vtvr && typeof d.vtvr === 'object') ? d.vtvr : {};
       // ALTERADO (27/10/2026): período coberto pela base atual (do início da folha da pendência aberta mais antiga
@@ -2645,7 +2652,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       Mande um print desta mensagem para ajustar.</div>`);
   }
 
-  let idadeReal = 0;   // quantos funcionários tiveram a idade das horas calculada pelo histórico
+  let idadeReal = 0;
+  let ORG = {};   // matrícula → { sup, co } do Organograma (dados.json)   // quantos funcionários tiveram a idade das horas calculada pelo histórico
   async function iniciar() {
     let el = document.getElementById(CONTAINER);
     if (!el) {
@@ -2676,7 +2684,12 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       return;
     }
     dados.itens.forEach(i => { if (!Array.isArray(i.bh)) i.bh = []; });
-    try { const dj = await lerJson('dados.json'); idadeReal = aplicarIdadeReal(dados.itens, dj && dj.bancoHoras); }
+    try {
+      const dj = await lerJson('dados.json'); idadeReal = aplicarIdadeReal(dados.itens, dj && dj.bancoHoras);
+      // ALTERADO (03/11/2026): supervisor e coordenador pelo Organograma (para quem ainda não está no relatório de BH)
+      ORG = {};
+      ((dj && dj.colaboradores) || []).forEach(c => { const k = String(c.matricula || '').replace(/\D/g, '').replace(/^0+/, ''); if (k && c.ativo !== false) ORG[k] = { sup: String(c.supervisor || '').trim(), co: String(c.coordenador || '').trim() }; });
+    }
     catch (e) { console.warn('[BH] sem histórico para a idade das horas:', e); }
     css();
     layout(el);
