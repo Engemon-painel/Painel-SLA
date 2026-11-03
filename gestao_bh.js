@@ -182,7 +182,10 @@ ${C} .s3{grid-column:span 3}${C} .s4{grid-column:span 4}${C} .s5{grid-column:spa
 ${C} .bh-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 ${C} .bh-k{border-radius:14px;padding:14px 16px;color:#fff;min-width:0}
 ${C} .bh-jk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-${C} .bh-jk .bh-k b{font-size:26px}
+${C} .bh-jx{background:#fff;border:1px solid var(--bh-borda);border-left:4px solid var(--jx,#0b2545);border-radius:12px;padding:14px 16px;min-width:0}
+${C} .bh-jx small{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b}
+${C} .bh-jx b{display:block;font-size:26px;line-height:1.15;margin:6px 0 2px;color:var(--jx,#0b2545);white-space:nowrap;font-variant-numeric:tabular-nums}
+${C} .bh-jx span{font-size:12px;color:#64748b}
 @media (max-width:1100px){${C} .bh-jk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 ${C} .bh-rank ol{list-style:none;margin:6px 0 0;padding:0}
 ${C} .bh-rank li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12.5px}
@@ -1774,8 +1777,10 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   const jf = { area: '', esc: '', tipo: '', st: '' };
   const TIPOS_J = { 'FALTA': 'Falta (dia sem marcação)', 'SEM MARCACAO': 'Sem marcação', 'PONTO ABERTO': 'Ponto aberto / incompleto',
     'INTERJORNADA': 'Interjornada', 'FOLGA NAO CUMPRIDA': 'Folga não cumprida', 'ATRASO': 'Atraso', 'HORA EXTRA': 'Hora extra' };
-  const COR_TJ = { 'FALTA': '#dc2626', 'SEM MARCACAO': '#7c3aed', 'PONTO ABERTO': '#f59e0b', 'INTERJORNADA': '#0e7490',
-    'FOLGA NAO CUMPRIDA': '#be185d', 'ATRASO': '#b45309', 'HORA EXTRA': '#2563eb' };
+  // ALTERADO (03/11/2026): visual executivo — tons de azul-marinho e cinza, um destaque âmbar só para alerta
+  const NAVY = '#0b2545', NAVY2 = '#33507a', NAVY3 = '#7d93b2', CINZA = '#cbd5e1', ALERTA = '#b45309';
+  const COR_TJ = { 'HORA EXTRA': '#0b2545', 'ATRASO': '#33507a', 'FALTA': '#5b7398', 'PONTO ABERTO': '#7d93b2',
+    'INTERJORNADA': '#a3b3c9', 'SEM MARCACAO': '#c3cedd', 'FOLGA NAO CUMPRIDA': '#dde4ee', 'INTRAJORNADA': '#94a3b8' };
   const heMinJ = i => { const m = /(\d+):(\d{2})/.exec(minDet(i.det, 'HE')); return m ? +m[1] * 60 + +m[2] : 0; };
   const ehAusJ = i => i.tipo === 'FALTA' || i.tipo === 'SEM MARCACAO';
   const ehIntraJ = i => ehSemAlmoco(i);
@@ -1866,10 +1871,12 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       ['👥 Colaboradores com pendência', nf(Object.keys(colab).length), 'no filtro', '#334155'],
       ['✅ Regularização', (B.length ? f1(nReg / B.length * 100) : '0,0') + '%', nf(nReg) + ' de ' + nf(B.length) + ' tratadas', nReg / (B.length || 1) >= .8 ? '#0f9d58' : '#b45309'],
       ['⏱️ Horas extras no mês', hMin(heMin / 60).replace('+', ''), nf(B.filter(i => i.tipo === 'HORA EXTRA').length) + ' lançamentos de HE', '#2563eb'],
-      ['🏦 BH gerado no mês', `<span style="font-size:20px">+${hMin(movFo.cr).replace('+', '')} / −${hMin(movFo.de).replace('+', '')}</span>`, foMov ? 'competência ' + rotFolha(foMov) : 'sem movimentação', '#0e7490'],
-      ['💰 Saldo acumulado do BH', hMin(saldo), nf(bh.length) + ' colaboradores ativos', saldo >= 0 ? '#065f46' : '#991b1b'],
+      ['🏦 BH gerado no mês', `<span style="font-size:19px">+${hMin(movFo.cr).replace('+', '')} / −${hMin(movFo.de).replace('+', '')}</span>`, foMov ? 'competência ' + rotFolha(foMov) : 'sem movimentação', '#0e7490'],
+      ['💰 Saldo acumulado do BH', hMin(saldo), nf(bh.length) + ' colaboradores ativos', NAVY],
       ['🎯 Conformidade do ponto', icp == null ? '—' : f1(icp) + '%', icp == null ? 'sem dados do espelho para a folha' : `${nf(totD - totI)} de ${nf(totD)} dias sem pendência`, corIcp]];
-    box.innerHTML = cards.map(c => `<div class="bh-k" style="background:${c[3]}"><small>${c[0]}</small><b>${c[1]}</b><span>${c[2]}</span></div>`).join('');
+    const destaque = { '✅ Regularização': nReg / (B.length || 1) >= .8 ? '#0f766e' : ALERTA, '🎯 Conformidade do ponto': icp == null ? NAVY : icp >= 95 ? '#0f766e' : icp >= 85 ? ALERTA : '#b91c1c' };
+    box.innerHTML = cards.map(c => { const t = c[0].replace(/^\S+\s/, ''), cor = destaque[c[0]] || NAVY;
+      return `<div class="bh-jx" style="--jx:${cor}"><small>${esc(t)}</small><b>${c[1]}</b><span>${c[2]}</span></div>`; }).join('');
 
     // ---- irregularidades
     const irr = [['⛔ Marcações de ponto ausentes', nAus, '#dc2626', 'FALTA'], ['🕗 Pontos abertos ou incompletos', B.filter(i => i.tipo === 'PONTO ABERTO').length, '#f59e0b', 'PONTO ABERTO'],
@@ -1877,7 +1884,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       ['📅 Folgas não cumpridas', B.filter(i => i.tipo === 'FOLGA NAO CUMPRIDA').length, '#be185d', 'FOLGA NAO CUMPRIDA'], ['🚫 HE sem autorização', B.filter(heSemAutJ).length, '#991b1b', ''],
       ['⏳ Pendências ainda não tratadas', B.filter(i => stJ(i) === 'aberta').length, '#b45309', '']];
     const mxI = Math.max(1, ...irr.map(x => x[1]));
-    $('#bh-j-irr').innerHTML = irr.map(x => `<div class="bh-bar" style="grid-template-columns:260px 1fr 60px"><span>${x[0]}</span><i><em style="width:${x[1] / mxI * 100}%;background:${x[2]}"></em></i><b style="text-align:right">${nf(x[1])}</b></div>`).join('') +
+    $('#bh-j-irr').innerHTML = irr.map((x, k) => `<div class="bh-bar" style="grid-template-columns:250px 1fr 56px"><span>${x[0].replace(/^\S+\s/, '')}</span><i><em style="width:${x[1] / mxI * 100}%;background:${k === irr.length - 1 ? ALERTA : NAVY2}"></em></i><b style="text-align:right;color:${NAVY}">${nf(x[1])}</b></div>`).join('') +
       '<p class="sub" style="margin-top:8px">HE sem autorização = hora extra com justificativa "não autorizada" · intrajornada = jornada acima de 6h sem o intervalo registrado</p>';
 
     // ---- rankings
@@ -1900,7 +1907,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       ['💰 Maiores saldos positivos de BH', posTop],
       ['🔻 Maiores saldos negativos de BH', negTop],
       ['🔁 Reincidência em folhas seguidas', reinc.sort((a, b) => b.v - a.v || b.fs.length - a.fs.length).slice(0, 10).map((o, k) => `<li><span class="r">${k + 1}</span><span class="nm">${esc(o.i.n)}<small>${esc(o.i.sup || '')}</small></span><b>${o.v} folhas</b></li>`).join('') || '<li style="color:#94a3b8">ninguém com pendência em 2 folhas seguidas</li>']
-    ].map(([t, h]) => `<div class="bh-c s4 bh-rank"><h3>${t}</h3><ol>${h}</ol></div>`).join('');
+    ].map(([t, h]) => `<div class="bh-c s4 bh-rank"><h3>${t.replace(/^\S+\s/, '')}</h3><ol>${h}</ol></div>`).join('');
 
     // ---- gráficos
     const folhas = [...new Set((pend || []).map(i => folhaIniDe(i.d)).filter(Boolean))].sort().slice(-6);
@@ -1914,8 +1921,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const par = Object.entries(cnt).sort((a, b) => b[1] - a[1]); let ac = 0;
     desenhar('bh-j-pareto', { type: 'bar',
       data: { labels: par.map(p => TIPOS_J[p[0]] || 'Intrajornada'), datasets: [
-        { type: 'line', label: '% acumulado', data: par.map(p => { ac += p[1]; return Math.round(ac / (B.length || 1) * 1000) / 10; }), yAxisID: 'y1', borderColor: '#0b2545', backgroundColor: '#0b2545', pointRadius: 3, tension: .2, datalabels: { display: false } },
-        { label: 'Pendências', data: par.map(p => p[1]), backgroundColor: par.map(p => COR_TJ[p[0]] || '#7c3aed'), borderRadius: 4 }] },
+        { type: 'line', label: '% acumulado', data: par.map(p => { ac += p[1]; return Math.round(ac / (B.length || 1) * 1000) / 10; }), yAxisID: 'y1', borderColor: ALERTA, backgroundColor: ALERTA, pointRadius: 3, tension: .2, datalabels: { display: false } },
+        { label: 'Pendências', data: par.map(p => p[1]), backgroundColor: NAVY2, borderRadius: 3 }] },
       options: { plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'end', color: '#334155', font: { size: 10, weight: '700' } } },
         scales: { y: { beginAtZero: true, grace: '10%' }, y1: { position: 'right', min: 0, max: 100, grid: { display: false }, ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } } } });
     // por supervisor
@@ -1923,7 +1930,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const sups = Object.keys(porSup).sort((a, b) => (porSup[b].a + porSup[b].r) - (porSup[a].a + porSup[a].r)).slice(0, 14);
     $('#bh-j-box-sup').style.height = Math.max(240, sups.length * 26 + 60) + 'px';
     desenhar('bh-j-sup', { type: 'bar',
-      data: { labels: sups, datasets: [{ label: 'Em aberto', data: sups.map(s => porSup[s].a), backgroundColor: '#f59e0b', stack: 's' }, { label: 'Regularizadas', data: sups.map(s => porSup[s].r), backgroundColor: '#0f9d58', stack: 's' }] },
+      data: { labels: sups, datasets: [{ label: 'Regularizadas', data: sups.map(s => porSup[s].r), backgroundColor: NAVY2, stack: 's' }, { label: 'Em aberto', data: sups.map(s => porSup[s].a), backgroundColor: ALERTA, stack: 's' }] },
       options: { indexAxis: 'y', plugins: { legend: { position: 'bottom' }, datalabels: { color: '#fff', font: { size: 10, weight: '700' }, formatter: v => v || '' } }, scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true, grid: { display: false } } } } });
     // contrato e área (tabela)
     const grp = f => { const o = {}; B.forEach(i => { const k = f(i) || '—'; const g = o[k] = o[k] || { n: 0, a: 0, c: new Set() }; g.n++; if (!regularJ(i)) g.a++; g.c.add(mat6(i.m)); }); return Object.entries(o).sort((a, b) => b[1].n - a[1].n); };
@@ -1935,14 +1942,14 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const fMov = [...new Set(folhas.concat(Object.keys(mov)))].sort().slice(-6);
     desenhar('bh-j-hebh', { type: 'bar',
       data: { labels: fMov.map(rotFolha), datasets: [
-        { label: 'BH crédito (h)', data: fMov.map(f => mov[f] ? Math.round(mov[f].cr) : null), backgroundColor: '#0f9d58', borderRadius: 4 },
-        { label: 'BH débito (h)', data: fMov.map(f => mov[f] ? -Math.round(mov[f].de) : null), backgroundColor: '#dc2626', borderRadius: 4 },
-        { type: 'line', label: 'HE das pendências (h)', data: fMov.map(f => { const k = folhas.indexOf(f); return k >= 0 ? Math.round(heF[k]) : null; }), borderColor: '#2563eb', backgroundColor: '#2563eb', tension: .25, pointRadius: 4 }] },
+        { label: 'BH crédito (h)', data: fMov.map(f => mov[f] ? Math.round(mov[f].cr) : null), backgroundColor: NAVY2, borderRadius: 3 },
+        { label: 'BH débito (h)', data: fMov.map(f => mov[f] ? -Math.round(mov[f].de) : null), backgroundColor: CINZA, borderRadius: 3 },
+        { type: 'line', label: 'HE das pendências (h)', data: fMov.map(f => { const k = folhas.indexOf(f); return k >= 0 ? Math.round(heF[k]) : null; }), borderColor: ALERTA, backgroundColor: ALERTA, tension: .25, pointRadius: 4 }] },
       options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } }, datalabels: { display: false } }, scales: { x: { grid: { display: false } }, y: { ticks: { callback: v => v + 'h' } } } } });
     // dia da semana
     const ws = [1, 2, 3, 4, 5, 6, 0];
     desenhar('bh-j-dow', { type: 'bar',
-      data: { labels: ws.map(w => DIAS_TXT[w]), datasets: [{ label: 'Pendências', data: ws.map(w => B.filter(i => wSem(i.d) === w).length), backgroundColor: ws.map(w => w === 0 || w === 6 ? '#94a3b8' : '#0b2545'), borderRadius: 4 }] },
+      data: { labels: ws.map(w => DIAS_TXT[w]), datasets: [{ label: 'Pendências', data: ws.map(w => B.filter(i => wSem(i.d) === w).length), backgroundColor: ws.map(w => w === 0 || w === 6 ? CINZA : NAVY2), borderRadius: 3 }] },
       options: { plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'end', color: '#334155', font: { size: 10, weight: '700' } } }, scales: { y: { beginAtZero: true, grace: '12%' }, x: { grid: { display: false } } } } });
     // geradas x regularizadas por semana
     const segDe = d => { const x = new Date(String(d).slice(0, 10) + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x.toISOString().slice(0, 10); };
@@ -1950,7 +1957,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     B.forEach(i => { const s = segDe(i.d); ger[s] = (ger[s] || 0) + 1; if (regularJ(i)) { const dr = justDe(i).dataResp || justDe(i).dataRH || i.d; const s2 = segDe(dr); reg[s2] = (reg[s2] || 0) + 1; } });
     const semanas = [...new Set(Object.keys(ger).concat(Object.keys(reg)))].sort().slice(-10);
     desenhar('bh-j-gr', { type: 'bar',
-      data: { labels: semanas.map(s => s.slice(8, 10) + '/' + s.slice(5, 7)), datasets: [{ label: 'Geradas', data: semanas.map(s => ger[s] || 0), backgroundColor: '#f59e0b', borderRadius: 4 }, { label: 'Regularizadas', data: semanas.map(s => reg[s] || 0), backgroundColor: '#0f9d58', borderRadius: 4 }] },
+      data: { labels: semanas.map(s => s.slice(8, 10) + '/' + s.slice(5, 7)), datasets: [{ label: 'Geradas', data: semanas.map(s => ger[s] || 0), backgroundColor: CINZA, borderRadius: 3 }, { label: 'Regularizadas', data: semanas.map(s => reg[s] || 0), backgroundColor: NAVY2, borderRadius: 3 }] },
       options: { plugins: { legend: { position: 'bottom' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } } } });
 
     // ---- tabela analítica por colaborador
@@ -1971,7 +1978,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
           <td class="num">${r.mv ? `<span class="pos">+${hMin(r.mv.cr).replace('+', '')}</span> / <span class="neg">−${hMin(r.mv.de).replace('+', '')}</span>` : '—'}</td>
           <td class="num ${r.saldo == null ? '' : r.saldo < 0 ? 'neg' : 'pos'}">${r.saldo == null ? '—' : hMin(r.saldo)}</td>
           <td class="num${r.ab ? ' neg' : ''}"><b>${nf(r.ab)}</b></td>
-          <td class="num" style="font-weight:700;color:${cp == null ? '#94a3b8' : cp >= 95 ? '#0f9d58' : cp >= 85 ? '#b45309' : '#dc2626'}" title="${r.c ? r.c.dias - r.c.irr + ' de ' + r.c.dias + ' dias sem pendência' : 'sem dados do espelho'}">${cp == null ? '—' : f1(cp) + '%'}</td></tr>`; }).join('') +
+          <td class="num" style="font-weight:700;color:${cp == null ? '#94a3b8' : cp >= 95 ? '#0f766e' : cp >= 85 ? ALERTA : '#b91c1c'}" title="${r.c ? r.c.dias - r.c.irr + ' de ' + r.c.dias + ' dias sem pendência' : 'sem dados do espelho'}">${cp == null ? '—' : f1(cp) + '%'}</td></tr>`; }).join('') +
       (linhas.length ? '' : '<tr><td colspan="11">Nenhuma pendência nesse filtro 🎉</td></tr>') +
       (linhas.length > MAX ? `<tr><td colspan="11" style="color:#64748b">Mostrando ${MAX} de ${nf(linhas.length)} · use os filtros</td></tr>` : '') + '</tbody>';
   }
