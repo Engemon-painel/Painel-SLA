@@ -1349,6 +1349,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     try {
       const [d, h] = await Promise.all([lerJson(ARQ_PEND), lerJson(ARQ_PEND_HIST).catch(() => null)]);
       pend = Array.isArray(d) ? d : (d.itens || []);
+      // ALTERADO (03/11/2026): falta e atraso só até ontem (o espelho traz "Ausente" nos dias futuros da folha)
+      { const hj = hojeIso(); pend = pend.filter(i => !((i.tipo === 'FALTA' || i.tipo === 'ATRASO') && String(i.d || '').slice(0, 10) >= hj)); }
       pendAbs = (d && Array.isArray(d.absenteismo)) ? d.absenteismo : null;
       pendEsp = (d && d.espelho && Array.isArray(d.espelho.mats)) ? d.espelho : null;
       pendVT = (d && d.vtvr && typeof d.vtvr === 'object') ? d.vtvr : {};
@@ -1923,6 +1925,11 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       `<span style="display:inline-flex;gap:8px;margin-left:10px;vertical-align:middle;align-items:center">` +
       `<select id="bh-rh-tipo" title="Tipo de pendência" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:12px;background:#fff">` +
       `<option value="">Pendência: todas (${nf(base.length)})</option>${tiposRH.map(t => `<option value="${esc(t)}"${t === rhTipo ? ' selected' : ''}>${esc(t)} (${nf(contTipo[t])})</option>`).join('')}</select>` +
+      // ALTERADO (03/11/2026): filtro da situação do RH (ex.: só o que o RH ainda não ajustou)
+      `<select id="bh-rh-sit" title="Situação do RH" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:12px;background:#fff">` +
+      [['', 'Status RH: todos (' + nf(baseT.length) + ')'], ['aguardando', 'Ainda não ajustei · aguardando RH (' + nf(cont.aguardando) + ')'],
+       ['AJUSTADO', 'Ajustado / OK (' + nf(cont.AJUSTADO) + ')'], ['devolvido', 'Devolvido ao gestor (' + nf(cont.devolvido) + ')'], ['rhresp', 'Respondidas pelo RH no painel (' + nf(respRH.length) + ')']]
+        .map(([v, r]) => `<option value="${v}"${rhFiltro === v ? ' selected' : ''}>${r}</option>`).join('') + `</select>` +
       `<button type="button" class="bh-pd-btn on" id="bh-rh-lote"${rhSel.size ? '' : ' disabled'}>Responder selecionadas (${rhSel.size})</button>` +
       (rhSel.size ? '<button type="button" class="bh-pd-btn" id="bh-rh-limpa">Limpar seleção</button>' : '') + '</span>';
     $('#bh-rh-head').innerHTML = '<tr><th style="width:28px"><input type="checkbox" id="bh-rh-todos" title="Marcar todas as aguardando RH da lista"></th><th>Colaborador</th><th>Pendência</th><th>Data</th><th>Supervisor</th><th>Detalhe / o que verificar</th><th class="num">Quantidade</th><th>Tratativa do gestor</th><th>Gestor respondeu em</th>' +
@@ -1963,6 +1970,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     todos.checked = aguard.length > 0 && aguard.every(i => rhSel.has(i.id));
     todos.onchange = () => { aguard.forEach(i => todos.checked ? rhSel.add(i.id) : rhSel.delete(i.id)); renderRH(); };
     $('#bh-rh-tipo').onchange = e => { rhTipo = e.target.value; rhSel.clear(); renderRH(); };
+    $('#bh-rh-sit').onchange = e => { rhFiltro = e.target.value; rhSel.clear(); renderRH(); };
     const btL = $('#bh-rh-lote'); if (btL) btL.onclick = () => abrirRespostaRH(lista.filter(i => rhSel.has(i.id)));
     const btC = $('#bh-rh-limpa'); if (btC) btC.onclick = () => { rhSel.clear(); renderRH(); };
     if (lista.length > MAX) $('#bh-rh-body').insertAdjacentHTML('beforeend', `<tr><td colspan="13" style="color:#64748b">Mostrando ${MAX} de ${nf(lista.length)} · use os filtros</td></tr>`);
