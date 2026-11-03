@@ -1476,6 +1476,10 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       if (semBH) Object.keys(abs).forEach(k => {
         if (jaTem.has(k)) return;
         const a = abs[k];
+        // só quem tem falta e está ativo no Organograma
+        const falt = a.dCal != null ? a.dAusReg : (a.dSem != null ? a.dSem : a.dAus);
+        if (!(falt > 0)) return;
+        if (!ORG[String(k).replace(/^0+/, '')]) return;
         const x = { n: a.n, m: a.m, sup: a.sup, co: a.co, cc: a.cc, novoBH: true };
         if (!passaProj(x)) return;
         if (filtro.co && String(x.co || '').trim() !== String(filtro.co).trim()) return;
@@ -1519,7 +1523,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const c = l.pct >= 10 ? VERMELHO : l.pct >= 5 ? '#b45309' : '#0f9d58';
       return `<tr${l.sit === 'zero' || l.sit === 'fora' ? ' style="background:#fef2f2"' : ''}>
         <td>${al}</td><td>${esc(l.i.m)}</td>
-        <td class="nm" title="${esc(l.i.n)}">${esc(l.i.n)}<small>${esc(l.i.sup || '')}${l.i.novoBH ? ' · <span style="color:#7c3aed" title="Está no espelho de ponto, mas ainda não aparece no relatório de banco de horas">ainda fora do relatório de BH</span>' : ''}</small></td>
+        <td class="nm" title="${esc(l.i.n)}">${esc(l.i.n)}<small>${esc(l.i.sup || '')}</small></td>
         <td>${esc(l.cc || '—')}</td><td>${esc(l.esc || '—')}</td>
         <td class="num">${v(l.dPer)}</td><td class="num${l.dAus ? ' neg' : ''}">${v(l.dAus)}</td>
         <td class="num" style="font-weight:700;color:${l.dPer ? c : '#94a3b8'}">${l.dPer ? f1(l.pct) + '%' : '—'}</td>
