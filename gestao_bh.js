@@ -97,7 +97,8 @@
   const projForcado = n => { const k = nomeChave(n); if (PROJ_FORCADO[k]) return PROJ_FORCADO[k];
     const f = k.length >= 15 && Object.keys(PROJ_FORCADO).find(x => x.startsWith(k) || k.startsWith(x)); return f ? PROJ_FORCADO[f] : ''; };   // nome cortado no BH
   const projItem = i => projForcado(i.n) || (i.projeto != null ? projDe(i.projeto) : (projDe(i.cc) || projDaMat(i.m)));
-  const passaProj = i => !filtro.pj || projItem(i) === filtro.pj;
+  // ALTERADO (03/11/2026): Banco de Horas só com o contrato CLARO em todas as abas (Cirion fora)
+  const passaProj = i => projItem(i) === 'CLARO';
 
   // estado das abas novas
   let aba = 'jornada';
@@ -297,7 +298,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     </nav>
     <div class="bh-conteudo">
     <div class="bh-filtros">
-      <select data-f="pj" data-nao="evol"><option value="">Projeto: todos</option><option value="CLARO">Claro</option><option value="CIRION">Cirion</option></select>
+      <select data-f="pj" data-nao="evol" style="display:none"><option value="">Projeto: todos</option><option value="CLARO">Claro</option><option value="CIRION">Cirion</option></select>
       <select data-f="co"><option value="">Coordenador: todos</option></select>
       <select data-f="sup"><option value="">Supervisor: todos</option></select>
       <select data-f="tp" data-nao="pend andamento atraso falta rh jornada"><option value="">Tipo de saldo: todos</option><option value="POSITIVO">Positivo</option><option value="NEGATIVO">Negativo</option></select>
@@ -326,7 +327,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
         <div class="bh-c s6"><h3>Evolução mensal das pendências</h3><p class="sub">Últimas folhas disponíveis (15 a 14) · por tipo</p><div class="bh-box"><canvas id="bh-j-evol"></canvas></div></div>
         <div class="bh-c s6"><h3>Horas extras e banco de horas por mês</h3><p class="sub">Crédito e débito do BH por competência · linha = HE das pendências</p><div class="bh-box"><canvas id="bh-j-hebh"></canvas></div></div>
         <div class="bh-c s7"><h3>Pendências por supervisor</h3><p class="sub">Em aberto x regularizadas</p><div class="bh-box" id="bh-j-box-sup"><canvas id="bh-j-sup"></canvas></div></div>
-        <div class="bh-c s5"><h3>Por contrato e equipe</h3><p class="sub">Equipe = área técnica</p><div class="bh-tab" style="max-height:340px"><table id="bh-j-grp"></table></div></div>
+        <div class="bh-c s5"><h3>Pendências por equipe</h3><p class="sub">Contrato Claro · equipe = área técnica</p><div class="bh-tab" style="max-height:340px"><table id="bh-j-grp"></table></div></div>
         <div class="bh-c s6"><h3>Pendências por dia da semana</h3><p class="sub">Data da ocorrência</p><div class="bh-box p"><canvas id="bh-j-dow"></canvas></div></div>
         <div class="bh-c s6"><h3>Geradas x regularizadas</h3><p class="sub">Por semana · regularizada na semana da resposta</p><div class="bh-box p"><canvas id="bh-j-gr"></canvas></div></div>
         <div class="bh-c s12"><h3>Conformidade por colaborador</h3><p class="sub" id="bh-j-tab-sub"></p>
@@ -1927,9 +1928,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     // contrato e área (tabela)
     const grp = f => { const o = {}; B.forEach(i => { const k = f(i) || '—'; const g = o[k] = o[k] || { n: 0, a: 0, c: new Set() }; g.n++; if (!regularJ(i)) g.a++; g.c.add(mat6(i.m)); }); return Object.entries(o).sort((a, b) => b[1].n - a[1].n); };
     const linhaG = (k, g) => `<tr><td>${esc(k)}</td><td class="num">${nf(g.c.size)}</td><td class="num">${nf(g.n)}</td><td class="num">${nf(g.a)}</td><td class="num">${pct(g.n - g.a, g.n)}%</td></tr>`;
-    $('#bh-j-grp').innerHTML = `<thead><tr><th>Contrato / equipe</th><th class="num">Colab.</th><th class="num">Pendências</th><th class="num">Em aberto</th><th class="num">Regularizado</th></tr></thead><tbody>` +
-      grp(i => projItem(i) === 'CIRION' ? 'Cirion' : 'Claro').map(([k, g]) => linhaG('Contrato · ' + k, g)).join('') +
-      grp(i => String(i.area || '').trim()).map(([k, g]) => linhaG('Equipe · ' + k, g)).join('') + '</tbody>';
+    $('#bh-j-grp').innerHTML = `<thead><tr><th>Equipe (área técnica)</th><th class="num">Colab.</th><th class="num">Pendências</th><th class="num">Em aberto</th><th class="num">Regularizado</th></tr></thead><tbody>` +
+      grp(i => String(i.area || '').trim()).map(([k, g]) => linhaG(k, g)).join('') + '</tbody>';
     // HE e BH por mês
     const heF = folhas.map(f => pendF.filter(i => i.tipo === 'HORA EXTRA' && folhaIniDe(i.d) === f).reduce((s, i) => s + heMinJ(i), 0) / 60);
     const fMov = [...new Set(folhas.concat(Object.keys(mov)))].sort().slice(-6);
@@ -1961,10 +1961,10 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }).sort((a, b) => b.ab - a.ab || b.n - a.n);
     const MAX = 400;
     $('#bh-j-tab-sub').textContent = `${nf(linhas.length)} colaboradores com pendência no filtro · conformidade = dias de escala sem pendência de marcação ÷ dias de escala já passados (folha atual, pelo espelho)`;
-    $('#bh-j-tab').innerHTML = `<thead><tr><th>Colaborador</th><th>Contrato · área · supervisor</th><th>Escala</th><th class="num">Pendências</th><th class="num">Marc. ausentes</th><th class="num">Inter / intra</th><th class="num">HE no mês</th><th class="num">BH gerado (+ / −)</th><th class="num">Saldo BH</th><th class="num">Em aberto</th><th class="num">Conformidade</th></tr></thead><tbody>` +
+    $('#bh-j-tab').innerHTML = `<thead><tr><th>Colaborador</th><th>Supervisor</th><th>Escala</th><th class="num">Pendências</th><th class="num">Marc. ausentes</th><th class="num">Inter / intra</th><th class="num">HE no mês</th><th class="num">BH gerado (+ / −)</th><th class="num">Saldo BH</th><th class="num">Em aberto</th><th class="num">Conformidade</th></tr></thead><tbody>` +
       linhas.slice(0, MAX).map(r => { const i = r.x.i, cp = r.c ? r.c.pct : null;
         return `<tr><td class="nm" title="${esc(i.n)}">${esc(i.n)}<small>${esc(i.m)}</small></td>
-          <td style="font-size:12px">${projItem(i) === 'CIRION' ? 'Cirion' : 'Claro'} · ${esc(i.area || '—')}<small style="display:block;color:#64748b">${esc(i.sup || '—')}</small></td>
+          <td style="font-size:12px">${esc(i.sup || '—')}</td>
           <td style="font-size:12px;white-space:normal;max-width:200px">${esc(escDe(i) || '—')}</td>
           <td class="num"><b>${nf(r.n)}</b></td><td class="num${r.aus ? ' neg' : ''}">${nf(r.aus)}</td><td class="num">${nf(r.inter)} / ${nf(r.intra)}</td>
           <td class="num">${r.he ? hMin(r.he).replace('+', '') : '—'}</td>
