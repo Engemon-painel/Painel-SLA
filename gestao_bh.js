@@ -1783,7 +1783,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     'INTERJORNADA': '#a3b3c9', 'SEM MARCACAO': '#c3cedd', 'FOLGA NAO CUMPRIDA': '#dde4ee', 'INTRAJORNADA': '#94a3b8' };
   const heMinJ = i => { const m = /(\d+):(\d{2})/.exec(minDet(i.det, 'HE')); return m ? +m[1] * 60 + +m[2] : 0; };
   const ehAusJ = i => i.tipo === 'FALTA' || i.tipo === 'SEM MARCACAO';
-  const ehIntraJ = i => ehSemAlmoco(i);
+  const ehIntraJ = i => false;   // intrajornada não é calculada a partir do horário de almoço
   const heSemAutJ = i => i.tipo === 'HORA EXTRA' && /NAO AUTORIZ/.test(semAc((justDe(i).texto || '') + ' ' + (justDe(i).trat || '')));
   const irregJ = i => i.tipo !== 'HORA EXTRA' || ehIntraJ(i);          // dia sem cumprir as marcações obrigatórias
   const stJ = i => ehTratada(i) ? 'tratada' : sitDe(i) === 'Justificado' ? 'regularizada' : 'aberta';
@@ -1838,7 +1838,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     $('#bh-j-filtros').innerHTML =
       `<select data-j="area">${op(areas, jf.area, 'Área: todas')}</select>` +
       `<select data-j="esc">${op(escs, jf.esc, 'Escala: todas')}</select>` +
-      `<select data-j="tipo"><option value="">Tipo de pendência: todos</option>${Object.keys(TIPOS_J).concat(['INTRAJORNADA']).map(t => `<option value="${t}"${t === jf.tipo ? ' selected' : ''}>${esc(TIPOS_J[t] || 'Intrajornada (intervalo não registrado)')}</option>`).join('')}</select>` +
+      `<select data-j="tipo"><option value="">Tipo de pendência: todos</option>${Object.keys(TIPOS_J).map(t => `<option value="${t}"${t === jf.tipo ? ' selected' : ''}>${esc(TIPOS_J[t])}</option>`).join('')}</select>` +
       `<select data-j="st">${[['', 'Status: todos'], ['aberta', 'Em aberto (não tratada)'], ['regularizada', 'Regularizada (justificada)'], ['tratada', 'Tratada · saiu da base']].map(([v, r]) => `<option value="${v}"${v === jf.st ? ' selected' : ''}>${r}</option>`).join('')}</select>`;
     $('#bh-j-filtros').querySelectorAll('select').forEach(s => s.onchange = () => { jf[s.dataset.j] = s.value; renderJornada(); });
 
@@ -1880,12 +1880,12 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
     // ---- irregularidades
     const irr = [['⛔ Marcações de ponto ausentes', nAus, '#dc2626', 'FALTA'], ['🕗 Pontos abertos ou incompletos', B.filter(i => i.tipo === 'PONTO ABERTO').length, '#f59e0b', 'PONTO ABERTO'],
-      ['🌙 Interjornada', B.filter(i => i.tipo === 'INTERJORNADA').length, '#0e7490', 'INTERJORNADA'], ['🍽️ Intrajornada (intervalo não registrado)', B.filter(ehIntraJ).length, '#7c3aed', 'INTRAJORNADA'],
+      ['🌙 Interjornada', B.filter(i => i.tipo === 'INTERJORNADA').length, '#0e7490', 'INTERJORNADA'],
       ['📅 Folgas não cumpridas', B.filter(i => i.tipo === 'FOLGA NAO CUMPRIDA').length, '#be185d', 'FOLGA NAO CUMPRIDA'], ['🚫 HE sem autorização', B.filter(heSemAutJ).length, '#991b1b', ''],
       ['⏳ Pendências ainda não tratadas', B.filter(i => stJ(i) === 'aberta').length, '#b45309', '']];
     const mxI = Math.max(1, ...irr.map(x => x[1]));
     $('#bh-j-irr').innerHTML = irr.map((x, k) => `<div class="bh-bar" style="grid-template-columns:250px 1fr 56px"><span>${x[0].replace(/^\S+\s/, '')}</span><i><em style="width:${x[1] / mxI * 100}%;background:${k === irr.length - 1 ? ALERTA : NAVY2}"></em></i><b style="text-align:right;color:${NAVY}">${nf(x[1])}</b></div>`).join('') +
-      '<p class="sub" style="margin-top:8px">HE sem autorização = hora extra com justificativa "não autorizada" · intrajornada = jornada acima de 6h sem o intervalo registrado</p>';
+      '<p class="sub" style="margin-top:8px">HE sem autorização = hora extra com justificativa "não autorizada"</p>';
 
     // ---- rankings
     const top = (arr, val, fmt, n = 10) => arr.filter(x => val(x) > 0).sort((a, b) => val(b) - val(a)).slice(0, n)
@@ -1968,12 +1968,12 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     }).sort((a, b) => b.ab - a.ab || b.n - a.n);
     const MAX = 400;
     $('#bh-j-tab-sub').textContent = `${nf(linhas.length)} colaboradores com pendência no filtro · conformidade = dias de escala sem pendência de marcação ÷ dias de escala já passados (folha atual, pelo espelho)`;
-    $('#bh-j-tab').innerHTML = `<thead><tr><th>Colaborador</th><th>Supervisor</th><th>Escala</th><th class="num">Pendências</th><th class="num">Marc. ausentes</th><th class="num">Inter / intra</th><th class="num">HE no mês</th><th class="num">BH gerado (+ / −)</th><th class="num">Saldo BH</th><th class="num">Em aberto</th><th class="num">Conformidade</th></tr></thead><tbody>` +
+    $('#bh-j-tab').innerHTML = `<thead><tr><th>Colaborador</th><th>Supervisor</th><th>Escala</th><th class="num">Pendências</th><th class="num">Marc. ausentes</th><th class="num">Interjornada</th><th class="num">HE no mês</th><th class="num">BH gerado (+ / −)</th><th class="num">Saldo BH</th><th class="num">Em aberto</th><th class="num">Conformidade</th></tr></thead><tbody>` +
       linhas.slice(0, MAX).map(r => { const i = r.x.i, cp = r.c ? r.c.pct : null;
         return `<tr><td class="nm" title="${esc(i.n)}">${esc(i.n)}<small>${esc(i.m)}</small></td>
           <td style="font-size:12px">${esc(i.sup || '—')}</td>
           <td style="font-size:12px;white-space:normal;max-width:200px">${esc(escDe(i) || '—')}</td>
-          <td class="num"><b>${nf(r.n)}</b></td><td class="num${r.aus ? ' neg' : ''}">${nf(r.aus)}</td><td class="num">${nf(r.inter)} / ${nf(r.intra)}</td>
+          <td class="num"><b>${nf(r.n)}</b></td><td class="num${r.aus ? ' neg' : ''}">${nf(r.aus)}</td><td class="num">${nf(r.inter)}</td>
           <td class="num">${r.he ? hMin(r.he).replace('+', '') : '—'}</td>
           <td class="num">${r.mv ? `<span class="pos">+${hMin(r.mv.cr).replace('+', '')}</span> / <span class="neg">−${hMin(r.mv.de).replace('+', '')}</span>` : '—'}</td>
           <td class="num ${r.saldo == null ? '' : r.saldo < 0 ? 'neg' : 'pos'}">${r.saldo == null ? '—' : hMin(r.saldo)}</td>
