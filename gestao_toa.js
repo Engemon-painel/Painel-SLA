@@ -32,7 +32,7 @@
   let ultimaCarga = 0;
   let carregando = null;
   const estado = { inicio:'', fim:'', supervisor:'', ignorarFds:true, busca:'', aba:'d1',
-    quadro: { d1: { dia:'', status:'', busca:'' }, d0: { dia:'', status:'', busca:'' } } };
+    quadro: { d1: { dia:'', status:'', busca:'', log:'nao' }, d0: { dia:'', status:'', busca:'', log:'nao' } } };
   let chartSup = null, chartDia = null;
 
   // ---------- utilitários ----------
@@ -72,6 +72,27 @@
     if(partes.length >= 2) out.push(partes[0] + ' ' + partes[partes.length - 1]);
     return out;
   }
+  // Presença TOA: o console do TOA traz o nome completo e o Organograma às vezes corta o nome
+  // (30 letras) ou tem sobrenome a menos. Se um nome começa com o outro (e só existe 1 candidato),
+  // usa o nome do Organograma. Acentos já são ignorados em chavesNome().
+  let AJUSTES_PRES = [];
+  function ajustarNomesPres(){
+    AJUSTES_PRES = [];
+    const org = COLABS.filter(c => c.ativo && c.nome).map(c => ({ nome: c.nome, k: chavePrincipal(c.nome) })).filter(o => o.k);
+    const exatas = new Set(org.map(o => o.k));
+    const vistos = {};
+    PRES = PRES.map(p => {
+      const kp = chavePrincipal(p.recurso);
+      if(!kp || exatas.has(kp)) return p;
+      if(!(kp in vistos)){
+        const cand = org.filter(o => Math.min(o.k.length, kp.length) >= 15 && (kp.indexOf(o.k) === 0 || o.k.indexOf(kp) === 0));
+        const unicos = [...new Set(cand.map(o => o.nome))];
+        vistos[kp] = unicos.length === 1 ? unicos[0] : '';
+        if(vistos[kp]) AJUSTES_PRES.push({ toa: p.recurso, organograma: vistos[kp] });
+      }
+      return vistos[kp] ? { data: p.data, recurso: vistos[kp] } : p;
+    });
+  }
   function chavePrincipal(s){ const k = chavesNome(s); return k.length ? k[0] : ''; }
   function mesmoSupervisor(a, b){ return semAcento(a) === semAcento(b); }
 
@@ -102,8 +123,15 @@
       <h2 style="font-size:14px; margin:6px 0 8px;">Resumo por supervisor — Organograma x TOA</h2>
       <div style="overflow:auto; border-radius:8px; margin-bottom:18px;"><table id="toaQ${q}Sup"></table></div>
 
-      <h2 style="font-size:14px; margin:6px 0 4px;">🔴 Técnicos que não logaram no TOA</h2>
-      <div class="hint">Técnicos ativos do Organograma sem o bonequinho no console do TOA no dia (aba TOA_PRESENCA, lida pelo robô).</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0 4px;">
+        <h2 style="font-size:14px; margin:0;">📲 Presença no TOA — técnicos do Organograma</h2>
+        <select id="toaQ${q}Log" class="mono" style="${ESTILO_SELECT} margin-left:auto;">
+          <option value="nao">🔴 Não logaram</option>
+          <option value="sim">🟢 Logaram</option>
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="hint">Técnicos ativos do Organograma com ou sem o bonequinho no console do TOA no dia (aba TOA_PRESENCA, lida pelo robô).</div>
       <div style="overflow:auto; max-height:520px; border-radius:8px;"><table id="toaQ${q}Table"></table></div>
     </div>`;
   }
@@ -247,6 +275,7 @@
       const st = estado.quadro[q];
       document.getElementById('toaQ' + q + 'Dia').addEventListener('change', e => { st.dia = e.target.value; renderQuadro(q); });
       document.getElementById('toaQ' + q + 'Status').addEventListener('change', e => { st.status = e.target.value; renderQuadro(q); });
+      document.getElementById('toaQ' + q + 'Log').addEventListener('change', e => { st.log = e.target.value; renderQuadro(q); });
       document.getElementById('toaQ' + q + 'Padrao').addEventListener('click', () => { st.dia = diaPadrao(q); renderQuadro(q); });
       let tq;
       document.getElementById('toaQ' + q + 'Busca').addEventListener('input', e => {
@@ -440,6 +469,7 @@
           return true;
         });
         PRES = (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
+        ajustarNomesPres();
         ajustarNomesToa();
         ultimaCarga = Date.now();
         if(!estado.fim && (TOA.length || PRES.length)){
@@ -466,7 +496,10 @@
     const diasComBase = new Set(noPeriodo.map(t => t.data));
     const diasAderencia = diasUteisSel.filter(d => diasComBase.has(d));
     const diasSemBase = diasUteisSel.filter(d => !diasComBase.has(d));
-    const diasPres = diasUteisSel.filter(d => PRES.some(p => p.data === d));
+    // Presença: vai do início do período até o último dia que o robô gravou (inclui hoje, mesmo se o período termina ontem).
+    const fimPres = PRES.reduce((m, p) => p.data > m ? p.data : m, estado.fim);
+    const diasPres = [...new Set(PRES.filter(p => p.data >= estado.inicio && p.data <= fimPres).map(p => p.data))]
+      .filter(d => !estado.ignorarFds || !fimDeSemana(d)).sort();
     const toaF = estado.supervisor ? noPeriodo.filter(t => mesmoSupervisor(t.supervisor, estado.supervisor)) : noPeriodo;
 
     const tecnicos = COLABS.filter(c => c.ativo && semAcento(c.areaTecnica) === 'tecnico' && c.nome);
@@ -482,7 +515,7 @@
     // Presença TOA: técnico logado (bonequinho no console do TOA, aba TOA_PRESENCA).
     const rotaPorDia = {};
     PRES.forEach(p => {
-      if(p.data < estado.inicio || p.data > estado.fim) return;
+      if(p.data < estado.inicio || p.data > fimPres) return;
       if(!rotaPorDia[p.data]) rotaPorDia[p.data] = new Set();
       chavesNome(p.recurso).forEach(k => rotaPorDia[p.data].add(k));
     });
@@ -529,8 +562,8 @@
     }).sort((a, b) => b.media - a.media);
     const chavesTec = new Set();
     tecF.forEach(c => chavesNome(c.nome).forEach(k => chavesTec.add(k)));
-    const presFora = [...new Set(PRES.filter(p => p.data >= estado.inicio && p.data <= estado.fim && !chavesNome(p.recurso).some(k => chavesTec.has(k))).map(p => p.recurso))].sort();
-    const temPresenca = PRES.some(p => p.data >= estado.inicio && p.data <= estado.fim);
+    const presFora = [...new Set(PRES.filter(p => p.data >= estado.inicio && p.data <= fimPres && !chavesNome(p.recurso).some(k => chavesTec.has(k))).map(p => p.recurso))].sort();
+    const temPresenca = diasPres.length > 0;
 
     // Técnicos do TOA que não existem no Organograma (ativos) — ajuda a achar nomes diferentes.
     const chavesOrg = new Set();
@@ -800,26 +833,29 @@
     PRES.filter(p => p.data === dia).forEach(p => chavesNome(p.recurso).forEach(k => presDia.add(k)));
     const ultLogin = {};
     PRES.forEach(p => { const k = chavePrincipal(p.recurso); if(k && p.data <= dia && (!ultLogin[k] || p.data > ultLogin[k])) ultLogin[k] = p.data; });
-    const naoLog = tecnicos
+    const todosPres = tecnicos
       .filter(c => !estado.supervisor || mesmoSupervisor(c.supervisor, estado.supervisor))
-      .filter(c => !chavesNome(c.nome).some(k => presDia.has(k)))
-      .map(c => { const tec = escalaDoTecnico(c.nome); return { nome: c.nome, supervisor: c.supervisor || '', temEscala: !!tec, codEscala: tec ? codigoEscala(tec, dia) : '' }; })
-      .filter(bate)
-      .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
+      .map(c => { const tec = escalaDoTecnico(c.nome); return { nome: c.nome, supervisor: c.supervisor || '', logou: chavesNome(c.nome).some(k => presDia.has(k)), temEscala: !!tec, codEscala: tec ? codigoEscala(tec, dia) : '' }; })
+      .filter(bate);
+    const nSim = todosPres.filter(l => l.logou).length, nNao = todosPres.length - nSim;
+    document.getElementById('toaQ' + q + 'Log').value = st.log;
+    const naoLog = todosPres.filter(l => !st.log || (st.log === 'sim' ? l.logou : !l.logou))
+      .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || (a.logou - b.logou) || a.nome.localeCompare(b.nome, 'pt-BR'));
     const temPresDia = presDia.size > 0;
-    document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? naoLog.length + ' não logaram' : 'sem presença no dia';
+    document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? '🟢 ' + nSim + ' logaram · 🔴 ' + nNao + ' não logaram' : 'sem presença no dia';
     tabela.innerHTML = !temPresDia
       ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.</td></tr></tbody>`
       : !naoLog.length
-        ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Todos os técnicos do Organograma logaram no TOA nesse dia.</td></tr></tbody>`
-        : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Escala</th><th>Último login no TOA</th></tr></thead><tbody>' +
+        ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico nesse filtro.</td></tr></tbody>`
+        : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Presença</th><th>Escala</th><th>Último login no TOA</th></tr></thead><tbody>' +
           naoLog.map(l => {
             const ult = ultLogin[chavePrincipal(l.nome)];
             return `<tr>
               <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
               <td style="white-space:nowrap;">${esc(l.nome)}</td>
+              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
               <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
-              <td class="mono" style="font-size:12px;">${ult ? fmtData(ult) : `<span style="color:${COR.muted};">não logou desde o início da presença</span>`}</td>
+              <td class="mono" style="font-size:12px;">${l.logou ? fmtData(dia) : ult ? fmtData(ult) : `<span style="color:${COR.muted};">não logou desde o início da presença</span>`}</td>
             </tr>`;
           }).join('') + '</tbody>';
   }
@@ -928,7 +964,13 @@
     }).join('');
     const rod = `<tfoot><tr style="font-weight:700;"><td>Total</td><td class="num">${totEq}</td>${tot.map(n => `<td class="num">${n}</td>`).join('')}<td class="num">${(tot.reduce((a, b) => a + b, 0) / Math.max(1, tot.length)).toFixed(1).replace('.', ',')}</td></tr></tfoot>`;
     tabela.innerHTML = cab + '<tbody>' + corpo + '</tbody>' + rod;
+    const notas = [];
+    if(AJUSTES_PRES.length) notas.push(`✔ ${AJUSTES_PRES.length} nome(s) do TOA ajustados para o nome do Organograma (acento ou sobrenome cortado): <span title="${esc(AJUSTES_PRES.map(a => a.toa + ' → ' + a.organograma).join('\n'))}" style="text-decoration:underline dotted; cursor:help;">ver ajustes</span>`);
     if(r.presFora.length){
+      notas.push(`ℹ ${r.presFora.length} técnico(s) logado(s) no TOA que não estão como técnicos ativos desta equipe no Organograma: <span title="${esc(r.presFora.join('\n'))}" style="text-decoration:underline dotted; cursor:help;">ver nomes</span>`);
+    }
+    fora.innerHTML = notas.join('<br>');
+    if(false){
       fora.innerHTML = `ℹ ${r.presFora.length} técnico(s) logado(s) no TOA que não estão como técnicos ativos desta equipe no Organograma: <span title="${esc(r.presFora.join('\n'))}" style="text-decoration:underline dotted; cursor:help;">ver nomes</span>`;
     }
   }
