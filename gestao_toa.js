@@ -93,6 +93,10 @@
       return vistos[kp] ? { data: p.data, recurso: vistos[kp] } : p;
     });
   }
+  // Técnicos SEM ACESSO ao TOA (restrição) — por matrícula. Não entram como "não logou" nem na % de aderência.
+  const RESTRICAO_TOA = ['6702', '8769', '8087', '6665', '7147', '6627', '8782', '6858', '6914', '8796', '6769', '6780'];
+  function matNum(m){ const x = String(m == null ? '' : m).split('-').pop().replace(/\D/g, '').replace(/^0+/, ''); return x; }
+  function temRestricao(c){ return !!c && RESTRICAO_TOA.indexOf(matNum(c.matricula)) !== -1; }
   function chavePrincipal(s){ const k = chavesNome(s); return k.length ? k[0] : ''; }
   function mesmoSupervisor(a, b){ return semAcento(a) === semAcento(b); }
 
@@ -129,6 +133,7 @@
         <select id="toaQ${q}Log" class="mono" style="${ESTILO_SELECT}">
           <option value="nao">🔴 Não logaram</option>
           <option value="sim">🟢 Logaram</option>
+          <option value="restr">⛔ Sem acesso (restrição)</option>
           <option value="">Todos</option>
         </select>
       </div>
@@ -725,10 +730,11 @@
       const k = chavesNome(c.nome).find(x => linhas[x]);
       if(k){
         linhas[k].noOrg = true;
+        linhas[k].restrito = temRestricao(c);
         if(c.supervisor) linhas[k].supervisor = c.supervisor;
       } else {
         const kn = chavePrincipal(c.nome);
-        if(kn && !linhas[kn]) linhas[kn] = { nome: c.nome, supervisor: c.supervisor || '', total: 0, concluidas: 0, refeicao: 0, status: {}, noOrg: true, ausente: true };
+        if(kn && !linhas[kn]) linhas[kn] = { nome: c.nome, supervisor: c.supervisor || '', total: 0, concluidas: 0, refeicao: 0, status: {}, noOrg: true, ausente: true, restrito: temRestricao(c) };
       }
     });
     if(estado.supervisor){
@@ -765,8 +771,10 @@
     const escalados = todas.filter(l => l.escalado);
     const escaladosIni = escalados.filter(l => l.logou).length;
     const orgTodos = todas.filter(l => l.noOrg);
+    const restritos = orgTodos.filter(l => l.restrito && !l.logou).length;
     const logaram = orgTodos.filter(l => l.logou).length;
-    const naoLogaram = orgTodos.length - logaram;
+    const naoLogaram = orgTodos.length - logaram - restritos;
+    const baseAder = orgTodos.length - restritos;
     const fez = naBase.filter(l => l.situacao === 'fez');
     const concluidas = naBase.reduce((s, l) => s + l.concluidas, 0);
     const equipe = todas.filter(l => l.noOrg).length;
@@ -780,8 +788,9 @@
       kpi('📅 Dia', fmtData(dia).slice(0, 5) + ' ' + DIAS_SEMANA[diaSemana(dia)], COR.text) +
       kpi('👥 Equipe (Organograma)', equipe, COR.text, 'técnicos ativos, sem Cirion') +
       kpi('📲 Na base do TOA', naBase.length, COR.accent, equipe ? pct(naBase.filter(l => l.noOrg).length / equipe) + ' da equipe' : '') +
-      kpi('🟢 Logaram (Presença TOA)', temPresDia ? logaram : '—', COR.good, temPresDia ? 'aderência ' + pct(equipe ? logaram / equipe : 0) + ' da equipe' : 'sem presença no dia') +
+      kpi('🟢 Logaram (Presença TOA)', temPresDia ? logaram : '—', COR.good, temPresDia ? 'aderência ' + pct(baseAder ? logaram / baseAder : 0) + ' da equipe com acesso' : 'sem presença no dia') +
       kpi('🔴 Não logaram', temPresDia ? naoLogaram : '—', COR.bad, temPresDia ? 'no Organograma, sem o bonequinho no TOA' : 'sem presença no dia') +
+      kpi('⛔ Restrição (sem acesso ao TOA)', restritos, COR.muted, 'fora da conta de aderência') +
       (ESCALA ? kpi('📋 Escalados (escala)', escalados.length, '#1d4ed8', escalados.length && temPresDia ? escaladosIni + ' logaram · ' + pct(escaladosIni / escalados.length) : (escalados.length ? 'sem presença no dia' : 'nenhum escalado no dia')) : '') +
       kpi('✅ Fizeram serviço', fez.length, COR.good, concluidas + ' atividades concluídas');
 
@@ -790,9 +799,9 @@
     todas.forEach(l => {
       const lab = String(l.supervisor || '').trim() || 'Sem supervisor';
       const k = semAcento(lab);
-      if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0, esc: 0, escIni: 0, log: 0, naoLog: 0, naoFez: 0 };
+      if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0, esc: 0, escIni: 0, log: 0, naoLog: 0, restr: 0 };
       const g = porSup[k];
-      if(l.noOrg){ g.equipe++; if(l.logou) g.log++; else g.naoLog++; if(l.situacao !== 'fez') g.naoFez++; }
+      if(l.noOrg){ g.equipe++; if(l.logou) g.log++; else if(l.restrito) g.restr++; else g.naoLog++; }
       if(l.escalado){ g.esc++; if(l.logou) g.escIni++; }
       if(l.ausente && !l.escalado){ g.fora++; return; }
       if(!l.ausente) g.base++;
@@ -800,7 +809,7 @@
       if(l.situacao === 'fez') g.fez++;
     });
     const sups = Object.values(porSup).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-    const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez','esc','escIni','log','naoLog','naoFez'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0, esc:0, escIni:0, log:0, naoLog:0, naoFez:0 });
+    const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez','esc','escIni','log','naoLog','restr'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0, esc:0, escIni:0, log:0, naoLog:0, restr:0 });
     const sp = v => temPresDia ? v : '—';
     const pctCel = (n, d) => d > 0 ? `<span class="pill ${n / d >= META_ADERENCIA ? 'good' : (n / d >= META_ADERENCIA - 0.2 ? 'warn' : 'bad')}">${pct(n / d)}</span>` : '—';
     const linhaSup = (g, negrito) => `<tr${negrito ? ` style="font-weight:700; border-top:2px solid ${COR.line};"` : ''}>
@@ -809,12 +818,13 @@
       <td class="num">${g.base}</td>
       <td class="num" style="color:${COR.good} !important;">${sp(g.log)}</td>
       <td class="num" style="color:${COR.bad} !important;">${sp(g.naoLog)}</td>
+      <td class="num" style="color:${COR.muted} !important;">${g.restr || '—'}</td>
       <td class="num">${g.fez}</td>
-      <td class="num">${temPresDia ? pctCel(g.log, g.equipe) : '—'}</td>
+      <td class="num">${temPresDia ? pctCel(g.log, g.equipe - g.restr) : '—'}</td>
       ${ESCALA ? `<td class="num">${g.esc || '—'}</td><td class="num">${g.esc && temPresDia ? pctCel(g.escIni, g.esc) : '—'}</td>` : ''}
     </tr>`;
     document.getElementById('toaQ' + q + 'Sup').innerHTML =
-      '<thead><tr><th>Supervisor</th><th class="num">Equipe (Organograma)</th><th class="num">Na base TOA</th><th class="num">🟢 Logaram</th><th class="num">🔴 Não logaram</th><th class="num">✅ Fizeram serviço</th><th class="num">% aderência (logados ÷ equipe)</th>' + (ESCALA ? '<th class="num">📋 Escalados</th><th class="num">% logados dos escalados</th>' : '') + '</tr></thead><tbody>' +
+      '<thead><tr><th>Supervisor</th><th class="num">Equipe (Organograma)</th><th class="num">Na base TOA</th><th class="num">🟢 Logaram</th><th class="num">🔴 Não logaram</th><th class="num">⛔ Restrição (sem acesso TOA)</th><th class="num">✅ Fizeram serviço</th><th class="num">% aderência (logados ÷ equipe com acesso)</th>' + (ESCALA ? '<th class="num">📋 Escalados</th><th class="num">% logados dos escalados</th>' : '') + '</tr></thead><tbody>' +
       sups.map(g => linhaSup(g, false)).join('') + linhaSup(Object.assign({ label: 'Total' }, tot), true) + '</tbody>';
 
     // ----- tabela: na base do TOA -----
@@ -848,18 +858,18 @@
     PRES.forEach(p => { const k = chavePrincipal(p.recurso); if(k && p.data <= dia && (!ultLogin[k] || p.data > ultLogin[k])) ultLogin[k] = p.data; });
     const todosPres = tecnicos
       .filter(c => !estado.supervisor || mesmoSupervisor(c.supervisor, estado.supervisor))
-      .map(c => { const tec = escalaDoTecnico(c.nome); return { nome: c.nome, supervisor: c.supervisor || '', logou: chavesNome(c.nome).some(k => presDia.has(k)), temEscala: !!tec, codEscala: tec ? codigoEscala(tec, dia) : '' }; })
+      .map(c => { const tec = escalaDoTecnico(c.nome); return { nome: c.nome, supervisor: c.supervisor || '', logou: chavesNome(c.nome).some(k => presDia.has(k)), restrito: temRestricao(c), temEscala: !!tec, codEscala: tec ? codigoEscala(tec, dia) : '' }; })
       .filter(bate);
     const selSup = document.getElementById('toaQ' + q + 'SupF');
     const supsTab = [...new Set(todosPres.map(l => l.supervisor).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     if(st.sup && supsTab.indexOf(st.sup) === -1) st.sup = '';
     selSup.innerHTML = '<option value="">Supervisor: todos</option>' + supsTab.map(x => `<option value="${esc(x)}"${x === st.sup ? ' selected' : ''}>${esc(x)}</option>`).join('');
     const todosSup = todosPres.filter(l => !st.sup || mesmoSupervisor(l.supervisor, st.sup));
-    const nSim = todosSup.filter(l => l.logou).length, nNao = todosSup.length - nSim;
+    const nSim = todosSup.filter(l => l.logou).length, nRes = todosSup.filter(l => !l.logou && l.restrito).length, nNao = todosSup.length - nSim - nRes;
     document.getElementById('toaQ' + q + 'Log').value = st.log;
-    const naoLog = todosSup.filter(l => !st.log || (st.log === 'sim' ? l.logou : !l.logou))
+    const naoLog = todosSup.filter(l => !st.log || (st.log === 'sim' ? l.logou : st.log === 'restr' ? (!l.logou && l.restrito) : (!l.logou && !l.restrito)))
       .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || (a.logou - b.logou) || a.nome.localeCompare(b.nome, 'pt-BR'));
-    document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? '🟢 ' + nSim + ' logaram · 🔴 ' + nNao + ' não logaram' : 'sem presença no dia';
+    document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? '🟢 ' + nSim + ' logaram · 🔴 ' + nNao + ' não logaram' + (nRes ? ' · ⛔ ' + nRes + ' sem acesso' : '') : 'sem presença no dia';
     tabela.innerHTML = !temPresDia
       ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.</td></tr></tbody>`
       : !naoLog.length
@@ -870,9 +880,9 @@
             return `<tr>
               <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
               <td style="white-space:nowrap;">${esc(l.nome)}</td>
-              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
+              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : l.restrito ? '<span class="pill" style="background:rgba(107,117,144,.16);">⛔ Sem acesso (restrição)</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
               <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
-              <td class="mono" style="font-size:12px;">${l.logou ? fmtData(dia) : ult ? fmtData(ult) : `<span style="color:${COR.muted};">não logou desde o início da presença</span>`}</td>
+              <td class="mono" style="font-size:12px;">${l.logou ? fmtData(dia) : (l.restrito && !ult) ? `<span style="color:${COR.muted};">sem acesso ao TOA</span>` : ult ? fmtData(ult) : `<span style="color:${COR.muted};">não logou desde o início da presença</span>`}</td>
             </tr>`;
           }).join('') + '</tbody>';
   }
