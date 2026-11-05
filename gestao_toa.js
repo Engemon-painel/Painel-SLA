@@ -448,9 +448,13 @@
     if(carregando) return carregando;
     const pegarEscala = fetch('dados_escala.json?_=' + Date.now())
       .then(r => r.ok ? r.json() : null).catch(() => null);
+    // Presença TOA também pode vir de um arquivo separado (fluxo pequeno, sem rodar o fluxo grande do painel)
+    const pegarPresenca = fetch('dados_toa_presenca.json?_=' + Date.now())
+      .then(r => r.ok ? r.json() : null).catch(() => null);
     carregando = fetch('dados.json?_=' + Date.now())
       .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(d => pegarEscala.then(e => { prepararEscala(e); return d; }))
+      .then(d => pegarPresenca.then(pr => { d.__presExtra = pr && Array.isArray(pr.toaPresenca) ? pr.toaPresenca : []; return d; }))
       .then(d => {
         const todosColabs = Array.isArray(d.colaboradores) ? d.colaboradores : [];
         const excluido = c => CONTRATOS_EXCLUIDOS.some(x =>
@@ -470,7 +474,9 @@
           if(!tecnicoValido && s && supsExcluidos.has(s) && !supsValidos.has(s)) return false; // supervisor só da Cirion
           return true;
         });
-        PRES = (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
+        const presJunta = {};
+        (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).concat(d.__presExtra || []).forEach(p => { if(p && p.data && p.recurso) presJunta[p.data + '|' + p.recurso] = p; });
+        PRES = Object.values(presJunta).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
         ajustarNomesPres();
         ajustarNomesToa();
         ultimaCarga = Date.now();
@@ -777,7 +783,6 @@
       kpi('🟢 Logaram (Presença TOA)', temPresDia ? logaram : '—', COR.good, temPresDia ? 'aderência ' + pct(equipe ? logaram / equipe : 0) + ' da equipe' : 'sem presença no dia') +
       kpi('🔴 Não logaram', temPresDia ? naoLogaram : '—', COR.bad, temPresDia ? 'no Organograma, sem o bonequinho no TOA' : 'sem presença no dia') +
       (ESCALA ? kpi('📋 Escalados (escala)', escalados.length, '#1d4ed8', escalados.length && temPresDia ? escaladosIni + ' logaram · ' + pct(escaladosIni / escalados.length) : (escalados.length ? 'sem presença no dia' : 'nenhum escalado no dia')) : '') +
-      kpi('🚫 Fora da base', fora.length, COR.bad, 'no Organograma, não estão no TOA nem escalados') +
       kpi('✅ Fizeram serviço', fez.length, COR.good, concluidas + ' atividades concluídas');
 
     // ----- resumo por supervisor -----
@@ -785,9 +790,9 @@
     todas.forEach(l => {
       const lab = String(l.supervisor || '').trim() || 'Sem supervisor';
       const k = semAcento(lab);
-      if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0, esc: 0, escIni: 0, log: 0, naoLog: 0 };
+      if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0, esc: 0, escIni: 0, log: 0, naoLog: 0, naoFez: 0 };
       const g = porSup[k];
-      if(l.noOrg){ g.equipe++; if(l.logou) g.log++; else g.naoLog++; }
+      if(l.noOrg){ g.equipe++; if(l.logou) g.log++; else g.naoLog++; if(l.situacao !== 'fez') g.naoFez++; }
       if(l.escalado){ g.esc++; if(l.logou) g.escIni++; }
       if(l.ausente && !l.escalado){ g.fora++; return; }
       if(!l.ausente) g.base++;
@@ -795,7 +800,7 @@
       if(l.situacao === 'fez') g.fez++;
     });
     const sups = Object.values(porSup).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-    const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez','esc','escIni','log','naoLog'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0, esc:0, escIni:0, log:0, naoLog:0 });
+    const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez','esc','escIni','log','naoLog','naoFez'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0, esc:0, escIni:0, log:0, naoLog:0, naoFez:0 });
     const sp = v => temPresDia ? v : '—';
     const pctCel = (n, d) => d > 0 ? `<span class="pill ${n / d >= META_ADERENCIA ? 'good' : (n / d >= META_ADERENCIA - 0.2 ? 'warn' : 'bad')}">${pct(n / d)}</span>` : '—';
     const linhaSup = (g, negrito) => `<tr${negrito ? ` style="font-weight:700; border-top:2px solid ${COR.line};"` : ''}>
@@ -804,13 +809,12 @@
       <td class="num">${g.base}</td>
       <td class="num" style="color:${COR.good} !important;">${sp(g.log)}</td>
       <td class="num" style="color:${COR.bad} !important;">${sp(g.naoLog)}</td>
-      <td class="num" style="color:${COR.bad} !important;">${g.fora}</td>
       <td class="num">${g.fez}</td>
       <td class="num">${temPresDia ? pctCel(g.log, g.equipe) : '—'}</td>
       ${ESCALA ? `<td class="num">${g.esc || '—'}</td><td class="num">${g.esc && temPresDia ? pctCel(g.escIni, g.esc) : '—'}</td>` : ''}
     </tr>`;
     document.getElementById('toaQ' + q + 'Sup').innerHTML =
-      '<thead><tr><th>Supervisor</th><th class="num">Equipe (Organograma)</th><th class="num">Na base TOA</th><th class="num">🟢 Logaram</th><th class="num">🔴 Não logaram</th><th class="num">🚫 Fora da base</th><th class="num">✅ Fizeram serviço</th><th class="num">% aderência (logados ÷ equipe)</th>' + (ESCALA ? '<th class="num">📋 Escalados</th><th class="num">% logados dos escalados</th>' : '') + '</tr></thead><tbody>' +
+      '<thead><tr><th>Supervisor</th><th class="num">Equipe (Organograma)</th><th class="num">Na base TOA</th><th class="num">🟢 Logaram</th><th class="num">🔴 Não logaram</th><th class="num">✅ Fizeram serviço</th><th class="num">% aderência (logados ÷ equipe)</th>' + (ESCALA ? '<th class="num">📋 Escalados</th><th class="num">% logados dos escalados</th>' : '') + '</tr></thead><tbody>' +
       sups.map(g => linhaSup(g, false)).join('') + linhaSup(Object.assign({ label: 'Total' }, tot), true) + '</tbody>';
 
     // ----- tabela: na base do TOA -----
