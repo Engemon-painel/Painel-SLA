@@ -26,6 +26,7 @@
   // Concluída, Não Concluída) ou Refeição = iniciou. Na base sem nenhuma atividade
   // (linha sem status) = não iniciou.
 
+  let PRES = [];     // [{ data, recurso }] técnicos com bonequinho no TOA (rota no dia), mesmo sem atividade
   let TOA = [];      // [{ data:'aaaa-mm-dd', recurso, supervisor, total, concluidas }]
   let COLABS = [];
   let ultimaCarga = 0;
@@ -211,6 +212,13 @@
             <div class="hint">% dos técnicos ativos da equipe (Organograma) que lançaram ao menos 1 atividade no dia. Passe o mouse para ver quem não lançou. Meta ${pct(META_ADERENCIA)}.</div>
             <div style="overflow-x:auto; border-radius:8px;"><table id="toaAderenciaTable"></table></div>
             <div id="toaNaoEncontrados" class="mono" style="font-size:11px; color:var(--muted); margin-top:10px;"></div>
+          </div>
+
+          <div class="panel" style="margin-bottom:16px;">
+            <h2>Presença no TOA — técnicos logados por supervisor</h2>
+            <div class="hint">Técnicos com o bonequinho no console do TOA (logados no dia), lidos pelo robô na aba TOA_PRESENCA. Passe o mouse para ver os nomes e quem estava logado sem atividade.</div>
+            <div style="overflow-x:auto; border-radius:8px;"><table id="toaPresencaTable"></table></div>
+            <div id="toaPresencaFora" class="mono" style="font-size:11px; color:var(--muted); margin-top:10px;"></div>
           </div>
 
           <div class="panel">
@@ -434,6 +442,7 @@
           if(!tecnicoValido && s && supsExcluidos.has(s) && !supsValidos.has(s)) return false; // supervisor só da Cirion
           return true;
         });
+        PRES = (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
         ajustarNomesToa();
         ultimaCarga = Date.now();
         if(!estado.fim && TOA.length){
@@ -453,9 +462,14 @@
   // Calcula tudo que as visões usam, a partir dos filtros atuais.
   function calcular(){
     const dias = listaDias(estado.inicio, estado.fim);
-    const diasAderencia = estado.ignorarFds ? dias.filter(d => !fimDeSemana(d)) : dias;
+    const diasUteisSel = estado.ignorarFds ? dias.filter(d => !fimDeSemana(d)) : dias;
 
     const noPeriodo = TOA.filter(t => t.data >= estado.inicio && t.data <= estado.fim);
+    // Dias sem base do TOA ainda (ex.: a base vai só até ontem/anteontem) não entram como 0% na aderência.
+    const diasComBase = new Set(noPeriodo.map(t => t.data));
+    const diasAderencia = diasUteisSel.filter(d => diasComBase.has(d));
+    const diasSemBase = diasUteisSel.filter(d => !diasComBase.has(d));
+    const diasPres = diasUteisSel.filter(d => PRES.some(p => p.data === d));
     const toaF = estado.supervisor ? noPeriodo.filter(t => mesmoSupervisor(t.supervisor, estado.supervisor)) : noPeriodo;
 
     const tecnicos = COLABS.filter(c => c.ativo && semAcento(c.areaTecnica) === 'tecnico' && c.nome);
@@ -468,6 +482,17 @@
       if(!lancouPorDia[t.data]) lancouPorDia[t.data] = new Set();
       chavesNome(t.recurso).forEach(k => lancouPorDia[t.data].add(k));
     });
+    // Presença TOA: técnico logado (bonequinho no console do TOA, aba TOA_PRESENCA).
+    const rotaPorDia = {};
+    PRES.forEach(p => {
+      if(p.data < estado.inicio || p.data > estado.fim) return;
+      if(!rotaPorDia[p.data]) rotaPorDia[p.data] = new Set();
+      chavesNome(p.recurso).forEach(k => rotaPorDia[p.data].add(k));
+    });
+    function logado(c, dia){
+      const r = rotaPorDia[dia];
+      return !!r && chavesNome(c.nome).some(k => r.has(k));
+    }
     function lancou(c, dia){
       const set = lancouPorDia[dia];
       return !!set && chavesNome(c.nome).some(k => set.has(k));
@@ -494,6 +519,24 @@
       somaLancaram += lanc; somaEsperados += esp;
       return { label: eq.label, equipe: eq.membros.length, porDia, media: esp > 0 ? lanc / esp : 0, nunca };
     }).sort((a, b) => b.media - a.media);
+
+    // Presença TOA por supervisor (Organograma), mesmos dias da aderência.
+    const presenca = Object.values(equipes).map(eq => {
+      let soma = 0;
+      const semAtivTot = new Set();
+      const porDia = diasPres.map(dia => {
+        const logados = eq.membros.filter(c => logado(c, dia));
+        const semAtiv = diasComBase.has(dia) ? logados.filter(c => !lancou(c, dia)) : [];   // sem base do TOA no dia: não dá para dizer quem não teve atividade
+        semAtiv.forEach(c => semAtivTot.add(c.nome));
+        soma += logados.length;
+        return { dia, n: logados.length, equipe: eq.membros.length, nomes: logados.map(c => c.nome), semAtiv: semAtiv.map(c => c.nome), naoLog: eq.membros.filter(c => !logado(c, dia)).map(c => c.nome) };
+      });
+      return { label: eq.label, equipe: eq.membros.length, porDia, media: diasPres.length ? soma / diasPres.length : 0, semAtiv: [...semAtivTot] };
+    }).sort((a, b) => b.media - a.media);
+    const chavesTec = new Set();
+    tecF.forEach(c => chavesNome(c.nome).forEach(k => chavesTec.add(k)));
+    const presFora = [...new Set(PRES.filter(p => p.data >= estado.inicio && p.data <= estado.fim && !chavesNome(p.recurso).some(k => chavesTec.has(k))).map(p => p.recurso))].sort();
+    const temPresenca = PRES.some(p => p.data >= estado.inicio && p.data <= estado.fim);
 
     // Técnicos do TOA que não existem no Organograma (ativos) — ajuda a achar nomes diferentes.
     const chavesOrg = new Set();
@@ -549,7 +592,7 @@
     const pares = toaF.filter(t => Number(t.total) > 0).length;
 
     return {
-      dias, diasAderencia, toaF, aderencia, naoEncontrados, porTec, supervisores, porDia,
+      dias, diasAderencia, diasSemBase, diasPres, toaF, aderencia, presenca, presFora, temPresenca, naoEncontrados, porTec, supervisores, porDia,
       kpi: {
         concluidas: totalConcluidas,
         lancadas: totalLancadas,
@@ -611,6 +654,7 @@
     renderKpis(r);
     renderGraficos(r);
     renderAderencia(r);
+    renderPresenca(r);
     renderTabelaTecnicos();
   }
 
@@ -865,6 +909,40 @@
     });
   }
 
+  function renderPresenca(r){
+    const tabela = document.getElementById('toaPresencaTable');
+    const fora = document.getElementById('toaPresencaFora');
+    if(!tabela) return;
+    fora.textContent = '';
+    if(!r.temPresenca){
+      tabela.innerHTML = `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença no período. O robô do Power Automate grava na aba TOA_PRESENCA (a partir de 05/11/2026).</td></tr></tbody>`;
+      return;
+    }
+    if(!r.presenca.length || !r.diasPres.length){
+      tabela.innerHTML = `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico para esse filtro.</td></tr></tbody>`;
+      return;
+    }
+    const tot = r.diasPres.map((d, i) => r.presenca.reduce((a, s) => a + s.porDia[i].n, 0));
+    const totEq = r.presenca.reduce((a, s) => a + s.equipe, 0);
+    const cab = '<thead><tr><th>Supervisor</th><th class="num">Equipe</th>' +
+      r.diasPres.map(d => `<th class="num" style="white-space:nowrap;">${fmtDiaCurto(d)}<br><span style="font-weight:400;">${DIAS_SEMANA[diaSemana(d)]}</span></th>`).join('') +
+      '<th class="num">Média logados/dia</th><th class="num">Logados sem atividade</th></tr></thead>';
+    const corpo = r.presenca.map(s => {
+      const cel = s.porDia.map(x => {
+        const t = x.n + ' de ' + x.equipe + ' logados' + (x.nomes.length ? '\nLogados: ' + x.nomes.join(', ') : '') + (x.semAtiv.length ? '\nLogados sem atividade: ' + x.semAtiv.join(', ') : '') + (x.naoLog.length ? '\nNão logados: ' + x.naoLog.join(', ') : '');
+        return `<td class="num" title="${esc(t)}" style="white-space:nowrap;"><b>${x.n}</b>${x.semAtiv.length ? `<div style="font-size:10px; color:${COR.warn}; font-weight:600;">${x.semAtiv.length} s/ ativ.</div>` : ''}</td>`;
+      }).join('');
+      return `<tr><td style="white-space:nowrap;">${esc(s.label)}</td><td class="num">${s.equipe}</td>${cel}
+        <td class="num"><b>${s.media.toFixed(1).replace('.', ',')}</b></td>
+        <td class="num" title="${esc(s.semAtiv.join(', '))}">${s.semAtiv.length ? `<span style="color:${COR.warn}; font-weight:700;">${s.semAtiv.length}</span>` : '0'}</td></tr>`;
+    }).join('');
+    const rod = `<tfoot><tr style="font-weight:700;"><td>Total</td><td class="num">${totEq}</td>${tot.map(n => `<td class="num">${n}</td>`).join('')}<td class="num">${(tot.reduce((a, b) => a + b, 0) / Math.max(1, tot.length)).toFixed(1).replace('.', ',')}</td><td class="num">${r.presenca.reduce((a, s) => a + s.semAtiv.length, 0)}</td></tr></tfoot>`;
+    tabela.innerHTML = cab + '<tbody>' + corpo + '</tbody>' + rod;
+    if(r.presFora.length){
+      fora.innerHTML = `ℹ ${r.presFora.length} técnico(s) logado(s) no TOA que não estão como técnicos ativos desta equipe no Organograma: <span title="${esc(r.presFora.join('\n'))}" style="text-decoration:underline dotted; cursor:help;">ver nomes</span>`;
+    }
+  }
+
   function renderAderencia(r){
     const tabela = document.getElementById('toaAderenciaTable');
     if(!r.aderencia.length){
@@ -894,6 +972,7 @@
 
     const ne = document.getElementById('toaNaoEncontrados');
     const partes = [];
+    if(r.diasSemBase && r.diasSemBase.length) partes.push(`⏳ Sem base do TOA ainda (fora da aderência): ${r.diasSemBase.map(d => fmtDiaCurto(d)).join(', ')}`);
     if(AJUSTES.length){
       const lista = AJUSTES.map(a => a.toa + ' → ' + a.organograma).join('\n');
       partes.push(`✔ ${AJUSTES.length} nome(s) do TOA ajustados para o nome do Organograma: <span title="${esc(lista)}" style="text-decoration:underline dotted; cursor:help;">ver ajustes</span>`);
