@@ -125,7 +125,13 @@
       <div class="kpi-row" id="toaQ${q}Kpis" style="margin-bottom:14px;"></div>
 
       <h2 style="font-size:14px; margin:6px 0 8px;">Resumo por supervisor — Organograma x TOA</h2>
-      <div style="overflow:auto; border-radius:8px; margin-bottom:18px;"><table id="toaQ${q}Sup"></table></div>
+      <div style="margin-bottom:18px;">
+        <div style="overflow:auto; border-radius:8px; margin-bottom:14px;"><table id="toaQ${q}Sup" class="toa-resumo"></table></div>
+        <div style="max-width:760px;">
+          <div class="mono" style="${ESTILO_LABEL} margin-bottom:6px;">🏆 Ranking de aderência por supervisor</div>
+          <div id="toaQ${q}AderWrap" style="position:relative; height:260px;"><canvas id="toaQ${q}AderChart"></canvas></div>
+        </div>
+      </div>
 
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:6px 0 4px;">
         <h2 style="font-size:14px; margin:0;">📲 Presença no TOA — técnicos do Organograma</h2>
@@ -271,6 +277,18 @@
         </div>
       </div>`;
     main.appendChild(pg);
+    if(!document.getElementById('toa-resumo-css')){
+      const css = document.createElement('style');
+      css.id = 'toa-resumo-css';
+      css.textContent = `
+        table.toa-resumo{ width:auto; min-width:100%; }
+        table.toa-resumo th{ padding:6px 8px !important; font-size:10px !important; color:var(--text) !important; white-space:normal; max-width:96px; line-height:1.25; vertical-align:bottom; }
+        table.toa-resumo td{ padding:5px 8px !important; font-size:13px !important; color:var(--text) !important; font-weight:600; }
+        table.toa-resumo td.num{ font-weight:700; }
+        .pill.forte{ font-size:12px; padding:2px 10px; color:#fff !important; }
+        .pill.forte.good{ background:#059669; } .pill.forte.warn{ background:#d97706; } .pill.forte.bad{ background:#dc2626; }`;
+      document.head.appendChild(css);
+    }
 
     document.getElementById('toaInicio').addEventListener('change', e => { estado.inicio = e.target.value; render(); });
     document.getElementById('toaFim').addEventListener('change', e => { estado.fim = e.target.value; render(); });
@@ -768,7 +786,7 @@
     const fora = todas.filter(l => l.ausente && !l.escalado);
     const iniciaram = naBase.filter(l => l.iniciou).length;
     const naoIniciaram = listaBase.filter(l => !l.iniciou).length;
-    const escalados = todas.filter(l => l.escalado);
+    const escalados = todas.filter(l => l.escalado && !l.restrito);
     const escaladosIni = escalados.filter(l => l.logou).length;
     const orgTodos = todas.filter(l => l.noOrg);
     const restritos = orgTodos.filter(l => l.restrito && !l.logou).length;
@@ -787,11 +805,10 @@
     document.getElementById('toaQ' + q + 'Kpis').innerHTML = aviso +
       kpi('📅 Dia', fmtData(dia).slice(0, 5) + ' ' + DIAS_SEMANA[diaSemana(dia)], COR.text) +
       kpi('👥 Equipe (Organograma)', equipe, COR.text, 'técnicos ativos, sem Cirion') +
-      kpi('📲 Na base do TOA', naBase.length, COR.accent, equipe ? pct(naBase.filter(l => l.noOrg).length / equipe) + ' da equipe' : '') +
       kpi('🟢 Logaram (Presença TOA)', temPresDia ? logaram : '—', COR.good, temPresDia ? 'aderência ' + pct(baseAder ? logaram / baseAder : 0) + ' da equipe com acesso' : 'sem presença no dia') +
       kpi('🔴 Não logaram', temPresDia ? naoLogaram : '—', COR.bad, temPresDia ? 'no Organograma, sem o bonequinho no TOA' : 'sem presença no dia') +
       kpi('⛔ Restrição (sem acesso ao TOA)', restritos, COR.muted, 'fora da conta de aderência') +
-      (ESCALA ? kpi('📋 Escalados (escala)', escalados.length, '#1d4ed8', escalados.length && temPresDia ? escaladosIni + ' logaram · ' + pct(escaladosIni / escalados.length) : (escalados.length ? 'sem presença no dia' : 'nenhum escalado no dia')) : '') +
+      (ESCALA ? kpi('📋 Escalados (escala)', escalados.length, '#1d4ed8', escalados.length && temPresDia ? escaladosIni + ' logaram · aderência ' + pct(escaladosIni / escalados.length) : (escalados.length ? 'sem presença no dia' : 'nenhum escalado no dia')) : '') +
       kpi('✅ Fizeram serviço', fez.length, COR.good, concluidas + ' atividades concluídas');
 
     // ----- resumo por supervisor -----
@@ -802,7 +819,7 @@
       if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0, esc: 0, escIni: 0, log: 0, naoLog: 0, restr: 0 };
       const g = porSup[k];
       if(l.noOrg){ g.equipe++; if(l.logou) g.log++; else if(l.restrito) g.restr++; else g.naoLog++; }
-      if(l.escalado){ g.esc++; if(l.logou) g.escIni++; }
+      if(l.escalado && !l.restrito){ g.esc++; if(l.logou) g.escIni++; }
       if(l.ausente && !l.escalado){ g.fora++; return; }
       if(!l.ausente) g.base++;
       if(l.iniciou) g.ini++; else g.naoIni++;
@@ -811,21 +828,23 @@
     const sups = Object.values(porSup).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
     const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez','esc','escIni','log','naoLog','restr'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0, esc:0, escIni:0, log:0, naoLog:0, restr:0 });
     const sp = v => temPresDia ? v : '—';
-    const pctCel = (n, d) => d > 0 ? `<span class="pill ${n / d >= META_ADERENCIA ? 'good' : (n / d >= META_ADERENCIA - 0.2 ? 'warn' : 'bad')}">${pct(n / d)}</span>` : '—';
+    const pctCel = (n, d) => d > 0 ? `<span class="pill forte ${n / d >= META_ADERENCIA ? 'good' : (n / d >= META_ADERENCIA - 0.2 ? 'warn' : 'bad')}">${pct(n / d)}</span>` : '—';
     const linhaSup = (g, negrito) => `<tr${negrito ? ` style="font-weight:700; border-top:2px solid ${COR.line};"` : ''}>
       <td style="white-space:nowrap;">${esc(g.label)}</td>
       <td class="num">${g.equipe}</td>
-      <td class="num">${g.base}</td>
       <td class="num" style="color:${COR.good} !important;">${sp(g.log)}</td>
       <td class="num" style="color:${COR.bad} !important;">${sp(g.naoLog)}</td>
-      <td class="num" style="color:${COR.muted} !important;">${g.restr || '—'}</td>
+      <td class="num">${g.restr || '—'}</td>
       <td class="num">${g.fez}</td>
       <td class="num">${temPresDia ? pctCel(g.log, g.equipe - g.restr) : '—'}</td>
       ${ESCALA ? `<td class="num">${g.esc || '—'}</td><td class="num">${g.esc && temPresDia ? pctCel(g.escIni, g.esc) : '—'}</td>` : ''}
     </tr>`;
     document.getElementById('toaQ' + q + 'Sup').innerHTML =
-      '<thead><tr><th>Supervisor</th><th class="num">Equipe (Organograma)</th><th class="num">Na base TOA</th><th class="num">🟢 Logaram</th><th class="num">🔴 Não logaram</th><th class="num">⛔ Restrição (sem acesso TOA)</th><th class="num">✅ Fizeram serviço</th><th class="num">% aderência (logados ÷ equipe com acesso)</th>' + (ESCALA ? '<th class="num">📋 Escalados</th><th class="num">% logados dos escalados</th>' : '') + '</tr></thead><tbody>' +
+      '<thead><tr><th>Supervisor</th><th class="num">Equipe</th><th class="num">🟢 Logaram</th><th class="num">🔴 Não logaram</th><th class="num">⛔ Restrição</th><th class="num">✅ Fizeram serviço</th><th class="num" title="logados ÷ equipe com acesso ao TOA">% logados da equipe</th>' + (ESCALA ? '<th class="num">📋 Escalados</th><th class="num">Aderência (escalados logados)</th>' : '') + '</tr></thead><tbody>' +
       sups.map(g => linhaSup(g, false)).join('') + linhaSup(Object.assign({ label: 'Total' }, tot), true) + '</tbody>';
+
+    // ----- gráfico: ranking de aderência (escalados sem restrição que logaram) -----
+    desenharRankingAder(q, sups, temPresDia);
 
     // ----- tabela: na base do TOA -----
     const ordem = { fez: 0, sem: 1 };
@@ -884,6 +903,35 @@
               <td>${l.restrito ? '<span class="pill bad">Sim</span>' : '<span class="pill good">Não</span>'}</td>
             </tr>`;
           }).join('') + '</tbody>';
+  }
+
+  const chartsAder = {};
+  function desenharRankingAder(q, sups, temPresDia){
+    const wrap = document.getElementById('toaQ' + q + 'AderWrap');
+    if(!wrap) return;
+    if(chartsAder[q]){ chartsAder[q].destroy(); chartsAder[q] = null; }
+    const dados = sups.filter(g => g.esc > 0).map(g => ({ label: g.label, v: g.escIni / g.esc, n: g.escIni, d: g.esc }))
+      .sort((a, b) => b.v - a.v || b.d - a.d);
+    if(!temPresDia || !dados.length || typeof Chart === 'undefined'){
+      wrap.innerHTML = `<div class="mono" style="font-size:12px; color:${COR.muted}; padding:20px 0;">${!temPresDia ? 'Sem presença do TOA no dia.' : 'Nenhum escalado (sem restrição) no dia.'}</div><canvas id="toaQ${q}AderChart" style="display:none;"></canvas>`;
+      return;
+    }
+    wrap.innerHTML = `<canvas id="toaQ${q}AderChart"></canvas>`;
+    wrap.style.height = Math.max(180, dados.length * 30 + 40) + 'px';
+    const cor = v => v >= META_ADERENCIA ? '#059669' : (v >= META_ADERENCIA - 0.2 ? '#d97706' : '#dc2626');
+    const plugins = typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [];
+    chartsAder[q] = new Chart(document.getElementById('toaQ' + q + 'AderChart'), {
+      type: 'bar',
+      data: { labels: dados.map((x, i) => (i === 0 ? '🏆 ' : '') + x.label),
+        datasets: [{ label: 'Aderência', data: dados.map(x => Math.round(x.v * 1000) / 10), backgroundColor: dados.map(x => cor(x.v)), borderRadius: 4, barThickness: 18,
+          datalabels: { color: '#111827', anchor: 'end', align: 'right', font: { size: 11, family: 'JetBrains Mono', weight: '700' }, formatter: (v, c) => v.toFixed(0) + '% (' + dados[c.dataIndex].n + '/' + dados[c.dataIndex].d + ')' } }] },
+      plugins,
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 70 } },
+        plugins: { legend: { display: false }, datalabels: { display: true },
+          tooltip: { callbacks: { label: c => ' ' + dados[c.dataIndex].n + ' de ' + dados[c.dataIndex].d + ' escalados logaram (' + c.raw + '%)' } } },
+        scales: { x: { min: 0, max: 100, ticks: { color: COR.text, callback: v => v + '%' }, grid: { color: COR.line } },
+                  y: { ticks: { color: COR.text, font: { size: 11, weight: 'bold' } }, grid: { display: false } } } }
+    });
   }
 
   function renderKpis(r){
