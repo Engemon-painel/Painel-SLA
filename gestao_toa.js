@@ -874,15 +874,14 @@
       ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.</td></tr></tbody>`
       : !naoLog.length
         ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico nesse filtro.</td></tr></tbody>`
-        : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Presença</th><th>Escala</th><th>Último login no TOA</th></tr></thead><tbody>' +
+        : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Presença</th><th>Escala</th><th>Restrição</th></tr></thead><tbody>' +
           naoLog.map(l => {
-            const ult = ultLogin[chavePrincipal(l.nome)];
             return `<tr>
               <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
               <td style="white-space:nowrap;">${esc(l.nome)}</td>
               <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : l.restrito ? '<span class="pill" style="background:rgba(107,117,144,.16);">⛔ Sem acesso (restrição)</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
               <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
-              <td class="mono" style="font-size:12px;">${l.logou ? fmtData(dia) : (l.restrito && !ult) ? `<span style="color:${COR.muted};">sem acesso ao TOA</span>` : ult ? fmtData(ult) : `<span style="color:${COR.muted};">não logou desde o início da presença</span>`}</td>
+              <td>${l.restrito ? '<span class="pill bad">Sim</span>' : '<span class="pill good">Não</span>'}</td>
             </tr>`;
           }).join('') + '</tbody>';
   }
