@@ -340,6 +340,20 @@
   // Para os supervisores que têm escala (ex.: Marcelo, Nayane, Ycaro, Esaie), a escala do
   // dia diz quem devia trabalhar: escalado (X) sem atividade no TOA = 🟠 Não iniciou.
   let ESCALA = null;   // { datas: [...], tecnicos: [...], porChave: {} }
+  function juntarEscalas(a, b){
+    const lista = [a, b].filter(e => e && Array.isArray(e.datas) && Array.isArray(e.tecnicos));
+    if(!lista.length) return null;
+    if(lista.length === 1) return lista[0];
+    const datas = [...new Set(lista[0].datas.concat(lista[1].datas))].sort();
+    const idx = {}; datas.forEach((d, i) => idx[d] = i);
+    const tecnicos = [];
+    lista.forEach(e => e.tecnicos.forEach(t => {
+      const cod = new Array(datas.length).fill('');
+      e.datas.forEach((d, i) => { cod[idx[d]] = (t.codigos || [])[i] || ''; });
+      tecnicos.push(Object.assign({}, t, { codigos: cod }));
+    }));
+    return { datas, tecnicos };
+  }
   function prepararEscala(e){
     ESCALA = null;
     if(!e || !Array.isArray(e.datas) || !Array.isArray(e.tecnicos)) return;
@@ -419,7 +433,7 @@
     return dia < hoje ? HORA_LEITURA_ROBO : '00:00';
   }
   function celEscala(l){
-    const base = l.fonte === 'escala' ? pillEscala(l.cod)
+    const base = (l.fonte === 'escala' && !l.cod) ? `<span class="pill" style="background:rgba(107,117,144,.14); color:#6b7590;">Folga</span>` : l.fonte === 'escala' ? pillEscala(l.cod)
       : l.fonte === 'org' ? (l.escalado ? `<span class="pill" style="background:rgba(37,99,235,.12); color:#1d4ed8;">Escalado</span>` : `<span class="pill" style="background:rgba(107,117,144,.14); color:#6b7590;">Folga</span>`)
       : `<span style="color:${COR.muted};">—</span>`;
     const det = l.nomeEscala;
@@ -515,8 +529,12 @@
   function carregar(forcar){
     if(!forcar && ultimaCarga > 0 && Date.now() - ultimaCarga < RECARREGAR_A_CADA_MS) return Promise.resolve();
     if(carregando) return carregando;
-    const pegarEscala = fetch('dados_escala.json?_=' + Date.now())
+    const pegarEscalaBase = fetch('dados_escala.json?_=' + Date.now())
       .then(r => r.ok ? r.json() : null).catch(() => null);
+    // escala das equipes Residente (Rodolfo) e Volante (Thiago) — planilha Controle de Faltas e Atestados
+    const pegarEscalaExtra = fetch('dados_escala_extra.json?_=' + Date.now())
+      .then(r => r.ok ? r.json() : null).catch(() => null);
+    const pegarEscala = Promise.all([pegarEscalaBase, pegarEscalaExtra]).then(([a, b]) => juntarEscalas(a, b));
     // Presença TOA também pode vir de um arquivo separado (fluxo pequeno, sem rodar o fluxo grande do painel)
     const pegarPresenca = fetch('dados_toa_presenca.json?_=' + Date.now())
       .then(r => r.ok ? r.json() : null).catch(() => null);
