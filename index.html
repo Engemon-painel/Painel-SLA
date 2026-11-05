@@ -692,7 +692,11 @@
           <h2>Requisições</h2>
 
           <div style="margin:10px 0 14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <label for="vagasCargoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Cargo</label>
+            <label for="vagasSupFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Supervisor</label>
+            <select id="vagasSupFiltro" class="mono" onchange="filtrarVagasPorSupervisor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:200px;">
+              <option value="">Todos</option>
+            </select>
+            <label for="vagasCargoFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Cargo</label>
             <select id="vagasCargoFiltro" class="mono" onchange="filtrarVagasPorCargo(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
               <option value="">Todos</option>
             </select>
@@ -722,35 +726,15 @@
             <table id="vagasTable" role="table" aria-label="Tabela de vagas">
               <thead>
                 <tr>
-                  <th>Recrutadora</th>
-                  <th>Data de criação da Requisição</th>
-                  <th>Requisição aprovada</th>
-                  <th>Previsão de entrega</th>
+                  <th>Data de criação da Req.</th>
                   <th>Requisição</th>
-                  <th>ÁREA</th>
-                  <th>SUPERVISÃO</th>
-                  <th>Cargo (Obrigatório)</th>
-                  <th class="num">Número de posições</th>
+                  <th>Supervisão</th>
+                  <th>Cargo</th>
                   <th>Motivo</th>
-                  <th>PROFISSIONAL SUBSTITUÍDO</th>
-                  <th>Column12</th>
-                  <th>Column13</th>
-                  <th>Status Req.</th>
-                  <th>Fechamento</th>
-                  <th>STATUS</th>
-                  <th>Nome do candidato aprovado</th>
-                  <th>CPF</th>
-                  <th class="num">SLA dias</th>
-                  <th>Envio de link documento</th>
-                  <th>Status ASO</th>
-                  <th>Data exame</th>
-                  <th>Previsão de admissão</th>
-                  <th class="num">SLA Admissão</th>
-                  <th>Data Integração</th>
-                  <th>Liberado?</th>
-                  <th class="num">SLA total</th>
-                  <th>Column28</th>
-                  <th>Column29</th>
+                  <th>Profissional substituído</th>
+                  <th>Modelo</th>
+                  <th>Data de Fechamento</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody id="vagasTableBody"></tbody>
@@ -2290,6 +2274,12 @@ let vagasCargoFiltroAtual = '';
 let vagasMotivoFiltroAtual = '';
 let vagasStatusReqFiltroAtual = '';
 let vagasStatusFiltroAtual = '';
+let vagasSupFiltroAtual = '';
+function filtrarVagasPorSupervisor(valor){
+  vagasSupFiltroAtual = valor;
+  vagasPaginaAtual = 1;
+  renderVagas();
+}
 let vagasFiltrosPopulados = false;
 let vagasPaginaAtual = 1;
 const VAGAS_POR_PAGINA = 10;
@@ -2329,6 +2319,7 @@ function vagasFiltradaGeral(){
     if(vagasMotivoFiltroAtual && normFrota(v.motivo) !== vagasMotivoFiltroAtual) return false;
     if(vagasStatusReqFiltroAtual && normFrota(v.statusReq) !== vagasStatusReqFiltroAtual) return false;
     if(vagasStatusFiltroAtual && normFrota(v.status) !== vagasStatusFiltroAtual) return false;
+    if(vagasSupFiltroAtual && (vagasSupFiltroAtual === '__sem__' ? !!normFrota(v.supervisao) : normFrota(v.supervisao) !== vagasSupFiltroAtual)) return false;
     return true;
   });
 }
@@ -2340,8 +2331,9 @@ function vagasFiltrada(){
     if(vagasMotivoFiltroAtual && normFrota(v.motivo) !== vagasMotivoFiltroAtual) return false;
     if(vagasStatusReqFiltroAtual && normFrota(v.statusReq) !== vagasStatusReqFiltroAtual) return false;
     if(vagasStatusFiltroAtual && normFrota(v.status) !== vagasStatusFiltroAtual) return false;
+    if(vagasSupFiltroAtual && (vagasSupFiltroAtual === '__sem__' ? !!normFrota(v.supervisao) : normFrota(v.supervisao) !== vagasSupFiltroAtual)) return false;
     if(q){
-      const hay = [v.requisicao, v.cargo, v.recrutadora, v.area, v.supervisao, v.nomeCandidatoAprovado, v.cpf]
+      const hay = [v.requisicao, v.cargo, v.recrutadora, v.area, v.supervisao, v.nomeCandidatoAprovado, v.cpf, v.profissionalSubstituido, v.modelo]
         .map(x => normFrota(x).toLowerCase()).join(' ');
       if(!hay.includes(q)) return false;
     }
@@ -2376,35 +2368,15 @@ function renderVagasTabela(){
   function cel(v){ return esc(v) || '—'; }
 
   tbody.innerHTML = pagina.map(v => `<tr>
-    <td>${cel(v.recrutadora)}</td>
     <td class="mono" style="font-size:12px;">${cel(v.dataCriacaoRequisicao)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.requisicaoAprovada)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.previsaoEntrega)}</td>
     <td>${cel(v.requisicao)}</td>
-    <td>${cel(v.area)}</td>
     <td>${cel(v.supervisao)}</td>
     <td>${cel(v.cargo)}</td>
-    <td class="num mono">${cel(v.numeroPosicoes)}</td>
     <td>${cel(v.motivo)}</td>
     <td>${cel(v.profissionalSubstituido)}</td>
-    <td>${cel(v.column12)}</td>
-    <td>${cel(v.column13)}</td>
-    <td>${cel(v.statusReq)}</td>
+    <td>${cel(v.modelo)}</td>
     <td class="mono" style="font-size:12px;">${cel(v.fechamento)}</td>
     <td>${cel(v.status)}</td>
-    <td>${cel(v.nomeCandidatoAprovado)}</td>
-    <td class="mono">${cel(v.cpf)}</td>
-    <td class="num mono">${cel(v.slaDias)}</td>
-    <td>${cel(v.envioLinkDocumento)}</td>
-    <td>${cel(v.statusAso)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.dataExame)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.previsaoAdmissao)}</td>
-    <td class="num mono">${cel(v.slaAdmissao)}</td>
-    <td class="mono" style="font-size:12px;">${cel(v.dataIntegracao)}</td>
-    <td>${cel(v.liberado)}</td>
-    <td class="num mono">${cel(v.slaTotal)}</td>
-    <td>${cel(v.column28)}</td>
-    <td>${cel(v.column29)}</td>
   </tr>`).join('');
 
   if(paginacao){
@@ -2434,7 +2406,7 @@ function exportarVagasCsv(){
       alert('Nenhuma requisição para exportar com os filtros atuais.');
       return;
     }
-    const colunas = ['Recrutadora','DataCriacaoRequisicao','RequisicaoAprovada','PrevisaoEntrega','Requisicao','Area','Supervisao','Cargo','NumeroPosicoes','Motivo','ProfissionalSubstituido','Column12','Column13','StatusReq','Fechamento','Status','NomeCandidatoAprovado','CPF','SLADias','EnvioLinkDocumento','StatusASO','DataExame','PrevisaoAdmissao','SLAAdmissao','DataIntegracao','Liberado','SLATotal','Column28','Column29'];
+    const colunas = ['Data de criação da Req.','Requisição','Supervisão','Cargo','Motivo','Profissional substituído','Modelo','Data de Fechamento','Status'];
     function csvEsc(v){
       const s = String(v ?? '');
       if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
@@ -2443,11 +2415,8 @@ function exportarVagasCsv(){
     const linhas = [colunas.map(csvEsc).join(';')];
     itens.forEach(v => {
       linhas.push([
-        v.recrutadora, v.dataCriacaoRequisicao, v.requisicaoAprovada, v.previsaoEntrega, v.requisicao,
-        v.area, v.supervisao, v.cargo, v.numeroPosicoes, v.motivo, v.profissionalSubstituido,
-        v.column12, v.column13, v.statusReq, v.fechamento, v.status, v.nomeCandidatoAprovado, v.cpf,
-        v.slaDias, v.envioLinkDocumento, v.statusAso, v.dataExame, v.previsaoAdmissao, v.slaAdmissao,
-        v.dataIntegracao, v.liberado, v.slaTotal, v.column28, v.column29
+        v.dataCriacaoRequisicao, v.requisicao, v.supervisao, v.cargo, v.motivo,
+        v.profissionalSubstituido, v.modelo, v.fechamento, v.status
       ].map(csvEsc).join(';'));
     });
     const csvContent = '\uFEFF' + linhas.join('\r\n');
@@ -2497,6 +2466,9 @@ function renderVagas(){
     const selectMotivo = document.getElementById('vagasMotivoFiltro');
     const selectStatusReq = document.getElementById('vagasStatusReqFiltro');
     const selectStatus = document.getElementById('vagasStatusFiltro');
+    const selectSup = document.getElementById('vagasSupFiltro');
+    const supsUnicos = Array.from(new Set(VAGAS.map(v => normFrota(v.supervisao)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(selectSup) selectSup.innerHTML = '<option value="">Todos</option>' + supsUnicos.map(s => `<option value="${s}">${s}</option>`).join('') + (VAGAS.some(v => !normFrota(v.supervisao)) ? '<option value="__sem__">(sem supervisor)</option>' : '');
 
     const cargosUnicos = Array.from(new Set(VAGAS.map(v => normFrota(v.cargo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const motivosUnicos = Array.from(new Set(VAGAS.map(v => normFrota(v.motivo)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
@@ -5394,7 +5366,7 @@ setInterval(carregarDados, 5 * 60 * 1000);
 <script src="gestao_combustivel.js?v=9"></script>
 <script src="gestao_bh.js?v=83"></script>
 <script src="gestao_kpis.js?v=5"></script>
-<script src="gestao_toa.js?v=9"></script>
+<script src="gestao_toa.js?v=12"></script>
 <script src="tela_inicial.js?v=2"></script>
 <script src="trava_senha.js?v=2"></script>
 <script src="trava_usuario.js?v=6"></script>
