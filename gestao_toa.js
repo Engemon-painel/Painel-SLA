@@ -139,6 +139,8 @@
         <select id="toaQ${q}Log" class="mono" style="${ESTILO_SELECT}">
           <option value="nao">🔴 Não logaram</option>
           <option value="sim">🟢 Logaram</option>
+          <option value="ag">⏳ Entram depois (horário)</option>
+          <option value="folga">📅 De folga (escala)</option>
           <option value="restr">⛔ Sem acesso (restrição)</option>
           <option value="">Todos</option>
         </select>
@@ -378,6 +380,50 @@
     const r = rotuloEscala(c);
     return r.cls ? `<span class="pill ${r.cls}">${esc(r.txt)}</span>`
       : `<span class="pill" style="background:${r.cor}; color:${r.tcor};">${esc(r.txt)}</span>`;
+  }
+
+
+  // ---------- escala + horário de entrada (Gestão de Escala; se o técnico não estiver lá, usa Escala/Horário do Organograma) ----------
+  const HORA_LEITURA_ROBO = '18:00';   // dias anteriores: horário em que o robô lê a presença no TOA
+  function horaEntrada(txt){ const m = /(\d{1,2})\s*[:hH]\s*(\d{2})/.exec(String(txt || '')); return m ? pad2(+m[1]) + ':' + m[2] : ''; }
+  function escaladoPeloOrg(escala, dia){
+    const n = semAcento(escala).replace(/[\s.]/g, '');
+    const dw = diaSemana(dia);
+    if(/5x2|segasex|segundaasexta/.test(n)) return dw >= 1 && dw <= 5;
+    if(/terasab|tercaasabado/.test(n)) return dw >= 2 && dw <= 6;
+    if(/6x1|segasab|segundaasabado/.test(n)) return dw >= 1 && dw <= 6;
+    return null;   // 12x36, espanhola etc. sem Gestão de Escala: não dá para saber o dia
+  }
+  // Escala padrão por supervisor, para equipes que não estão na Gestão de Escala nem têm Escala/Horário no Organograma
+  const ESCALA_PADRAO_SUP = {
+    'cleiton de souza cardoso': { escala: '5X2', horario: '08:00–18:00' }
+  };
+  function infoEscala(c, dia){
+    const pad = ESCALA_PADRAO_SUP[semAcento(c.supervisor)];
+    if(pad) c = Object.assign({}, c, { escala: c.escala || pad.escala, horario: c.horario || pad.horario });
+    const tec = escalaDoTecnico(c.nome);
+    const cod = tec ? codigoEscala(tec, dia) : '';
+    let escalado = false, fonte = '';
+    if(tec && cod){ escalado = cod === 'X'; fonte = 'escala'; }
+    else {
+      const e = escaladoPeloOrg(c.escala, dia);
+      if(e !== null){ escalado = e; fonte = 'org'; }
+      else if(tec){ fonte = 'escala'; }
+    }
+    const horTxt = String((tec && tec.horario) || c.horario || '').trim();
+    return { tec, cod, escalado, fonte, hora: horaEntrada(horTxt), horario: horTxt.replace(/\s*(AS|ÀS|as|às|-|–)\s*/, ' – '), nomeEscala: String((tec && tec.escala) || c.escala || '').trim() };
+  }
+  function horaRef(dia){
+    const hoje = hojeIsoToa();
+    if(dia === hoje){ const d = new Date(); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+    return dia < hoje ? HORA_LEITURA_ROBO : '00:00';
+  }
+  function celEscala(l){
+    const base = l.fonte === 'escala' ? pillEscala(l.cod)
+      : l.fonte === 'org' ? (l.escalado ? `<span class="pill" style="background:rgba(37,99,235,.12); color:#1d4ed8;">Escalado</span>` : `<span class="pill" style="background:rgba(107,117,144,.14); color:#6b7590;">Folga</span>`)
+      : `<span style="color:${COR.muted};">—</span>`;
+    const det = l.nomeEscala;
+    return base + (det ? ` <span class="mono" style="font-size:11px; color:${COR.text};">${esc(det)}</span>` : '');
   }
 
   function tokensNome(s){
@@ -749,21 +795,25 @@
       if(k){
         linhas[k].noOrg = true;
         linhas[k].restrito = temRestricao(c);
+        linhas[k].org = c;
         if(c.supervisor) linhas[k].supervisor = c.supervisor;
       } else {
         const kn = chavePrincipal(c.nome);
-        if(kn && !linhas[kn]) linhas[kn] = { nome: c.nome, supervisor: c.supervisor || '', total: 0, concluidas: 0, refeicao: 0, status: {}, noOrg: true, ausente: true, restrito: temRestricao(c) };
+        if(kn && !linhas[kn]) linhas[kn] = { nome: c.nome, supervisor: c.supervisor || '', total: 0, concluidas: 0, refeicao: 0, status: {}, noOrg: true, ausente: true, restrito: temRestricao(c), org: c };
       }
     });
     if(estado.supervisor){
       Object.keys(linhas).forEach(k => { if(!mesmoSupervisor(linhas[k].supervisor, estado.supervisor)) delete linhas[k]; });
     }
     // Escala do dia (só técnicos que existem na Gestão de Escala)
+    const refHora = horaRef(dia);
     Object.values(linhas).forEach(l => {
-      const tec = escalaDoTecnico(l.nome);
-      l.temEscala = !!tec;
-      l.codEscala = tec ? codigoEscala(tec, dia) : '';
-      l.escalado = l.codEscala === 'X';
+      const ie = infoEscala(l.org || { nome: l.nome }, dia);
+      l.temEscala = !!ie.tec;
+      l.codEscala = ie.cod;
+      l.escalado = ie.escalado;
+      l.horaEnt = ie.hora;
+      l.folga = !!ie.fonte && !ie.escalado;   // escala conhecida e não escalado no dia
     });
     // Último lançamento de quem não apareceu (ajuda a conferir data/nome)
     const ultimoDia = {};
@@ -775,6 +825,7 @@
     const temPresDia = presDia.size > 0;
     const todas = Object.values(linhas).map(l => {
       l.logou = chavesNome(l.nome).some(k => presDia.has(k));
+      l.aguardando = l.escalado && !l.logou && !!l.horaEnt && l.horaEnt > refHora;   // ainda não chegou o horário de entrada
       l.situacao = l.ausente ? 'fora' : (l.concluidas > 0 ? 'fez' : 'sem');
       l.iniciou = !l.ausente && (l.concluidas > 0 || l.refeicao > 0 ||
         Object.keys(l.status).some(x => (Number(l.status[x]) || 0) > 0 && semAcento(x) !== 'sem status'));
@@ -786,12 +837,14 @@
     const fora = todas.filter(l => l.ausente && !l.escalado);
     const iniciaram = naBase.filter(l => l.iniciou).length;
     const naoIniciaram = listaBase.filter(l => !l.iniciou).length;
-    const escalados = todas.filter(l => l.escalado && !l.restrito);
+    const escaladosTodos = todas.filter(l => l.escalado && !l.restrito);
+    const aguardandoDia = escaladosTodos.filter(l => l.aguardando).length;
+    const escalados = escaladosTodos.filter(l => !l.aguardando);
     const escaladosIni = escalados.filter(l => l.logou).length;
     const orgTodos = todas.filter(l => l.noOrg);
     const restritos = orgTodos.filter(l => l.restrito && !l.logou).length;
     const logaram = orgTodos.filter(l => l.logou).length;
-    const naoLogaram = orgTodos.length - logaram - restritos;
+    const naoLogaram = orgTodos.filter(l => !l.logou && !l.restrito && !l.folga && !l.aguardando).length;
     const baseAder = orgTodos.length - restritos;
     const fez = naBase.filter(l => l.situacao === 'fez');
     const concluidas = naBase.reduce((s, l) => s + l.concluidas, 0);
@@ -806,9 +859,9 @@
       kpi('📅 Dia', fmtData(dia).slice(0, 5) + ' ' + DIAS_SEMANA[diaSemana(dia)], COR.text) +
       kpi('👥 Equipe (Organograma)', equipe, COR.text, 'técnicos ativos, sem Cirion') +
       kpi('🟢 Logaram (Presença TOA)', temPresDia ? logaram : '—', COR.good, temPresDia ? 'aderência ' + pct(baseAder ? logaram / baseAder : 0) + ' da equipe com acesso' : 'sem presença no dia') +
-      kpi('🔴 Não logaram', temPresDia ? naoLogaram : '—', COR.bad, temPresDia ? 'no Organograma, sem o bonequinho no TOA' : 'sem presença no dia') +
+      kpi('🔴 Não logaram', temPresDia ? naoLogaram : '—', COR.bad, temPresDia ? 'sem o bonequinho no TOA (fora folga e quem entra depois)' : 'sem presença no dia') +
       kpi('⛔ Restrição (sem acesso ao TOA)', restritos, COR.muted, 'fora da conta de aderência') +
-      (ESCALA ? kpi('📋 Escalados (escala)', escalados.length, '#1d4ed8', escalados.length && temPresDia ? escaladosIni + ' logaram · aderência ' + pct(escaladosIni / escalados.length) : (escalados.length ? 'sem presença no dia' : 'nenhum escalado no dia')) : '') +
+      (ESCALA ? kpi('📋 Escalados (escala)', escalados.length, '#1d4ed8', (escalados.length && temPresDia ? escaladosIni + ' logaram · aderência ' + pct(escaladosIni / escalados.length) : (escalados.length ? 'sem presença no dia' : 'nenhum escalado no horário')) + (aguardandoDia ? ' · ⏳ ' + aguardandoDia + ' entram depois' : '')) : '') +
       kpi('✅ Fizeram serviço', fez.length, COR.good, concluidas + ' atividades concluídas');
 
     // ----- resumo por supervisor -----
@@ -816,17 +869,17 @@
     todas.forEach(l => {
       const lab = String(l.supervisor || '').trim() || 'Sem supervisor';
       const k = semAcento(lab);
-      if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0, esc: 0, escIni: 0, log: 0, naoLog: 0, restr: 0 };
+      if(!porSup[k]) porSup[k] = { label: lab, equipe: 0, base: 0, ini: 0, naoIni: 0, fora: 0, fez: 0, esc: 0, escIni: 0, log: 0, naoLog: 0, restr: 0, ag: 0, folga: 0 };
       const g = porSup[k];
-      if(l.noOrg){ g.equipe++; if(l.logou) g.log++; else if(l.restrito) g.restr++; else g.naoLog++; }
-      if(l.escalado && !l.restrito){ g.esc++; if(l.logou) g.escIni++; }
+      if(l.noOrg){ g.equipe++; if(l.logou) g.log++; else if(l.restrito) g.restr++; else if(l.folga) g.folga++; else if(!l.aguardando) g.naoLog++; }
+      if(l.escalado && !l.restrito){ if(l.aguardando) g.ag++; else { g.esc++; if(l.logou) g.escIni++; } }
       if(l.ausente && !l.escalado){ g.fora++; return; }
       if(!l.ausente) g.base++;
       if(l.iniciou) g.ini++; else g.naoIni++;
       if(l.situacao === 'fez') g.fez++;
     });
     const sups = Object.values(porSup).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-    const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez','esc','escIni','log','naoLog','restr'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0, esc:0, escIni:0, log:0, naoLog:0, restr:0 });
+    const tot = sups.reduce((t, g) => { ['equipe','base','ini','naoIni','fora','fez','esc','escIni','log','naoLog','restr','ag','folga'].forEach(c => t[c] += g[c]); return t; }, { equipe:0, base:0, ini:0, naoIni:0, fora:0, fez:0, esc:0, escIni:0, log:0, naoLog:0, restr:0, ag:0, folga:0 });
     const sp = v => temPresDia ? v : '—';
     const pctCel = (n, d) => d > 0 ? `<span class="pill forte ${n / d >= META_ADERENCIA ? 'good' : (n / d >= META_ADERENCIA - 0.2 ? 'warn' : 'bad')}">${pct(n / d)}</span>` : '—';
     const linhaSup = (g, negrito) => `<tr${negrito ? ` style="font-weight:700; border-top:2px solid ${COR.line};"` : ''}>
@@ -834,13 +887,14 @@
       <td class="num">${g.equipe}</td>
       <td class="num" style="color:${COR.good} !important;">${sp(g.log)}</td>
       <td class="num" style="color:${COR.bad} !important;">${sp(g.naoLog)}</td>
+      <td class="num">${g.folga || '—'}</td>
       <td class="num">${g.restr || '—'}</td>
       <td class="num">${g.fez}</td>
       <td class="num">${temPresDia ? pctCel(g.log, g.equipe - g.restr) : '—'}</td>
-      ${ESCALA ? `<td class="num">${g.esc || '—'}</td><td class="num">${g.esc && temPresDia ? pctCel(g.escIni, g.esc) : '—'}</td>` : ''}
+      ${ESCALA ? `<td class="num" title="${g.ag ? g.ag + ' escalado(s) entram depois do horário de leitura' : ''}">${g.esc || '—'}${g.ag ? ` <span style="font-size:10px; color:${COR.muted};">+${g.ag}⏳</span>` : ''}</td><td class="num">${g.esc && temPresDia ? pctCel(g.escIni, g.esc) : '—'}</td>` : ''}
     </tr>`;
     document.getElementById('toaQ' + q + 'Sup').innerHTML =
-      '<thead><tr><th>Supervisor</th><th class="num">Equipe</th><th class="num">🟢 Logaram</th><th class="num">🔴 Não logaram</th><th class="num">⛔ Restrição</th><th class="num">✅ Fizeram serviço</th><th class="num" title="logados ÷ equipe com acesso ao TOA">% logados da equipe</th>' + (ESCALA ? '<th class="num">📋 Escalados</th><th class="num">Aderência (escalados logados)</th>' : '') + '</tr></thead><tbody>' +
+      '<thead><tr><th>Supervisor</th><th class="num">Equipe</th><th class="num">🟢 Logaram</th><th class="num">🔴 Não logaram</th><th class="num" title="não logaram, mas estavam de folga pela escala">📅 Folga</th><th class="num">⛔ Restrição</th><th class="num">✅ Fizeram serviço</th><th class="num" title="logados ÷ equipe com acesso ao TOA">% logados da equipe</th>' + (ESCALA ? '<th class="num" title="escalados no dia, sem restrição, cujo horário de entrada já passou (⏳ = entram depois)">📋 Escalados</th><th class="num">Aderência (escalados logados)</th>' : '') + '</tr></thead><tbody>' +
       sups.map(g => linhaSup(g, false)).join('') + linhaSup(Object.assign({ label: 'Total' }, tot), true) + '</tbody>';
 
     // ----- gráfico: ranking de aderência (escalados sem restrição que logaram) -----
@@ -877,29 +931,30 @@
     PRES.forEach(p => { const k = chavePrincipal(p.recurso); if(k && p.data <= dia && (!ultLogin[k] || p.data > ultLogin[k])) ultLogin[k] = p.data; });
     const todosPres = tecnicos
       .filter(c => !estado.supervisor || mesmoSupervisor(c.supervisor, estado.supervisor))
-      .map(c => { const tec = escalaDoTecnico(c.nome); return { nome: c.nome, supervisor: c.supervisor || '', logou: chavesNome(c.nome).some(k => presDia.has(k)), restrito: temRestricao(c), temEscala: !!tec, codEscala: tec ? codigoEscala(tec, dia) : '' }; })
+      .map(c => { const ie = infoEscala(c, dia); const logou = chavesNome(c.nome).some(k => presDia.has(k)); return { nome: c.nome, supervisor: c.supervisor || '', logou, restrito: temRestricao(c), fonte: ie.fonte, cod: ie.cod, escalado: ie.escalado, hora: ie.hora, horario: ie.horario, nomeEscala: ie.nomeEscala, aguardando: ie.escalado && !logou && !!ie.hora && ie.hora > refHora, folga: !!ie.fonte && !ie.escalado && !logou }; })
       .filter(bate);
     const selSup = document.getElementById('toaQ' + q + 'SupF');
     const supsTab = [...new Set(todosPres.map(l => l.supervisor).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     if(st.sup && supsTab.indexOf(st.sup) === -1) st.sup = '';
     selSup.innerHTML = '<option value="">Supervisor: todos</option>' + supsTab.map(x => `<option value="${esc(x)}"${x === st.sup ? ' selected' : ''}>${esc(x)}</option>`).join('');
     const todosSup = todosPres.filter(l => !st.sup || mesmoSupervisor(l.supervisor, st.sup));
-    const nSim = todosSup.filter(l => l.logou).length, nRes = todosSup.filter(l => !l.logou && l.restrito).length, nNao = todosSup.length - nSim - nRes;
+    const nSim = todosSup.filter(l => l.logou).length, nRes = todosSup.filter(l => !l.logou && l.restrito).length, nAg = todosSup.filter(l => l.aguardando && !l.restrito).length, nFol = todosSup.filter(l => l.folga && !l.restrito).length, nNao = todosSup.length - nSim - nRes - nAg - nFol;
     document.getElementById('toaQ' + q + 'Log').value = st.log;
-    const naoLog = todosSup.filter(l => !st.log || (st.log === 'sim' ? l.logou : st.log === 'restr' ? (!l.logou && l.restrito) : (!l.logou && !l.restrito)))
+    const naoLog = todosSup.filter(l => !st.log || (st.log === 'sim' ? l.logou : st.log === 'restr' ? (!l.logou && l.restrito) : st.log === 'ag' ? (l.aguardando && !l.restrito) : st.log === 'folga' ? (l.folga && !l.restrito) : (!l.logou && !l.restrito && !l.aguardando && !l.folga)))
       .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || (a.logou - b.logou) || a.nome.localeCompare(b.nome, 'pt-BR'));
-    document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? '🟢 ' + nSim + ' logaram · 🔴 ' + nNao + ' não logaram' + (nRes ? ' · ⛔ ' + nRes + ' sem acesso' : '') : 'sem presença no dia';
+    document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? '🟢 ' + nSim + ' logaram · 🔴 ' + nNao + ' não logaram' + (nAg ? ' · ⏳ ' + nAg + ' entram depois' : '') + (nFol ? ' · 📅 ' + nFol + ' de folga' : '') + (nRes ? ' · ⛔ ' + nRes + ' sem acesso' : '') : 'sem presença no dia';
     tabela.innerHTML = !temPresDia
       ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.</td></tr></tbody>`
       : !naoLog.length
         ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico nesse filtro.</td></tr></tbody>`
-        : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Presença</th><th>Escala</th><th>Restrição</th></tr></thead><tbody>' +
+        : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Presença</th><th>Escala</th><th>Horário</th><th>Restrição</th></tr></thead><tbody>' +
           naoLog.map(l => {
             return `<tr>
               <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
               <td style="white-space:nowrap;">${esc(l.nome)}</td>
-              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : l.restrito ? '<span class="pill" style="background:rgba(107,117,144,.16);">⛔ Sem acesso (restrição)</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
-              <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
+              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : (l.aguardando && !l.restrito) ? `<span class="pill" style="background:rgba(37,99,235,.12); color:#1d4ed8;">⏳ Entra às ${esc(l.hora)}</span>` : (l.folga && !l.restrito) ? '<span class="pill" style="background:rgba(107,117,144,.16); color:#374151;">📅 Folga</span>' : l.restrito ? '<span class="pill" style="background:rgba(107,117,144,.16);">⛔ Sem acesso (restrição)</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
+              <td style="white-space:nowrap;">${celEscala(l)}</td>
+              <td class="mono" style="white-space:nowrap; font-size:12px; color:${COR.text};">${l.horario ? esc(l.horario) : `<span style="color:${COR.muted};">—</span>`}</td>
               <td>${l.restrito ? '<span class="pill bad">Sim</span>' : '<span class="pill good">Não</span>'}</td>
             </tr>`;
           }).join('') + '</tbody>';
