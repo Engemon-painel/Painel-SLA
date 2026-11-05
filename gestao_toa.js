@@ -84,8 +84,8 @@
         <label for="toaQ${q}Dia" class="mono" style="${ESTILO_LABEL}">Dia</label>
         <input type="date" id="toaQ${q}Dia" class="mono" style="${ESTILO_SELECT}">
         <div class="chip" id="toaQ${q}Padrao">${q === 'd0' ? 'Hoje' : 'Ontem'}</div>
-        <label for="toaQ${q}Status" class="mono" style="${ESTILO_LABEL} margin-left:8px;">Mostrar</label>
-        <select id="toaQ${q}Status" class="mono" style="${ESTILO_SELECT} min-width:200px;">
+        <label for="toaQ${q}Status" class="mono" style="${ESTILO_LABEL} margin-left:8px; display:none;">Mostrar</label>
+        <select id="toaQ${q}Status" class="mono" style="${ESTILO_SELECT} min-width:200px; display:none;">
           <option value="">Todos</option>
           <option value="fez">Fez serviço</option>
           <option value="sem">Na base sem concluir</option>
@@ -102,12 +102,9 @@
       <h2 style="font-size:14px; margin:6px 0 8px;">Resumo por supervisor — Organograma x TOA</h2>
       <div style="overflow:auto; border-radius:8px; margin-bottom:18px;"><table id="toaQ${q}Sup"></table></div>
 
-      <h2 style="font-size:14px; margin:6px 0 8px;">📲 Técnicos na base do TOA</h2>
-      <div style="overflow:auto; max-height:520px; border-radius:8px; margin-bottom:18px;"><table id="toaQ${q}Table"></table></div>
-
-      <h2 style="font-size:14px; margin:6px 0 4px;">👥 Organograma — técnicos que não estão na base do TOA</h2>
-      <div class="hint">Técnicos ativos da equipe sem nenhuma linha na base do TOA no dia e que não estavam escalados (folga, falta, atestado, sem escala ou nome diferente). Escalados sem TOA aparecem na tabela de cima como 🟠.</div>
-      <div style="overflow:auto; max-height:420px; border-radius:8px;"><table id="toaQ${q}Fora"></table></div>
+      <h2 style="font-size:14px; margin:6px 0 4px;">🔴 Técnicos que não logaram no TOA</h2>
+      <div class="hint">Técnicos ativos do Organograma sem o bonequinho no console do TOA no dia (aba TOA_PRESENCA, lida pelo robô).</div>
+      <div style="overflow:auto; max-height:520px; border-radius:8px;"><table id="toaQ${q}Table"></table></div>
     </div>`;
   }
 
@@ -216,7 +213,7 @@
 
           <div class="panel" style="margin-bottom:16px;">
             <h2>Presença no TOA — técnicos logados por supervisor</h2>
-            <div class="hint">Técnicos com o bonequinho no console do TOA (logados no dia), lidos pelo robô na aba TOA_PRESENCA. Passe o mouse para ver os nomes e quem estava logado sem atividade.</div>
+            <div class="hint">Técnicos com o bonequinho no console do TOA (logados no dia), lidos pelo robô na aba TOA_PRESENCA. Não depende da base de atividades do TOA. Passe o mouse para ver quem logou e quem não logou.</div>
             <div style="overflow-x:auto; border-radius:8px;"><table id="toaPresencaTable"></table></div>
             <div id="toaPresencaFora" class="mono" style="font-size:11px; color:var(--muted); margin-top:10px;"></div>
           </div>
@@ -445,7 +442,7 @@
         PRES = (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
         ajustarNomesToa();
         ultimaCarga = Date.now();
-        if(!estado.fim && TOA.length){
+        if(!estado.fim && (TOA.length || PRES.length)){
           estado.fim = diaPadrao('d1');
           estado.inicio = somarDias(estado.fim, -6);
         }
@@ -523,15 +520,12 @@
     // Presença TOA por supervisor (Organograma), mesmos dias da aderência.
     const presenca = Object.values(equipes).map(eq => {
       let soma = 0;
-      const semAtivTot = new Set();
       const porDia = diasPres.map(dia => {
         const logados = eq.membros.filter(c => logado(c, dia));
-        const semAtiv = diasComBase.has(dia) ? logados.filter(c => !lancou(c, dia)) : [];   // sem base do TOA no dia: não dá para dizer quem não teve atividade
-        semAtiv.forEach(c => semAtivTot.add(c.nome));
         soma += logados.length;
-        return { dia, n: logados.length, equipe: eq.membros.length, nomes: logados.map(c => c.nome), semAtiv: semAtiv.map(c => c.nome), naoLog: eq.membros.filter(c => !logado(c, dia)).map(c => c.nome) };
+        return { dia, n: logados.length, equipe: eq.membros.length, nomes: logados.map(c => c.nome), naoLog: eq.membros.filter(c => !logado(c, dia)).map(c => c.nome) };
       });
-      return { label: eq.label, equipe: eq.membros.length, porDia, media: diasPres.length ? soma / diasPres.length : 0, semAtiv: [...semAtivTot] };
+      return { label: eq.label, equipe: eq.membros.length, porDia, media: diasPres.length ? soma / diasPres.length : 0 };
     }).sort((a, b) => b.media - a.media);
     const chavesTec = new Set();
     tecF.forEach(c => chavesNome(c.nome).forEach(k => chavesTec.add(k)));
@@ -612,7 +606,7 @@
     if(!pg) return;
     const info = document.getElementById('toaInfo');
 
-    if(!TOA.length){
+    if(!TOA.length && !PRES.length){
       info.textContent = 'Sem dados do TOA no dados.json. Rode o Office Script atualizado (item 48) com a aba "TOA" preenchida.';
       ['toaKpis','toaAderenciaTable','toaTecTable','toaNaoEncontrados','toaQd1Kpis','toaQd1Table','toaQd1Sup','toaQd1Fora','toaQd0Kpis','toaQd0Table','toaQd0Sup','toaQd0Fora'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = ''; });
       return;
@@ -786,7 +780,6 @@
     const listaFora = fora.filter(bate)
       .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
 
-    document.getElementById('toaQ' + q + 'Contagem').textContent = lista.length + ' na base · ' + listaFora.length + ' fora da base';
 
     function corStatus(nome){
       const n = semAcento(nome);
@@ -802,35 +795,33 @@
       if(l.refeicao) itens.push(`<span class="pill" style="margin:1px 4px 1px 0; background:rgba(107,117,144,.14); color:${COR.muted};">Refeição ${l.refeicao}</span>`);
       return itens.length ? itens.join('') : `<span class="mono" style="font-size:11px; color:${COR.muted};">sem atividade</span>`;
     }
-    tabela.innerHTML = !lista.length
-      ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico na base do TOA para esse filtro.</td></tr></tbody>`
-      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Lançadas</th><th class="num">Concluídas</th><th>Escala</th><th>Expediente</th><th>Situação no TOA</th></tr></thead><tbody>' +
-        lista.map(l => `<tr>
-          <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
-          <td style="white-space:nowrap;">${esc(l.nome)}${!l.noOrg ? ` <span class="mono" style="font-size:10px; color:${COR.muted};" title="Nome não encontrado entre os técnicos ativos do Organograma">(fora do Organograma)</span>` : ''}</td>
-          <td class="num">${l.ausente ? '' : l.total}</td>
-          <td class="num">${l.ausente ? '' : l.concluidas}</td>
-          <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
-          <td style="white-space:nowrap;">${l.iniciou
-            ? '<span class="pill" style="background:rgba(37,99,235,.14); color:#1d4ed8;">🔵 Iniciou</span>'
-            : '<span class="pill warn">🟠 Não iniciou</span>'}</td>
-          <td>${situacaoToa(l)}</td>
-        </tr>`).join('') + '</tbody>';
-
-    // ----- tabela: Organograma fora da base -----
-    const tabFora = document.getElementById('toaQ' + q + 'Fora');
-    tabFora.innerHTML = !listaFora.length
-      ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Todos os técnicos da equipe estão na base do TOA.</td></tr></tbody>`
-      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Escala</th><th>Último lançamento no TOA</th></tr></thead><tbody>' +
-        listaFora.map(l => {
-          const ult = ultimoDia[chavePrincipal(l.nome)];
-          return `<tr>
-            <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
-            <td style="white-space:nowrap;">${esc(l.nome)}</td>
-            <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
-            <td class="mono" style="font-size:12px;">${ult ? fmtData(ult) : `<span style="color:${COR.muted};">nunca apareceu no período da base</span>`}</td>
-          </tr>`;
-        }).join('') + '</tbody>';
+    // ----- tabela: técnicos do Organograma que NÃO logaram no TOA (Presença TOA) -----
+    const presDia = new Set();
+    PRES.filter(p => p.data === dia).forEach(p => chavesNome(p.recurso).forEach(k => presDia.add(k)));
+    const ultLogin = {};
+    PRES.forEach(p => { const k = chavePrincipal(p.recurso); if(k && p.data <= dia && (!ultLogin[k] || p.data > ultLogin[k])) ultLogin[k] = p.data; });
+    const naoLog = tecnicos
+      .filter(c => !estado.supervisor || mesmoSupervisor(c.supervisor, estado.supervisor))
+      .filter(c => !chavesNome(c.nome).some(k => presDia.has(k)))
+      .map(c => { const tec = escalaDoTecnico(c.nome); return { nome: c.nome, supervisor: c.supervisor || '', temEscala: !!tec, codEscala: tec ? codigoEscala(tec, dia) : '' }; })
+      .filter(bate)
+      .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const temPresDia = presDia.size > 0;
+    document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? naoLog.length + ' não logaram' : 'sem presença no dia';
+    tabela.innerHTML = !temPresDia
+      ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.</td></tr></tbody>`
+      : !naoLog.length
+        ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Todos os técnicos do Organograma logaram no TOA nesse dia.</td></tr></tbody>`
+        : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Escala</th><th>Último login no TOA</th></tr></thead><tbody>' +
+          naoLog.map(l => {
+            const ult = ultLogin[chavePrincipal(l.nome)];
+            return `<tr>
+              <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
+              <td style="white-space:nowrap;">${esc(l.nome)}</td>
+              <td style="white-space:nowrap;">${l.temEscala ? pillEscala(l.codEscala) : `<span style="color:${COR.muted};">—</span>`}</td>
+              <td class="mono" style="font-size:12px;">${ult ? fmtData(ult) : `<span style="color:${COR.muted};">não logou desde o início da presença</span>`}</td>
+            </tr>`;
+          }).join('') + '</tbody>';
   }
 
   function renderKpis(r){
@@ -926,17 +917,16 @@
     const totEq = r.presenca.reduce((a, s) => a + s.equipe, 0);
     const cab = '<thead><tr><th>Supervisor</th><th class="num">Equipe</th>' +
       r.diasPres.map(d => `<th class="num" style="white-space:nowrap;">${fmtDiaCurto(d)}<br><span style="font-weight:400;">${DIAS_SEMANA[diaSemana(d)]}</span></th>`).join('') +
-      '<th class="num">Média logados/dia</th><th class="num">Logados sem atividade</th></tr></thead>';
+      '<th class="num">Média logados/dia</th></tr></thead>';
     const corpo = r.presenca.map(s => {
       const cel = s.porDia.map(x => {
-        const t = x.n + ' de ' + x.equipe + ' logados' + (x.nomes.length ? '\nLogados: ' + x.nomes.join(', ') : '') + (x.semAtiv.length ? '\nLogados sem atividade: ' + x.semAtiv.join(', ') : '') + (x.naoLog.length ? '\nNão logados: ' + x.naoLog.join(', ') : '');
-        return `<td class="num" title="${esc(t)}" style="white-space:nowrap;"><b>${x.n}</b>${x.semAtiv.length ? `<div style="font-size:10px; color:${COR.warn}; font-weight:600;">${x.semAtiv.length} s/ ativ.</div>` : ''}</td>`;
+        const t = x.n + ' de ' + x.equipe + ' logados' + (x.nomes.length ? '\nLogados: ' + x.nomes.join(', ') : '') + (x.naoLog.length ? '\nNão logados: ' + x.naoLog.join(', ') : '');
+        return `<td class="num" title="${esc(t)}" style="white-space:nowrap;"><b>${x.n}</b></td>`;
       }).join('');
       return `<tr><td style="white-space:nowrap;">${esc(s.label)}</td><td class="num">${s.equipe}</td>${cel}
-        <td class="num"><b>${s.media.toFixed(1).replace('.', ',')}</b></td>
-        <td class="num" title="${esc(s.semAtiv.join(', '))}">${s.semAtiv.length ? `<span style="color:${COR.warn}; font-weight:700;">${s.semAtiv.length}</span>` : '0'}</td></tr>`;
+        <td class="num"><b>${s.media.toFixed(1).replace('.', ',')}</b></td></tr>`;
     }).join('');
-    const rod = `<tfoot><tr style="font-weight:700;"><td>Total</td><td class="num">${totEq}</td>${tot.map(n => `<td class="num">${n}</td>`).join('')}<td class="num">${(tot.reduce((a, b) => a + b, 0) / Math.max(1, tot.length)).toFixed(1).replace('.', ',')}</td><td class="num">${r.presenca.reduce((a, s) => a + s.semAtiv.length, 0)}</td></tr></tfoot>`;
+    const rod = `<tfoot><tr style="font-weight:700;"><td>Total</td><td class="num">${totEq}</td>${tot.map(n => `<td class="num">${n}</td>`).join('')}<td class="num">${(tot.reduce((a, b) => a + b, 0) / Math.max(1, tot.length)).toFixed(1).replace('.', ',')}</td></tr></tfoot>`;
     tabela.innerHTML = cab + '<tbody>' + corpo + '</tbody>' + rod;
     if(r.presFora.length){
       fora.innerHTML = `ℹ ${r.presFora.length} técnico(s) logado(s) no TOA que não estão como técnicos ativos desta equipe no Organograma: <span title="${esc(r.presFora.join('\n'))}" style="text-decoration:underline dotted; cursor:help;">ver nomes</span>`;
