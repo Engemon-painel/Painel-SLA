@@ -13,7 +13,7 @@
   'use strict';
 
   // >>> COLE AQUI a URL do gatilho HTTP do fluxo "Avaliação Experiência – Gravar" <<<
-  const FLUXO_AVALIACAO = '';
+  const FLUXO_AVALIACAO = 'https://defaultc54e138a79f54294aa9bb004cf8d7f.f7.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/11/workflows/8ac7331ffa21496caf9fbb84763a05ae/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jnwHYpz7ZOuYh2QtvqebFXDA-H7ln30RcRt_Hvu6Pd8';
   const ADMISSAO_DESDE = '2026-10-01';   // técnicos admitidos a partir desta data
   const CHAVE_LOCAL = 'avalExpLocais_v1';
 
