@@ -671,8 +671,11 @@
         ajustarNomesToa();
         ultimaCarga = Date.now();
         if(!estado.fim && (TOA.length || PRES.length)){
+          // ALTERADO (06/11/2026): abre no MÊS ATUAL (dia 01 até ontem). A produtividade (base de atividades)
+          // tem o mês todo; a presença (robô) só existe a partir do dia em que o robô começou — os dias antes
+          // disso ficam fora das contas de presença/aderência do logado (não contam como "não logou").
           estado.fim = diaPadrao('d1');
-          estado.inicio = somarDias(estado.fim, -6);
+          estado.inicio = estado.fim.slice(0, 8) + '01';
         }
       })
       .catch(e => {
@@ -847,7 +850,7 @@
 
     const min = menorData(), max = maiorData();
     if(!estado.fim) estado.fim = diaPadrao('d1');
-    if(!estado.inicio) estado.inicio = somarDias(estado.fim, -6);
+    if(!estado.inicio) estado.inicio = estado.fim.slice(0, 8) + '01';   // padrão: mês atual
     if(estado.inicio > estado.fim){ const x = estado.inicio; estado.inicio = estado.fim; estado.fim = x; }
     info.style.color = '';
     info.textContent = 'Base TOA de ' + fmtData(min) + ' a ' + fmtData(max) + ' · período: ' + fmtData(estado.inicio) + ' a ' + fmtData(estado.fim) + '.';
@@ -1248,7 +1251,9 @@
           datalabels:{ color:'#16a34a', align:'top', offset:4, font:{ size:9, family:'JetBrains Mono', weight:'700' }, formatter: v => v === null ? '' : v } }
       ];
       escalas = { y1: { position:'right', beginAtZero:true, ticks:{ color:COR.muted, precision:0 }, grid:{ display:false }, title:{ display:true, text:'técnicos', color:COR.muted } } };
-      hint.textContent = 'Total: barras = concluídas no dia (base TOA) · azul = técnicos com lançamento · verde tracejado = técnicos logados (presença, bonequinho). Dia sem leitura do robô fica sem ponto verde.';
+      const iniPres = PRES.reduce((m, x) => !m || x.data < m ? x.data : m, '');
+      hint.textContent = 'Total: barras = concluídas no dia (base TOA) · azul = técnicos com lançamento · verde tracejado = técnicos logados (presença, bonequinho)' +
+        (iniPres ? ` · presença lida pelo robô desde ${fmtData(iniPres)}; antes disso fica sem ponto verde.` : '.');
     } else {
       const p = r.porTec[tecEvo];
       const pres = d => { const set = r.rotaPorDia[d]; return set ? chavesNome(p.nome).some(k => set.has(k)) : null; };
