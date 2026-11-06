@@ -444,10 +444,10 @@
     if (!carregado) { tb.innerHTML = '<tbody><tr><td>Carregando…</td></tr></tbody>'; return; }
     const q = semAcento(estadoS.busca);
     const base = DESLIG.filter(c => (!estadoS.sup || c.sup === estadoS.sup) && (!q || semAcento(c.nome + ' ' + c.sup).includes(q)));
-    const lista = base.filter(c => !estadoS.st || (estadoS.st === 'ok' ? !!SAIDA[c.mat] : !SAIDA[c.mat]))
+    const lista = base.filter(c => !estadoS.st || (estadoS.st === 'ok' ? feito(c) : !feito(c)))
       .sort((a, b) => (b.dem || '').localeCompare(a.dem || '') || a.nome.localeCompare(b.nome, 'pt-BR'));
-    const feitos = base.filter(c => SAIDA[c.mat]).length;
-    document.getElementById('sdResumo').innerHTML = `${base.length} desligamento(s) · ✅ ${feitos} preenchido(s) · <span style="color:#b91c1c; font-weight:700;">🔴 ${base.length - feitos} pendente(s)</span>`;
+    const feitos = base.filter(feito).length, antigos = base.filter(c => !SAIDA[c.mat] && c.causaRH).length;
+    document.getElementById('sdResumo').innerHTML = `${base.length} desligamento(s) · ✅ ${feitos} feito(s)${antigos ? ` (${antigos} no modelo antigo)` : ''} · <span style="color:#b91c1c; font-weight:700;">🔴 ${base.length - feitos} pendente(s)</span>`;
     tb.innerHTML = !lista.length ? '<tbody><tr><td style="color:var(--muted);">Nenhum desligamento nesse filtro.</td></tr></tbody>' :
       '<thead><tr><th>Colaborador</th><th>Supervisor</th><th>Área / Projeto</th><th>Admissão</th><th>Desligamento</th><th>Tipo</th><th>Causa (RH)</th><th>Motivo (entrevista)</th><th>Poderia evitar?</th><th></th></tr></thead><tbody>' +
       lista.map(c => {
@@ -456,7 +456,7 @@
         return `<tr><td><b>${esc(c.nome)}</b><div style="font-size:11px; color:var(--muted);">${esc(c.mat)} · ${esc(c.cargo)}</div></td>
           <td>${esc(c.sup) || '—'}</td><td>${esc(c.un) || '—'}</td><td class="mono">${br(c.adm)}</td><td class="mono">${br(c.dem) || '—'}</td>
           <td>${esc(r ? r.q1 : c.tipoRH) || '—'}</td><td>${c.causaRH ? esc(c.causaRH) + (c.oqRH ? `<div style="font-size:11px; color:var(--muted);">${esc(c.oqRH)}</div>` : '') : '—'}</td><td>${r ? esc(motivo) : '—'}</td><td>${r ? esc(r.q8) : '—'}</td>
-          <td><button type="button" class="av-bt ${r ? 'sec' : 'pri'}" data-sd="${esc(c.mat)}">${r ? '✅ Ver / editar' : '🔴 Preencher'}</button></td></tr>`;
+          <td><button type="button" class="av-bt ${feito(c) ? 'sec' : 'pri'}" data-sd="${esc(c.mat)}" title="${!r && c.causaRH ? 'Feito no modelo antigo (causa do Turnover). Clique se quiser completar a entrevista nova.' : ''}">${r ? '✅ Ver / editar' : c.causaRH ? '✅ Modelo antigo' : '🔴 Preencher'}</button></td></tr>`;
       }).join('') + '</tbody>';
     // resumo dos motivos (o que o RH quer ver)
     const resp = base.map(c => SAIDA[c.mat]).filter(Boolean);
@@ -499,7 +499,7 @@
     const media = casa.length ? casa.reduce((a, b) => a + b, 0) / casa.length : null;
     const ate30 = casa.filter(v => v <= 30).length, ate90 = casa.filter(v => v <= 90).length;
     const causas = contarPor(base.filter(c => c.causaRH), c => c.causaRH);
-    const feitos = base.filter(c => SAIDA[c.mat]).length;
+    const feitos = base.filter(feito).length;
     const fmtCasa = v => v == null ? '—' : (v >= 60 ? (v / 30).toFixed(1).replace('.', ',') + ' meses' : Math.round(v) + ' dias');
     const PAL = ['#2563eb', '#d97706', '#059669', '#5e34b5', '#be185d'];
     const kpi = (lab, val, cor, sub) => `<div class="kpi"><div class="label">${lab}</div><div class="value" style="color:${cor}; ${String(val).length > 8 ? 'font-size:18px;' : ''}">${val}</div>${sub ? `<div class="delta">${sub}</div>` : ''}</div>`;
@@ -515,6 +515,8 @@
     graficoTipo(base);
   }
 
+  // feito = entrevista nova preenchida OU já classificado no modelo antigo (causa no Turnover)
+  function feito(c) { return !!SAIDA[c.mat] || !!c.causaRH; }
   const TIPOS4 = [['Pedido de demissão', '#2563eb'], ['Demissão sem justa causa', '#d97706'], ['Demissão por justa causa', '#dc2626'], ['Abandono', '#5e34b5']];
   function tipo4(c) { const r = SAIDA[c.mat]; return (r && r.q1) || sugestaoRH(c).q1 || 'Não informado'; }
   function graficoTipo(base) {
