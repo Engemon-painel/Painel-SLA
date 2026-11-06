@@ -581,8 +581,13 @@
         (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).concat(d.__presExtra || []).forEach(p => {
           if(!p) return;
           const data = dataIsoPres(p.data != null ? p.data : (p.Data != null ? p.Data : p.dia));
-          const recurso = String(p.recurso || p.Recurso || p.tecnico || p.nome || '').trim();
-          if(data && recurso) presJunta[data + '|' + semAcento(recurso)] = { data, recurso };
+          const recurso = String(p.recurso || p.Recurso || p.tecnico || p.Tecnico || p['Técnico'] || p.nome || p.Nome || '').trim();
+          // Ícone do TOA: "res-ic res_type_10 ..." = bonequinho (logado). "ic ptnon_working_cal" (fora do
+          // calendário de trabalho) e "ic ptnon_configured_cal" (sem calendário) = NÃO logado.
+          // Sem coluna de ícone (formato antigo) = conta como logado, como antes.
+          const icone = String(p.icone != null ? p.icone : (p.Icone != null ? p.Icone : (p['Ícone'] != null ? p['Ícone'] : ''))).toLowerCase();
+          const logou = !icone || (/res_type_/.test(icone) && !/ptnon_/.test(icone));
+          if(data && recurso && logou) presJunta[data + '|' + semAcento(recurso)] = { data, recurso };
         });
         PRES = Object.values(presJunta).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
         ajustarNomesPres();
