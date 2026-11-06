@@ -601,7 +601,9 @@
         });
         const presJunta = {};
         let presLidas = 0, presNaoLogou = 0, presSemDado = 0;
-        listaPresenca(d.toaPresenca).concat(d.__presExtra || []).forEach(p => {
+        // toaPresenca às vezes chega vazio no dados.json publicado; presencaToaBase é a mesma lista (cópia do script)
+        const listaBase = listaPresenca(d.toaPresenca).length ? listaPresenca(d.toaPresenca) : listaPresenca(d.presencaToaBase);
+        listaBase.concat(d.__presExtra || []).forEach(p => {
           if(!p) return;
           presLidas++;
           const data = dataIsoPres(p.data != null ? p.data : (p.Data != null ? p.Data : p.dia));
@@ -627,6 +629,7 @@
         // diagnóstico do painel: o que chegou do dados.json e o que ficou pelo caminho
         const brutoPres = d.toaPresenca;
         PRES_INFO += ` · Painel: toaPresenca é ${Array.isArray(brutoPres) ? 'lista com ' + brutoPres.length : typeof brutoPres}` +
+          `, presencaToaBase é ${Array.isArray(d.presencaToaBase) ? 'lista com ' + d.presencaToaBase.length : typeof d.presencaToaBase}` +
           `, ${presLidas} lidas, ${presSemDado} sem data/técnico, ${presNaoLogou} não logaram, ${Object.keys(presJunta).length} únicas, ` +
           `${Object.keys(presJunta).length - PRES.length} fora (Cirion), ${PRES.length} ficaram` +
           (Array.isArray(brutoPres) && brutoPres.length ? ' · 1ª linha: ' + JSON.stringify(brutoPres[0]).slice(0, 160) : '');
