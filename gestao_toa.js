@@ -27,7 +27,8 @@
   // (linha sem status) = não iniciou.
 
   let PRES = [];
-  let PRES_INFO = '';   // diagnóstico da carga da presença (mostrado quando a tabela fica vazia)     // [{ data, recurso }] técnicos com bonequinho no TOA (rota no dia), mesmo sem atividade
+  let PRES_INFO = '';
+  let NAO_INICIOU = new Set();   // NOVO (06/11/2026): "aaaa-mm-dd|chave do nome" com bonequinho laranja (rota não iniciada)   // diagnóstico da carga da presença (mostrado quando a tabela fica vazia)     // [{ data, recurso }] técnicos com bonequinho no TOA (rota no dia), mesmo sem atividade
   let TOA = [];      // [{ data:'aaaa-mm-dd', recurso, supervisor, total, concluidas }]
   let COLABS = [];
   let ultimaCarga = 0;
@@ -655,10 +656,15 @@
         // é opcional (só existe se houver um fluxo separado); quando não existe, não aparece no aviso.
         const dbg = d.debugToaPresenca;
         PRES_INFO = dbg
-          ? `Script do painel (aba ${dbg.aba || 'TOA_PRESENCA'}): ${dbg.linhas || 0} linhas, ${dbg.logaram || 0} logaram, ${dbg.naoLogaram || 0} sem bonequinho` + (dbg.aviso ? ' · ' + dbg.aviso : '')
+          ? `Script do painel (aba ${dbg.aba || 'TOA_PRESENCA'}): ${dbg.linhas || 0} linhas, ${dbg.logaram || 0} logaram, ${dbg.naoLogaram || 0} sem bonequinho, ${dbg.naoIniciaram || 0} bonequinho laranja (rota não iniciada)` + (dbg.aviso ? ' · ' + dbg.aviso : '')
           : (!Array.isArray(d.toaPresenca) ? 'O dados.json não tem toaPresenca: atualize o Office Script do painel e rode o fluxo.'
             : `dados.json → toaPresenca com ${d.toaPresenca.length} linhas (atualize o Office Script do painel para ver o motivo).`);
         if((d.__presExtra || []).length) PRES_INFO += ' · ' + d.__presInfo;
+        NAO_INICIOU = new Set();
+        (Array.isArray(d.toaNaoIniciou) ? d.toaNaoIniciou : []).forEach(p => {
+          const data = dataIsoPres(p && p.data); if(!data || !p.recurso) return;
+          chavesNome(p.recurso).forEach(k => NAO_INICIOU.add(data + '|' + k));
+        });
         PRES = Object.values(presJunta).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
         // diagnóstico do painel: o que chegou do dados.json e o que ficou pelo caminho
         const brutoPres = d.toaPresenca;
@@ -955,7 +961,10 @@
       l.logou = chavesNome(l.nome).some(k => presDia.has(k));
       l.turnoOntem = l.logou && presencaDoTurnoAnterior(l.org || { nome: l.nome }, dia, l.ie, refHora);
       if(l.turnoOntem) l.logou = false;   // presença é do turno noturno de ontem
-      l.aguardando = l.escalado && !l.logou && !!l.horaEnt && l.horaEnt > refHora;   // ainda não chegou o horário de entrada
+      // bonequinho laranja (rota não iniciada) e o horário de entrada ainda não chegou (ex.: 20:00 – 08:00 às 16h)
+      // = "entra depois", mesmo sem a escala do dia cadastrada
+      l.naoIniciou = !l.logou && chavesNome(l.nome).some(k => NAO_INICIOU.has(dia + '|' + k));
+      l.aguardando = (l.escalado || l.naoIniciou) && !l.logou && !!l.horaEnt && l.horaEnt > refHora;   // ainda não chegou o horário de entrada
       l.situacao = l.ausente ? 'fora' : (l.concluidas > 0 ? 'fez' : 'sem');
       l.iniciou = !l.ausente && (l.concluidas > 0 || l.refeicao > 0 ||
         Object.keys(l.status).some(x => (Number(l.status[x]) || 0) > 0 && semAcento(x) !== 'sem status'));
@@ -1063,7 +1072,8 @@
       .filter(c => !estado.supervisor || mesmoSupervisor(c.supervisor, estado.supervisor))
       .map(c => { const ie = infoEscala(c, dia); const viu = chavesNome(c.nome).some(k => presDia.has(k));
         const turnoOntem = viu && presencaDoTurnoAnterior(c, dia, ie, refHora); const logou = viu && !turnoOntem;
-        return { turnoOntem, nome: c.nome, supervisor: c.supervisor || '', logou, restrito: temRestricao(c), fonte: ie.fonte, cod: ie.cod, escalado: ie.escalado, hora: ie.hora, horario: ie.horario, nomeEscala: ie.nomeEscala, aguardando: ie.escalado && !logou && !!ie.hora && ie.hora > refHora, folga: !!ie.fonte && !ie.escalado && !logou }; })
+        const naoIniciou = !logou && chavesNome(c.nome).some(k => NAO_INICIOU.has(dia + '|' + k));
+        return { turnoOntem, naoIniciou, nome: c.nome, supervisor: c.supervisor || '', logou, restrito: temRestricao(c), fonte: ie.fonte, cod: ie.cod, escalado: ie.escalado, hora: ie.hora, horario: ie.horario, nomeEscala: ie.nomeEscala, aguardando: (ie.escalado || naoIniciou) && !logou && !!ie.hora && ie.hora > refHora, folga: !!ie.fonte && !ie.escalado && !logou }; })
       .filter(bate);
     const selSup = document.getElementById('toaQ' + q + 'SupF');
     const supsTab = [...new Set(todosPres.map(l => l.supervisor).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -1084,7 +1094,7 @@
             return `<tr>
               <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
               <td style="white-space:nowrap;">${esc(l.nome)}</td>
-              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : (l.aguardando && !l.restrito) ? `<span class="pill" style="background:rgba(37,99,235,.12); color:#1d4ed8;">⏳ Entra às ${esc(l.hora)}</span>` : (l.folga && !l.restrito) ? '<span class="pill" style="background:rgba(107,117,144,.16); color:#374151;">📅 Folga</span>' + (l.turnoOntem ? ' <span title="Turno noturno: o bonequinho de hoje é da saída do turno de ontem" style="font-size:11px; color:#6b7590;">🌙 saiu do turno de ontem</span>' : '') : l.restrito ? '<span class="pill" style="background:rgba(107,117,144,.16);">⛔ Sem acesso (restrição)</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
+              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : (l.naoIniciou && l.aguardando && !l.restrito) ? `<span class="pill" title="Bonequinho laranja no TOA e o horário de entrada ainda não chegou" style="background:rgba(234,138,0,.15); color:#b45309;">🟠 Ainda não entrou · entra às ${esc(l.hora)}</span>` : (l.naoIniciou && !l.restrito) ? `<span class="pill" title="Bonequinho laranja no TOA: passou do horário de entrada e a rota não foi iniciada" style="background:rgba(234,138,0,.15); color:#b45309;">🟠 Rota não iniciada</span>` : (l.aguardando && !l.restrito) ? `<span class="pill" style="background:rgba(37,99,235,.12); color:#1d4ed8;">⏳ Entra às ${esc(l.hora)}</span>` : (l.folga && !l.restrito) ? '<span class="pill" style="background:rgba(107,117,144,.16); color:#374151;">📅 Folga</span>' + (l.turnoOntem ? ' <span title="Turno noturno: o bonequinho de hoje é da saída do turno de ontem" style="font-size:11px; color:#6b7590;">🌙 saiu do turno de ontem</span>' : '') : l.restrito ? '<span class="pill" style="background:rgba(107,117,144,.16);">⛔ Sem acesso (restrição)</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
               <td style="white-space:nowrap;">${celEscala(l)}</td>
               <td class="mono" style="white-space:nowrap; font-size:12px; color:${COR.text};">${l.horario ? esc(l.horario) : `<span style="color:${COR.muted};">—</span>`}</td>
               <td>${l.restrito ? '<span class="pill bad">Sim</span>' : '<span class="pill good">Não</span>'}</td>
