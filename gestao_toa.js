@@ -34,7 +34,8 @@
   let carregando = null;
   const estado = { inicio:'', fim:'', supervisor:'', ignorarFds:true, busca:'', aba:'d1',
     quadro: { d1: { dia:'', status:'', busca:'', log:'nao', sup:'' }, d0: { dia:'', status:'', busca:'', log:'nao', sup:'' } } };
-  let chartSup = null, chartDia = null;
+  let chartSup = null, chartDia = null, chartTop = null, chartEvo = null;
+  let tecEvo = '';   // técnico escolhido na evolução diária ('' = total)
 
   // ---------- utilitários ----------
   function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -284,6 +285,21 @@
             </div>
           </div>
 
+          <!-- NOVO (06/11/2026): ranking e evolução diária pela base de atividades do TOA, com a presença junto -->
+          <div class="grid">
+            <div class="panel">
+              <h2>Top 12 — técnicos por volume de atendimento</h2>
+              <div class="hint">Atividades concluídas no período (base de atividades do TOA, não a presença). Clique numa barra para ver o técnico na evolução diária.</div>
+              <div style="position:relative; height:300px;"><canvas id="toaTopChart"></canvas></div>
+            </div>
+            <div class="panel">
+              <h2 style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">Evolução diária — produção e presença
+                <select id="toaEvoTec" style="margin-left:auto; font-size:12px; padding:3px 8px; border-radius:8px; border:1px solid var(--line, #cbd5e1); max-width:260px;"></select></h2>
+              <div class="hint" id="toaEvoHint">Total: barras = concluídas no dia (base TOA) · linhas = técnicos com lançamento e técnicos logados (presença, bonequinho).</div>
+              <div style="position:relative; height:300px;"><canvas id="toaEvoChart"></canvas></div>
+            </div>
+          </div>
+
           <div class="panel" style="margin-bottom:16px;">
             <h2>Aderência ao TOA por supervisor</h2>
             <div class="hint">% dos técnicos ativos da equipe (Organograma) que lançaram ao menos 1 atividade no dia. Passe o mouse para ver quem não lançou. Meta ${pct(META_ADERENCIA)}.</div>
@@ -464,6 +480,24 @@
     }
     const horTxt = String((tec && tec.horario) || c.horario || '').trim();
     return { tec, cod, escalado, fonte, hora: horaEntrada(horTxt), horario: horTxt.replace(/\s*(AS|ÀS|as|às|-|–)\s*/, ' – '), nomeEscala: String((tec && tec.escala) || c.escala || '').trim() };
+  }
+  // NOVO (06/11/2026): turno NOTURNO (ex.: 20:00 – 08:00, cruza a meia-noite). Quem entrou ontem à noite e saiu
+  // hoje de manhã aparece com o bonequinho HOJE no TOA, mas essa presença é do turno de ONTEM. Não conta como
+  // "logou" hoje quando: (a) hoje é folga dele e ontem estava escalado; ou (b) está escalado hoje também, mas o
+  // turno de hoje ainda não começou (antes do horário de entrada).
+  function turnoNoturno(horario){
+    const m = /(\d{1,2})\s*[:hH]\s*(\d{2}).*?(\d{1,2})\s*[:hH]\s*(\d{2})/.exec(String(horario || ''));
+    if(!m) return null;
+    const ini = pad2(+m[1]) + ':' + m[2], fim = pad2(+m[3]) + ':' + m[4];
+    return ini > fim ? { ini, fim } : null;
+  }
+  function presencaDoTurnoAnterior(c, dia, ie, refHora){
+    const t = turnoNoturno(ie.horario);
+    if(!t) return false;
+    const ontem = infoEscala(c, somarDias(dia, -1));
+    if(!ontem.escalado) return false;            // ontem não trabalhou: a presença é de hoje mesmo
+    if(ie.fonte && !ie.escalado) return true;     // hoje é folga: só pode ser o fim do turno de ontem
+    return ie.escalado && refHora < t.ini;        // escalado hoje, mas o turno de hoje ainda não começou
   }
   function horaRef(dia){
     const hoje = hojeIsoToa();
@@ -775,7 +809,9 @@
       const doDia = toaF.filter(t => t.data === dia);
       const concl = doDia.reduce((s, t) => s + (Number(t.concluidas) || 0), 0);
       const tecs = new Set(doDia.filter(t => Number(t.total) > 0).map(t => chavePrincipal(t.recurso))).size;
-      return { dia, concluidas: concl, tecnicos: tecs, media: tecs > 0 ? concl / tecs : null };
+      return { dia, concluidas: concl, tecnicos: tecs, media: tecs > 0 ? concl / tecs : null,
+        // presença (bonequinho) dos técnicos ativos do Organograma no filtro; null = robô ainda sem leitura no dia
+        logados: rotaPorDia[dia] ? tecF.filter(c => logado(c, dia)).length : null };
     });
 
     const totalConcluidas = toaF.reduce((s, t) => s + (Number(t.concluidas) || 0), 0);
@@ -783,7 +819,7 @@
     const pares = toaF.filter(t => Number(t.total) > 0).length;
 
     return {
-      dias, diasAderencia, diasSemBase, diasPres, toaF, aderencia, presenca, presFora, temPresenca, naoEncontrados, porTec, supervisores, porDia,
+      dias, diasAderencia, diasSemBase, diasPres, toaF, aderencia, presenca, presFora, temPresenca, naoEncontrados, porTec, supervisores, porDia, rotaPorDia,
       kpi: {
         concluidas: totalConcluidas,
         lancadas: totalLancadas,
@@ -844,6 +880,7 @@
     if(a0) a0.textContent = fmtDiaCurto(estado.quadro.d0.dia || diaPadrao('d0'));
     renderKpis(r);
     renderGraficos(r);
+    renderTopEvolucao(r);
     renderAderencia(r);
     renderPresenca(r);
     renderTabelaTecnicos();
@@ -901,6 +938,7 @@
       l.escalado = ie.escalado;
       l.horaEnt = ie.hora;
       l.folga = !!ie.fonte && !ie.escalado;   // escala conhecida e não escalado no dia
+      l.ie = ie;
     });
     // Último lançamento de quem não apareceu (ajuda a conferir data/nome)
     const ultimoDia = {};
@@ -912,6 +950,8 @@
     const temPresDia = presDia.size > 0;
     const todas = Object.values(linhas).map(l => {
       l.logou = chavesNome(l.nome).some(k => presDia.has(k));
+      l.turnoOntem = l.logou && presencaDoTurnoAnterior(l.org || { nome: l.nome }, dia, l.ie, refHora);
+      if(l.turnoOntem) l.logou = false;   // presença é do turno noturno de ontem
       l.aguardando = l.escalado && !l.logou && !!l.horaEnt && l.horaEnt > refHora;   // ainda não chegou o horário de entrada
       l.situacao = l.ausente ? 'fora' : (l.concluidas > 0 ? 'fez' : 'sem');
       l.iniciou = !l.ausente && (l.concluidas > 0 || l.refeicao > 0 ||
@@ -1018,7 +1058,9 @@
     PRES.forEach(p => { const k = chavePrincipal(p.recurso); if(k && p.data <= dia && (!ultLogin[k] || p.data > ultLogin[k])) ultLogin[k] = p.data; });
     const todosPres = tecnicos
       .filter(c => !estado.supervisor || mesmoSupervisor(c.supervisor, estado.supervisor))
-      .map(c => { const ie = infoEscala(c, dia); const logou = chavesNome(c.nome).some(k => presDia.has(k)); return { nome: c.nome, supervisor: c.supervisor || '', logou, restrito: temRestricao(c), fonte: ie.fonte, cod: ie.cod, escalado: ie.escalado, hora: ie.hora, horario: ie.horario, nomeEscala: ie.nomeEscala, aguardando: ie.escalado && !logou && !!ie.hora && ie.hora > refHora, folga: !!ie.fonte && !ie.escalado && !logou }; })
+      .map(c => { const ie = infoEscala(c, dia); const viu = chavesNome(c.nome).some(k => presDia.has(k));
+        const turnoOntem = viu && presencaDoTurnoAnterior(c, dia, ie, refHora); const logou = viu && !turnoOntem;
+        return { turnoOntem, nome: c.nome, supervisor: c.supervisor || '', logou, restrito: temRestricao(c), fonte: ie.fonte, cod: ie.cod, escalado: ie.escalado, hora: ie.hora, horario: ie.horario, nomeEscala: ie.nomeEscala, aguardando: ie.escalado && !logou && !!ie.hora && ie.hora > refHora, folga: !!ie.fonte && !ie.escalado && !logou }; })
       .filter(bate);
     const selSup = document.getElementById('toaQ' + q + 'SupF');
     const supsTab = [...new Set(todosPres.map(l => l.supervisor).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -1039,7 +1081,7 @@
             return `<tr>
               <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
               <td style="white-space:nowrap;">${esc(l.nome)}</td>
-              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : (l.aguardando && !l.restrito) ? `<span class="pill" style="background:rgba(37,99,235,.12); color:#1d4ed8;">⏳ Entra às ${esc(l.hora)}</span>` : (l.folga && !l.restrito) ? '<span class="pill" style="background:rgba(107,117,144,.16); color:#374151;">📅 Folga</span>' : l.restrito ? '<span class="pill" style="background:rgba(107,117,144,.16);">⛔ Sem acesso (restrição)</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
+              <td style="white-space:nowrap;">${l.logou ? '<span class="pill good">🟢 Logou</span>' : (l.aguardando && !l.restrito) ? `<span class="pill" style="background:rgba(37,99,235,.12); color:#1d4ed8;">⏳ Entra às ${esc(l.hora)}</span>` : (l.folga && !l.restrito) ? '<span class="pill" style="background:rgba(107,117,144,.16); color:#374151;">📅 Folga</span>' + (l.turnoOntem ? ' <span title="Turno noturno: o bonequinho de hoje é da saída do turno de ontem" style="font-size:11px; color:#6b7590;">🌙 saiu do turno de ontem</span>' : '') : l.restrito ? '<span class="pill" style="background:rgba(107,117,144,.16);">⛔ Sem acesso (restrição)</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
               <td style="white-space:nowrap;">${celEscala(l)}</td>
               <td class="mono" style="white-space:nowrap; font-size:12px; color:${COR.text};">${l.horario ? esc(l.horario) : `<span style="color:${COR.muted};">—</span>`}</td>
               <td>${l.restrito ? '<span class="pill bad">Sim</span>' : '<span class="pill good">Não</span>'}</td>
@@ -1148,6 +1190,94 @@
           y: { beginAtZero:true, ticks:{ color:COR.text, font:{ weight:'bold' } }, grid:{ display:false } },
           y1: { position:'right', beginAtZero:true, ticks:{ color:COR.text }, grid:{ display:false } }
         }
+      }
+    });
+  }
+
+  // NOVO (06/11/2026): Top 12 por volume (concluídas na base TOA) + evolução diária (total ou por técnico) com presença
+  function nomeCurto(n){ const p = String(n || '').trim().split(/\s+/); return (p[0] || '') + (p.length > 1 ? ' ' + p[p.length - 1][0] : ''); }
+  function renderTopEvolucao(r){
+    if(typeof Chart === 'undefined') return;
+    const plugins = typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [];
+    const ranking = Object.entries(r.porTec).map(([k, p]) => ({ k, nome: p.nome, sup: p.supervisor, concluidas: p.concluidas, total: p.total, diasLanc: p.diasLanc, media: p.media }))
+      .filter(p => p.concluidas > 0).sort((a, b) => b.concluidas - a.concluidas || a.nome.localeCompare(b.nome, 'pt-BR'));
+    if(tecEvo && !r.porTec[tecEvo]) tecEvo = '';
+    const top = ranking.slice(0, 12);
+
+    // ---- Top 12 ----
+    if(chartTop) chartTop.destroy();
+    chartTop = new Chart(document.getElementById('toaTopChart'), {
+      type: 'bar',
+      data: { labels: top.map(p => nomeCurto(p.nome).toUpperCase()), datasets: [{
+        label: 'Concluídas', data: top.map(p => p.concluidas),
+        backgroundColor: top.map((p, i) => tecEvo && p.k !== tecEvo ? 'rgba(148,163,184,.55)' : i < 4 ? '#c8102e' : i < 6 ? '#e8a317' : '#d6283b'),
+        borderRadius: 4,
+        datalabels: { color:'#000', anchor:'end', align:'top', font:{ size:10, family:'JetBrains Mono', weight:'700' } } }] },
+      plugins,
+      options: {
+        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 18 } },
+        onClick: (e, els) => { if(!els.length) return; const k = top[els[0].index].k; tecEvo = tecEvo === k ? '' : k; renderTopEvolucao(r); },
+        onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+        plugins: { legend: { display:false }, datalabels: { display:true },
+          tooltip: { callbacks: { title: c => top[c[0].dataIndex].nome, afterLabel: c => { const p = top[c.dataIndex];
+            return `${p.total} lançadas · ${p.diasLanc} dia(s) com lançamento · ${fmt1(p.media)} por dia${p.sup ? '\nSupervisor: ' + p.sup : ''}`; } } } },
+        scales: { x: { ticks:{ color:COR.text, font:{ size:9, weight:'bold' }, maxRotation:45, minRotation:45 }, grid:{ display:false } },
+                  y: { beginAtZero:true, ticks:{ color:COR.muted, precision:0 }, grid:{ color:COR.line } } }
+      }
+    });
+
+    // ---- seletor de técnico ----
+    const sel = document.getElementById('toaEvoTec');
+    sel.innerHTML = '<option value="">Total (todos os técnicos)</option>' +
+      ranking.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(p => `<option value="${esc(p.k)}"${p.k === tecEvo ? ' selected' : ''}>${esc(p.nome)} (${p.concluidas})</option>`).join('');
+    sel.onchange = () => { tecEvo = sel.value; renderTopEvolucao(r); };
+
+    // ---- evolução diária ----
+    const labels = r.porDia.map(d => fmtDiaCurto(d.dia) + ' ' + DIAS_SEMANA[diaSemana(d.dia)]);
+    const hint = document.getElementById('toaEvoHint');
+    let datasets, escalas, presTec = null;
+    if(!tecEvo){
+      datasets = [
+        { type:'bar', label:'Concluídas (base TOA)', data: r.porDia.map(d => d.concluidas), yAxisID:'y', order:3,
+          backgroundColor: r.porDia.map(d => fimDeSemana(d.dia) ? 'rgba(200,16,46,.35)' : 'rgba(200,16,46,.75)'), borderRadius:4,
+          datalabels:{ color:'#000', anchor:'end', align:'top', font:{ size:9, family:'JetBrains Mono', weight:'700' }, formatter: v => v > 0 ? v : '' } },
+        { type:'line', label:'Técnicos com lançamento', data: r.porDia.map(d => d.tecnicos || null), yAxisID:'y1', order:2,
+          borderColor:'#2563eb', backgroundColor:'#2563eb', tension:.3, pointRadius:3, spanGaps:true, datalabels:{ display:false } },
+        { type:'line', label:'Técnicos logados (presença)', data: r.porDia.map(d => d.logados), yAxisID:'y1', order:1,
+          borderColor:'#16a34a', backgroundColor:'#16a34a', borderDash:[5, 4], tension:.3, pointRadius:3, spanGaps:false,
+          datalabels:{ color:'#16a34a', align:'top', offset:4, font:{ size:9, family:'JetBrains Mono', weight:'700' }, formatter: v => v === null ? '' : v } }
+      ];
+      escalas = { y1: { position:'right', beginAtZero:true, ticks:{ color:COR.muted, precision:0 }, grid:{ display:false }, title:{ display:true, text:'técnicos', color:COR.muted } } };
+      hint.textContent = 'Total: barras = concluídas no dia (base TOA) · azul = técnicos com lançamento · verde tracejado = técnicos logados (presença, bonequinho). Dia sem leitura do robô fica sem ponto verde.';
+    } else {
+      const p = r.porTec[tecEvo];
+      const pres = d => { const set = r.rotaPorDia[d]; return set ? chavesNome(p.nome).some(k => set.has(k)) : null; };
+      const pr = r.porDia.map(d => pres(d.dia));
+      const conc = r.porDia.map(d => (p.dias[d.dia] && p.dias[d.dia].concluidas) || 0);
+      datasets = [
+        { type:'bar', label:'Concluídas', data: conc, yAxisID:'y', order:2,
+          backgroundColor: pr.map(x => x === true ? 'rgba(22,163,74,.8)' : x === false ? 'rgba(200,16,46,.8)' : 'rgba(107,117,144,.6)'), borderRadius:4,
+          datalabels:{ color:'#000', anchor:'end', align:'top', font:{ size:9, family:'JetBrains Mono', weight:'700' }, formatter: v => v > 0 ? v : '' } },
+        { type:'line', label:'Lançadas', data: r.porDia.map(d => (p.dias[d.dia] && p.dias[d.dia].total) || 0), yAxisID:'y', order:1,
+          borderColor:'#2563eb', backgroundColor:'#2563eb', tension:.3, pointRadius:3, datalabels:{ display:false } }
+      ];
+      escalas = {};
+      const nLog = pr.filter(x => x === true).length, nNao = pr.filter(x => x === false).length;
+      hint.textContent = `${p.nome}${p.supervisor ? ' · ' + p.supervisor : ''}: ${p.concluidas} concluídas no período · barra verde = logou no TOA no dia (${nLog}), vermelha = não logou (${nNao}), cinza = sem leitura do robô · linha azul = lançadas.`;
+      presTec = pr;
+    }
+    if(chartEvo) chartEvo.destroy();
+    chartEvo = new Chart(document.getElementById('toaEvoChart'), {
+      data: { labels, datasets },
+      plugins,
+      options: {
+        responsive: true, maintainAspectRatio: false, layout: { padding: { top: 16 } },
+        plugins: { legend:{ labels:{ color:COR.muted, font:{ family:'Inter', size:11 } } }, datalabels:{ display:true },
+          tooltip: { callbacks: { afterBody: c => presTec ? (presTec[c[0].dataIndex] === true ? '🟢 logou no TOA' : presTec[c[0].dataIndex] === false ? '🔴 não logou no TOA' : 'sem leitura de presença') : '' } } },
+        scales: Object.assign({
+          x: { ticks:{ color:COR.text, font:{ size:10, weight:'bold' } }, grid:{ display:false } },
+          y: { beginAtZero:true, ticks:{ color:COR.text, precision:0 }, grid:{ color:COR.line }, title:{ display:true, text:'atividades', color:COR.muted } }
+        }, escalas)
       }
     });
   }
