@@ -421,9 +421,9 @@
         <div class="panel" style="margin:0;"><h2>Pareto — Causas de Desligamento (RH)</h2>
           <div class="hint">Barras = quantidade por causa · linha = % acumulado · tracejado = corte de 80%</div>
           <div id="sdPar1Wrap" style="position:relative; height:320px;"><canvas id="sdPar1"></canvas></div></div>
-        <div class="panel" style="margin:0;"><h2>Pareto — Motivo informado na entrevista</h2>
-          <div class="hint">Pergunta 4 da entrevista do supervisor</div>
-          <div id="sdPar2Wrap" style="position:relative; height:320px;"><canvas id="sdPar2"></canvas></div></div>
+        <div class="panel" style="margin:0;"><h2>Tipo de Desligamento</h2>
+          <div class="hint">Resposta 1 da entrevista; sem entrevista, vem do tipo do Turnover (Desligamento Empresa = sem justa causa)</div>
+          <div id="sdTipoWrap" style="position:relative; height:320px;"><canvas id="sdTipo"></canvas></div></div>
       </div>
       <div id="sdResumo" class="mono" style="font-size:12px; color:var(--text); margin-bottom:8px;"></div>
       <div style="overflow:auto; border-radius:8px; max-height:620px;"><table id="sdTabela"></table></div>
@@ -494,7 +494,7 @@
   function contarPor(lista, f) { const m = {}; lista.forEach(x => { const v = String(f(x) || '').trim() || 'Não informado'; m[v] = (m[v] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); }
   function desenharKpisParetos(base) {
     const total = base.length;
-    const porTipo = contarPor(base, c => (SAIDA[c.mat] && SAIDA[c.mat].q1) || c.tipoRH);
+    const porTipo = contarPor(base, tipo4);
     const casa = base.map(c => c.adm && c.dem ? dias(c.adm, c.dem) : null).filter(v => v !== null && v >= 0);
     const media = casa.length ? casa.reduce((a, b) => a + b, 0) / casa.length : null;
     const ate30 = casa.filter(v => v <= 30).length, ate90 = casa.filter(v => v <= 90).length;
@@ -512,8 +512,31 @@
       (causas[0] ? kpi('🥇 Principal causa', esc(causas[0][0]), '#1b2440', causas[0][1] + ' (' + (causas[0][1] / Math.max(1, causas.reduce((a, x) => a + x[1], 0)) * 100).toFixed(1) + '%)') : '') +
       kpi('🗣️ Entrevistas feitas', feitos + ' de ' + total, feitos === total ? '#059669' : '#dc2626', total ? (feitos / total * 100).toFixed(0) + '% respondidas' : '');
     pareto('sdPar1', causas, 'Desligamentos');
-    const motivos = contarPor(base.filter(c => SAIDA[c.mat] && SAIDA[c.mat].q4), c => { const r = SAIDA[c.mat]; return r.q4 === 'Outros' && r.q4_outros ? 'Outros' : r.q4; });
-    pareto('sdPar2', motivos, 'Entrevistas');
+    graficoTipo(base);
+  }
+
+  const TIPOS4 = [['Pedido de demissão', '#2563eb'], ['Demissão sem justa causa', '#d97706'], ['Demissão por justa causa', '#dc2626'], ['Abandono', '#5e34b5']];
+  function tipo4(c) { const r = SAIDA[c.mat]; return (r && r.q1) || sugestaoRH(c).q1 || 'Não informado'; }
+  function graficoTipo(base) {
+    const cv = document.getElementById('sdTipo');
+    if (!cv || typeof Chart === 'undefined') return;
+    if (chartsSd.sdTipo) { chartsSd.sdTipo.destroy(); chartsSd.sdTipo = null; }
+    const total = base.length || 1;
+    const cats = TIPOS4.slice();
+    const sem = base.filter(c => tipo4(c) === 'Não informado').length;
+    if (sem) cats.push(['Não informado', '#94a3b8']);
+    const vals = cats.map(([k]) => base.filter(c => tipo4(c) === k).length);
+    const plugins = typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [];
+    chartsSd.sdTipo = new Chart(cv, {
+      type: 'bar',
+      data: { labels: cats.map(c => c[0]), datasets: [{ label: 'Desligamentos', data: vals, backgroundColor: cats.map(c => c[1]), borderRadius: 4, barThickness: 34,
+        datalabels: { anchor: 'end', align: 'right', color: '#1b2440', font: { size: 11, family: 'JetBrains Mono', weight: '700' }, formatter: v => v ? v + ' (' + Math.round(v / total * 100) + '%)' : '' } }] },
+      plugins,
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 70 } },
+        plugins: { legend: { display: false }, datalabels: { display: true } },
+        scales: { x: { beginAtZero: true, ticks: { color: '#1b2440', font: { weight: 'bold' } }, grid: { display: false } },
+          y: { ticks: { color: '#1b2440', font: { size: 11, weight: 'bold' } }, grid: { display: false } } } }
+    });
   }
   function pareto(id, itens, rot) {
     const cv = document.getElementById(id);
