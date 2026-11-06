@@ -1,4 +1,4 @@
-// gestao_avaliacao.js — Avaliação de Experiência (30 / 60 / 90 dias) — aba lateral dentro da página Organograma
+// gestao_avaliacao.js — Avaliação de Experiência (25 / 50 / 75 dias) — aba lateral dentro da página Organograma
 //
 // Lista os técnicos ativos admitidos a partir de ADMISSAO_DESDE (dados.json → colaboradores) e
 // deixa o supervisor preencher a avaliação de cada etapa. A gravação vai para o fluxo do
@@ -56,7 +56,7 @@
     ['ATENCAO', '⚠️ Em atenção — acompanhar / plano de ação', '#b45309', 'rgba(180,83,9,.12)'],
     ['REPROVADO', '❌ Reprovado — não efetivar', '#b91c1c', 'rgba(185,28,28,.12)']
   ];
-  const ETAPAS = ['30', '60', '90'];
+  const ETAPAS = ['25', '50', '75'];   // 3 períodos até 75 dias (janela abre 7 dias antes do prazo)
 
   let COLABS = [], AVAL = {}, carregado = false;
   let DESLIG = [], ATIVOS_TEC = [], AREAS = [], SAIDA = {};
@@ -230,7 +230,7 @@
     const sec = document.createElement('div');
     sec.className = 'panel'; sec.id = 'avalExpSecao';
     sec.innerHTML = `
-      <h2>🧭 Avaliação de Experiência — técnicos novos (30 / 60 / 90 dias)</h2>
+      <h2>🧭 Avaliação de Experiência — técnicos novos (${ETAPAS.join(' / ')} dias)</h2>
       <div class="hint">Técnicos ativos admitidos a partir de ${br(ADMISSAO_DESDE)}. Clique na etapa para o supervisor preencher a avaliação; o RH acompanha aqui o que já foi avaliado e a decisão.</div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0 12px;">
         <select id="avSup" class="mono" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:220px;"><option value="">Supervisor: todos</option></select>
@@ -273,7 +273,7 @@
     if (!carregado) { tb.innerHTML = '<tbody><tr><td>Carregando…</td></tr></tbody>'; return; }
     if (!lista.length) { tb.innerHTML = `<tbody><tr><td style="color:var(--muted);">Nenhum técnico admitido a partir de ${br(ADMISSAO_DESDE)} nesse filtro.</td></tr></tbody>`; return; }
     const hoje = hojeIso();
-    tb.innerHTML = '<thead><tr><th>Técnico</th><th>Supervisor</th><th>Admissão</th><th>Dias de casa</th><th>30 dias</th><th>60 dias</th><th>90 dias</th><th>Última decisão</th></tr></thead><tbody>' +
+    tb.innerHTML = '<thead><tr><th>Técnico</th><th>Supervisor</th><th>Admissão</th><th>Dias de casa</th>' + ETAPAS.map(e => '<th>' + e + ' dias</th>').join('') + '<th>Última decisão</th></tr></thead><tbody>' +
       lista.map(c => {
         const cel = ETAPAS.map(e => {
           const s = situacao(c, e);
