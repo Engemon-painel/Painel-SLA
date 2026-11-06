@@ -183,11 +183,12 @@ ${C} .bh-c .sub{margin:0 0 10px;font-size:12px;color:var(--bh-sub)}
 ${C} .s3{grid-column:span 3}${C} .s4{grid-column:span 4}${C} .s5{grid-column:span 5}${C} .s6{grid-column:span 6}${C} .s7{grid-column:span 7}${C} .s8{grid-column:span 8}${C} .s12{grid-column:span 12}
 ${C} .bh-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 ${C} .bh-k{border-radius:14px;padding:14px 16px;color:#fff;min-width:0}
-${C} .bh-jk{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+${C} .bh-jk{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 ${C} .bh-jx{background:#fff;border:1px solid var(--bh-borda);border-left:4px solid var(--jx,#0b2545);border-radius:12px;padding:14px 16px;min-width:0}
 ${C} .bh-jx small{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b}
 ${C} .bh-jx b{display:block;font-size:26px;line-height:1.15;margin:6px 0 2px;color:var(--jx,#0b2545);white-space:nowrap;font-variant-numeric:tabular-nums}
 ${C} .bh-jx span{font-size:12px;color:#64748b}
+@media (max-width:1400px){${C} .bh-jk{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:1100px){${C} .bh-jk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 ${C} .bh-rank ol{list-style:none;margin:6px 0 0;padding:0}
 ${C} .bh-rank li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12.5px}
@@ -1846,6 +1847,14 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const nAus = B.filter(ehAusJ).length;
     const nReg = B.filter(regularJ).length;
     const heMin = B.filter(i => i.tipo === 'HORA EXTRA').reduce((s, i) => s + heMinJ(i), 0);
+    // NOVO (06/11/2026): destino da hora extra conforme a Tratativa do gestor
+    //   PAGAMENTO HE   -> vai ser paga em folha · BANCO DE HORAS -> vai para o BH
+    const heTrat = t => B.filter(i => i.tipo === 'HORA EXTRA' && String(justDe(i).trat || '').trim().toUpperCase() === t);
+    const hePag = heTrat('PAGAMENTO HE'), heBH = heTrat('BANCO DE HORAS');
+    const somaHE = l => l.reduce((s, i) => s + heMinJ(i), 0);
+    const hePagMin = somaHE(hePag), heBHMin = somaHE(heBH);
+    const hePagAjust = hePag.filter(i => String(justDe(i).stRH || '').trim().toUpperCase() === 'AJUSTADO');
+    const hePagSemTratar = B.filter(i => i.tipo === 'HORA EXTRA' && !String(justDe(i).trat || '').trim());
     const mov = bhMovJ();
     const movFo = mov[fo || folhaIniDe(hojeIso())] || mov[Object.keys(mov).sort().pop()] || { cr: 0, de: 0, porMat: {} };
     const foMov = mov[fo || folhaIniDe(hojeIso())] ? (fo || folhaIniDe(hojeIso())) : Object.keys(mov).sort().pop();
@@ -1870,11 +1879,13 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       ['⛔ Marcações ausentes', nf(nAus), 'faltas + sem marcação', '#dc2626'],
       ['👥 Colaboradores com pendência', nf(Object.keys(colab).length), 'no filtro', '#334155'],
       ['✅ Regularização', (B.length ? f1(nReg / B.length * 100) : '0,0') + '%', nf(nReg) + ' de ' + nf(B.length) + ' tratadas', nReg / (B.length || 1) >= .8 ? '#0f9d58' : '#b45309'],
-      ['⏱️ Horas extras no mês', hMin(heMin / 60).replace('+', ''), nf(B.filter(i => i.tipo === 'HORA EXTRA').length) + ' lançamentos de HE', '#2563eb'],
+      ['🎯 Conformidade do ponto', icp == null ? '—' : f1(icp) + '%', icp == null ? 'sem dados do espelho para a folha' : `${nf(totD - totI)} de ${nf(totD)} dias sem pendência`, corIcp],
+      ['⏱️ Horas extras no mês', hMin(heMin / 60).replace('+', ''), nf(B.filter(i => i.tipo === 'HORA EXTRA').length) + ' lançamentos de HE' + (hePagSemTratar.length ? ` · ${nf(hePagSemTratar.length)} sem tratativa (${hMin(somaHE(hePagSemTratar) / 60).replace('+', '')})` : ''), '#2563eb'],
+      ['💵 HE a pagar', hMin(hePagMin / 60).replace('+', ''), `${nf(hePag.length)} lançamentos com "Pagamento HE" · ${nf(hePagAjust.length)} já ajustados pelo RH (${hMin(somaHE(hePagAjust) / 60).replace('+', '')})`, '#15803d'],
+      ['🏦 HE para banco de horas', hMin(heBHMin / 60).replace('+', ''), `${nf(heBH.length)} lançamentos com "Banco de Horas"`, '#0e7490'],
       ['🏦 BH gerado no mês', `<span style="font-size:19px">+${hMin(movFo.cr).replace('+', '')} / −${hMin(movFo.de).replace('+', '')}</span>`, foMov ? 'competência ' + rotFolha(foMov) : 'sem movimentação', '#0e7490'],
-      ['💰 Saldo acumulado do BH', hMin(saldo), nf(bh.length) + ' colaboradores ativos', NAVY],
-      ['🎯 Conformidade do ponto', icp == null ? '—' : f1(icp) + '%', icp == null ? 'sem dados do espelho para a folha' : `${nf(totD - totI)} de ${nf(totD)} dias sem pendência`, corIcp]];
-    const destaque = { '✅ Regularização': nReg / (B.length || 1) >= .8 ? '#0f766e' : ALERTA, '🎯 Conformidade do ponto': icp == null ? NAVY : icp >= 95 ? '#0f766e' : icp >= 85 ? ALERTA : '#b91c1c' };
+      ['💰 Saldo acumulado do BH', hMin(saldo), nf(bh.length) + ' colaboradores ativos', NAVY]];
+    const destaque = { '💵 HE a pagar': '#15803d', '🏦 HE para banco de horas': '#0e7490', '✅ Regularização': nReg / (B.length || 1) >= .8 ? '#0f766e' : ALERTA, '🎯 Conformidade do ponto': icp == null ? NAVY : icp >= 95 ? '#0f766e' : icp >= 85 ? ALERTA : '#b91c1c' };
     box.innerHTML = cards.map(c => { const t = c[0].replace(/^\S+\s/, ''), cor = destaque[c[0]] || NAVY;
       return `<div class="bh-jx" style="--jx:${cor}"><small>${esc(t)}</small><b>${c[1]}</b><span>${c[2]}</span></div>`; }).join('');
 
