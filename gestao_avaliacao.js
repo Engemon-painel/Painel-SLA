@@ -16,7 +16,7 @@
   const FLUXO_AVALIACAO = 'https://defaultc54e138a79f54294aa9bb004cf8d7f.f7.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/11/workflows/8ac7331ffa21496caf9fbb84763a05ae/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jnwHYpz7ZOuYh2QtvqebFXDA-H7ln30RcRt_Hvu6Pd8';
   const ADMISSAO_DESDE = '2026-10-01';   // técnicos admitidos a partir desta data
   const CHAVE_LOCAL = 'avalExpLocais_v1';
-  const DESLIG_DESDE = '2026-10-01';    // saídas a partir desta data
+  const DESLIG_DESDE = '2026-07-01';    // desligamentos a partir desta data (mesma base do Turnover)
   const CHAVE_LOCAL_SAIDA = 'saidaLocais_v1';
 
   const ESCALA = [
@@ -112,7 +112,20 @@
         contrato: String(c.contrato || '').trim(), un: String(c.unidadeNegocio || '').trim(), cargo: String(c.descFuncao || c.areaTecnica || '').trim(),
         area: String(c.areaTecnica || ''), adm: String(c.dataAdmis || '').slice(0, 10), dem: String(c.dataDemissao || '').slice(0, 10) });
       const ehTec = c => /tecnic|lid/.test(semAcento(c.areaTecnica));
-      DESLIG = cols.filter(c => c && c.nome && ehTec(c) && String(c.dataDemissao || '') >= DESLIG_DESDE).map(mapC);
+      const porMat = {};
+      cols.forEach(c => { if (c && c.matricula != null) porMat[matNum(c.matricula)] = c; });
+      // 1) desligamentos do Turnover (dados.json → turnover): tipo, causa e "o que entra" do RH
+      DESLIG = [];
+      (d && Array.isArray(d.turnover) ? d.turnover : []).forEach(t => {
+        if (!t || !t.nome || String(t.dataDemissao || '') < DESLIG_DESDE) return;
+        const mat = matNum(t.matricula), c = porMat[mat];
+        const b = c ? mapC(c) : { nome: String(t.nome).trim(), mat, sup: '', coord: '', contrato: '', un: '', cargo: '', area: '' };
+        DESLIG.push(Object.assign(b, { nome: String(t.nome).trim(), mat, sup: String(t.supervisor || b.sup || '').trim(), adm: String(t.dataAdmis || b.adm || '').slice(0, 10),
+          dem: String(t.dataDemissao || '').slice(0, 10), tipoRH: String(t.tipoDesligamento || '').trim(), causaRH: String(t.causaPareto || '').trim(), oqRH: String(t.oQueEntra || '').trim() }));
+      });
+      // 2) técnicos desligados no Organograma que ainda não estão no Turnover
+      cols.filter(c => c && c.nome && ehTec(c) && String(c.dataDemissao || '') >= DESLIG_DESDE && !DESLIG.some(x => x.mat === matNum(c.matricula)))
+        .forEach(c => DESLIG.push(mapC(c)));
       ATIVOS_TEC = cols.filter(c => c && c.nome && c.ativo && ehTec(c)).map(mapC).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       AREAS = [...new Set(cols.map(c => String(c.unidadeNegocio || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
       SAIDA = {};
@@ -155,7 +168,7 @@
     layout.innerHTML = `<nav class="org-menu"><div class="nav-group"><div class="nav-group-label"><span>Organograma</span></div><div class="nav-group-items">
         <div class="nav-item org-aba active" data-aba="estrutura"><span class="nav-icon">👥</span> Estrutura</div>
         <div class="nav-item org-aba" data-aba="aval"><span class="nav-icon">📝</span> Avaliação de Experiência</div>
-        <div class="nav-item org-aba" data-aba="saida"><span class="nav-icon">🚪</span> Saída do Técnico</div>
+        <div class="nav-item org-aba" data-aba="saida"><span class="nav-icon">🗣️</span> Entrevista de Desligamento</div>
       </div></div></nav><div class="org-conteudo"></div>`;
     layout.querySelector('.org-conteudo').appendChild(estrutura);
     layout.querySelector('.org-conteudo').appendChild(aval);
@@ -394,17 +407,26 @@
     const sec = document.createElement('div');
     sec.className = 'panel'; sec.id = 'saidaSecao';
     sec.innerHTML = `
-      <h2>🚪 Saída do Técnico — entrevista de desligamento</h2>
-      <div class="hint">Técnicos desligados a partir de ${br(DESLIG_DESDE)} (Organograma). O supervisor responde o questionário; o RH acompanha aqui os motivos de saída.</div>
+      <h2>🗣️ Entrevista de Desligamento</h2>
+      <div class="hint">Desligamentos a partir de ${br(DESLIG_DESDE)} (base do Turnover + Organograma). O supervisor responde a entrevista; o RH acompanha aqui as causas e os motivos de saída.</div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0 12px;">
         <select id="sdSup" class="mono" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:220px;"><option value="">Supervisor: todos</option></select>
         <select id="sdSt" class="mono" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text);">
           <option value="">Situação: todas</option><option value="pend">🔴 Pendentes</option><option value="ok">✅ Preenchidas</option></select>
         <div class="search"><input id="sdBusca" type="search" placeholder="Buscar colaborador..." aria-label="Buscar colaborador"></div>
-        <button type="button" id="sdNovo" class="av-bt sec" style="margin-left:auto;">+ Registrar saída de outro técnico</button>
+        <button type="button" id="sdNovo" class="av-bt sec" style="margin-left:auto;">+ Registrar outro desligamento</button>
+      </div>
+      <div class="kpi-row" id="sdKpis" style="margin-bottom:16px;"></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+        <div class="panel" style="margin:0;"><h2>Pareto — Causas de Desligamento (RH)</h2>
+          <div class="hint">Barras = quantidade por causa · linha = % acumulado · tracejado = corte de 80%</div>
+          <div id="sdPar1Wrap" style="position:relative; height:320px;"><canvas id="sdPar1"></canvas></div></div>
+        <div class="panel" style="margin:0;"><h2>Pareto — Motivo informado na entrevista</h2>
+          <div class="hint">Pergunta 4 da entrevista do supervisor</div>
+          <div id="sdPar2Wrap" style="position:relative; height:320px;"><canvas id="sdPar2"></canvas></div></div>
       </div>
       <div id="sdResumo" class="mono" style="font-size:12px; color:var(--text); margin-bottom:8px;"></div>
-      <div style="overflow:auto; border-radius:8px;"><table id="sdTabela"></table></div>
+      <div style="overflow:auto; border-radius:8px; max-height:620px;"><table id="sdTabela"></table></div>
       <div id="sdMotivos" style="margin-top:16px;"></div>`;
     box.appendChild(sec);
     document.getElementById('sdSup').addEventListener('change', e => { estadoS.sup = e.target.value; renderSaida(); });
@@ -427,13 +449,13 @@
     const feitos = base.filter(c => SAIDA[c.mat]).length;
     document.getElementById('sdResumo').innerHTML = `${base.length} desligamento(s) · ✅ ${feitos} preenchido(s) · <span style="color:#b91c1c; font-weight:700;">🔴 ${base.length - feitos} pendente(s)</span>`;
     tb.innerHTML = !lista.length ? '<tbody><tr><td style="color:var(--muted);">Nenhum desligamento nesse filtro.</td></tr></tbody>' :
-      '<thead><tr><th>Colaborador</th><th>Supervisor</th><th>Área / Projeto</th><th>Admissão</th><th>Desligamento</th><th>Tipo</th><th>Principal motivo</th><th>Poderia evitar?</th><th></th></tr></thead><tbody>' +
+      '<thead><tr><th>Colaborador</th><th>Supervisor</th><th>Área / Projeto</th><th>Admissão</th><th>Desligamento</th><th>Tipo</th><th>Causa (RH)</th><th>Motivo (entrevista)</th><th>Poderia evitar?</th><th></th></tr></thead><tbody>' +
       lista.map(c => {
         const r = SAIDA[c.mat];
         const motivo = r ? (r.q4 === 'Outros' && r.q4_outros ? 'Outros: ' + r.q4_outros : r.q4) : '';
         return `<tr><td><b>${esc(c.nome)}</b><div style="font-size:11px; color:var(--muted);">${esc(c.mat)} · ${esc(c.cargo)}</div></td>
           <td>${esc(c.sup) || '—'}</td><td>${esc(c.un) || '—'}</td><td class="mono">${br(c.adm)}</td><td class="mono">${br(c.dem) || '—'}</td>
-          <td>${r ? esc(r.q1) : '—'}</td><td>${r ? esc(motivo) : '—'}</td><td>${r ? esc(r.q8) : '—'}</td>
+          <td>${esc(r ? r.q1 : c.tipoRH) || '—'}</td><td>${c.causaRH ? esc(c.causaRH) + (c.oqRH ? `<div style="font-size:11px; color:var(--muted);">${esc(c.oqRH)}</div>` : '') : '—'}</td><td>${r ? esc(motivo) : '—'}</td><td>${r ? esc(r.q8) : '—'}</td>
           <td><button type="button" class="av-bt ${r ? 'sec' : 'pri'}" data-sd="${esc(c.mat)}">${r ? '✅ Ver / editar' : '🔴 Preencher'}</button></td></tr>`;
       }).join('') + '</tbody>';
     // resumo dos motivos (o que o RH quer ver)
@@ -443,13 +465,95 @@
         <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text); margin-bottom:6px;">${tit}</div>
         ${l.length ? l.map(([k, n]) => `<div style="display:flex; gap:8px; align-items:center; font-size:12.5px; margin:3px 0;"><span style="flex:1;">${esc(k)}</span><b>${n}</b>
           <span style="display:inline-block; height:8px; width:${Math.round(n / resp.length * 90)}px; background:#1e3a8a; border-radius:4px;"></span></div>`).join('') : '<span style="font-size:12px; color:var(--muted);">Sem respostas ainda.</span>'}</div>`; };
+    desenharKpisParetos(base);
     document.getElementById('sdMotivos').innerHTML = resp.length ? `<div style="display:flex; gap:12px; flex-wrap:wrap;">${bloco('Tipo de desligamento', 'q1')}${bloco('Principal motivo', 'q4')}${bloco('Poderia ter sido evitado?', 'q8')}${bloco('Ações para permanência', 'q9')}</div>` : '';
+  }
+
+
+  // sugestão das respostas a partir do Turnover (o supervisor confere / corrige)
+  function sugestaoRH(c) {
+    const o = {};
+    const t = semAcento(c.tipoRH), k = semAcento(c.causaRH + ' ' + c.oqRH);
+    if (/pedido/.test(t)) o.q1 = 'Pedido de demissão';
+    else if (/abandono/.test(t)) o.q1 = 'Abandono';
+    else if (/justa causa/.test(k) && !/sem justa/.test(k)) o.q1 = 'Demissão por justa causa';
+    else if (/empresa/.test(t)) o.q1 = 'Demissão sem justa causa';
+    if (/proposta|outra empresa|pj/.test(k)) o.q4 = 'Proposta de outra empresa';
+    else if (/salario|remunera|beneficio/.test(k)) o.q4 = 'Remuneração / benefícios';
+    else if (/promoc|cresciment/.test(k)) o.q4 = 'Oportunidade de crescimento profissional';
+    else if (/familia|pessoa/.test(k)) o.q4 = 'Questões pessoais';
+    else if (/horario|escala|jornada/.test(k)) o.q4 = 'Jornada / escala de trabalho';
+    else if (/desempenho|performance|adapt|norma|desistiu/.test(k)) o.q4 = 'Desempenho ou adaptação à função';
+    else if (/conduta|indisciplina|comport|falta|atraso|insubord|veiculo/.test(k)) { o.q4 = 'Outros'; o.q4_outros = c.oqRH || c.causaRH; }
+    if (o.q4) o.q3 = 'Sim';
+    return o;
+  }
+
+  // ---------- quadrinhos + Pareto (mesmo visual do Turnover) ----------
+  const chartsSd = {};
+  function contarPor(lista, f) { const m = {}; lista.forEach(x => { const v = String(f(x) || '').trim() || 'Não informado'; m[v] = (m[v] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); }
+  function desenharKpisParetos(base) {
+    const total = base.length;
+    const porTipo = contarPor(base, c => (SAIDA[c.mat] && SAIDA[c.mat].q1) || c.tipoRH);
+    const casa = base.map(c => c.adm && c.dem ? dias(c.adm, c.dem) : null).filter(v => v !== null && v >= 0);
+    const media = casa.length ? casa.reduce((a, b) => a + b, 0) / casa.length : null;
+    const ate30 = casa.filter(v => v <= 30).length, ate90 = casa.filter(v => v <= 90).length;
+    const causas = contarPor(base.filter(c => c.causaRH), c => c.causaRH);
+    const feitos = base.filter(c => SAIDA[c.mat]).length;
+    const fmtCasa = v => v == null ? '—' : (v >= 60 ? (v / 30).toFixed(1).replace('.', ',') + ' meses' : Math.round(v) + ' dias');
+    const PAL = ['#2563eb', '#d97706', '#059669', '#5e34b5', '#be185d'];
+    const kpi = (lab, val, cor, sub) => `<div class="kpi"><div class="label">${lab}</div><div class="value" style="color:${cor}; ${String(val).length > 8 ? 'font-size:18px;' : ''}">${val}</div>${sub ? `<div class="delta">${sub}</div>` : ''}</div>`;
+    document.getElementById('sdKpis').innerHTML =
+      kpi('🔄 Desligamentos', total, '#0e7c86') +
+      porTipo.slice(0, 3).map(([k, n], i) => kpi(esc(k), n, PAL[i], (total ? (n / total * 100).toFixed(1) : 0) + '% do total')).join('') +
+      kpi('⏳ Tempo médio de casa', fmtCasa(media), '#1b2440', 'entre admissão e demissão') +
+      kpi('🚨 Saíram em até 30 dias', ate30, ate30 ? '#dc2626' : '#059669', (total ? (ate30 / total * 100).toFixed(1) : 0) + '% do total') +
+      kpi('⚠️ Saíram em até 90 dias', ate90, ate90 ? '#d97706' : '#059669', (total ? (ate90 / total * 100).toFixed(1) : 0) + '% do total') +
+      (causas[0] ? kpi('🥇 Principal causa', esc(causas[0][0]), '#1b2440', causas[0][1] + ' (' + (causas[0][1] / Math.max(1, causas.reduce((a, x) => a + x[1], 0)) * 100).toFixed(1) + '%)') : '') +
+      kpi('🗣️ Entrevistas feitas', feitos + ' de ' + total, feitos === total ? '#059669' : '#dc2626', total ? (feitos / total * 100).toFixed(0) + '% respondidas' : '');
+    pareto('sdPar1', causas, 'Desligamentos');
+    const motivos = contarPor(base.filter(c => SAIDA[c.mat] && SAIDA[c.mat].q4), c => { const r = SAIDA[c.mat]; return r.q4 === 'Outros' && r.q4_outros ? 'Outros' : r.q4; });
+    pareto('sdPar2', motivos, 'Entrevistas');
+  }
+  function pareto(id, itens, rot) {
+    const cv = document.getElementById(id);
+    if (!cv) return;
+    if (chartsSd[id]) { chartsSd[id].destroy(); chartsSd[id] = null; }
+    const wrap = cv.parentNode;
+    let aviso = wrap.querySelector('.sd-vazio');
+    if (!itens.length || typeof Chart === 'undefined') {
+      cv.style.display = 'none';
+      if (!aviso) { aviso = document.createElement('div'); aviso.className = 'sd-vazio mono'; aviso.style.cssText = 'font-size:12px; color:var(--muted); padding:20px 0;'; wrap.appendChild(aviso); }
+      aviso.textContent = itens.length ? '' : 'Sem respostas ainda.';
+      return;
+    }
+    cv.style.display = ''; if (aviso) aviso.remove();
+    const total = itens.reduce((a, x) => a + x[1], 0);
+    let acum = 0;
+    const acumPct = itens.map(([, q]) => { acum += q; return acum / total * 100; });
+    const corte = acumPct.findIndex(v => v >= 80);
+    const plugins = typeof ChartDataLabels !== 'undefined' ? [ChartDataLabels] : [];
+    chartsSd[id] = new Chart(cv, {
+      data: { labels: itens.map(c => c[0]), datasets: [
+        { type: 'bar', label: rot, data: itens.map(c => c[1]), order: 2, yAxisID: 'y', borderRadius: 4,
+          backgroundColor: itens.map((_, i) => (corte === -1 || i <= corte) ? '#dc2626' : 'rgba(107,117,144,.6)'),
+          datalabels: { anchor: 'end', align: 'end', color: '#1b2440', font: { size: 11, family: 'JetBrains Mono', weight: '700' } } },
+        { type: 'line', label: '% Acumulado', data: acumPct, order: 1, yAxisID: 'y1', borderColor: '#0e7c86', backgroundColor: '#0e7c86', pointRadius: 4, tension: .2,
+          datalabels: { color: '#0e7c86', align: 'top', offset: 6, font: { size: 9, family: 'JetBrains Mono', weight: '700' }, formatter: v => v.toFixed(0) + '%' } },
+        { type: 'line', label: '80%', data: itens.map(() => 80), order: 1, yAxisID: 'y1', borderColor: '#000000', borderDash: [5, 5], pointRadius: 0, datalabels: { display: false } } ] },
+      plugins,
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#6b7590', font: { family: 'Inter', size: 11 } } }, datalabels: { display: true } },
+        scales: { x: { ticks: { color: '#1b2440', font: { size: 10, weight: 'bold' }, maxRotation: 45, minRotation: 0 }, grid: { display: false } },
+          y: { ticks: { color: '#1b2440', font: { weight: 'bold' } }, grid: { display: false }, beginAtZero: true },
+          y1: { position: 'right', min: 0, max: 110, ticks: { color: '#1b2440', font: { weight: 'bold' }, callback: v => v <= 100 ? v + '%' : '' }, grid: { display: false } } } }
+    });
   }
 
   function escolherOutro() {
     const fundo = document.createElement('div');
     fundo.className = 'av-modal-fundo';
-    fundo.innerHTML = `<div class="av-modal" style="width:min(560px,100%);"><div style="padding:18px 22px;"><h3>Registrar saída de outro técnico</h3>
+    fundo.innerHTML = `<div class="av-modal" style="width:min(560px,100%);"><div style="padding:18px 22px;"><h3>Registrar outro desligamento</h3>
       <div style="font-size:12.5px; color:#374151; margin:6px 0 10px;">Para quem ainda não aparece como desligado no Organograma.</div>
       <select id="sdEsc">${ATIVOS_TEC.map(c => `<option value="${esc(c.mat)}">${esc(c.nome)} — ${esc(c.sup)}</option>`).join('')}</select></div>
       <div class="av-rodape"><button type="button" class="av-bt sec" data-x>Cancelar</button><button type="button" class="av-bt pri" data-ok>Continuar</button></div></div>`;
@@ -461,7 +565,7 @@
   function abrirSaida(mat) {
     const c = DESLIG.find(x => x.mat === mat) || ATIVOS_TEC.find(x => x.mat === mat);
     if (!c) return;
-    const r = SAIDA[mat] || {};
+    const r = Object.assign({}, sugestaoRH(c), SAIDA[mat] || {});
     const contr = r.contrato || (/cirion/i.test(c.contrato) ? 'Cirion' : /claro/i.test(c.contrato) ? 'Claro' : (c.contrato ? 'Outros' : 'Claro'));
     const areaSel = r.areaProjeto || c.un || '';
     const areas = AREAS.indexOf(areaSel) === -1 && areaSel ? AREAS.concat([areaSel]) : AREAS;
@@ -477,8 +581,9 @@
     fundo.className = 'av-modal-fundo';
     fundo.innerHTML = `<div class="av-modal" role="dialog" aria-label="Entrevista de desligamento">
       <div style="padding:18px 22px; display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
-        <div><h3>Saída do Técnico — entrevista de desligamento</h3><div style="font-size:13px; color:#374151; margin-top:4px;"><b>${esc(c.nome)}</b> · matrícula ${esc(c.mat)}</div></div>
+        <div><h3>Entrevista de Desligamento</h3><div style="font-size:13px; color:#374151; margin-top:4px;"><b>${esc(c.nome)}</b> · matrícula ${esc(c.mat)}</div></div>
         <button type="button" class="av-bt sec" data-x>✕</button></div>
+      ${c.tipoRH || c.causaRH ? `<div class="av-sec" style="background:#f8fafc; font-size:12.5px;"><b>Registro do RH (Turnover):</b> ${esc(c.tipoRH || '—')} · causa <b>${esc(c.causaRH || '—')}</b>${c.oqRH ? ' · ' + esc(c.oqRH) : ''}${SAIDA[mat] ? '' : ' <span style="color:#6b7280;">(as respostas 1 e 4 vieram sugeridas daqui — confira)</span>'}</div>` : ''}
       <div class="av-sec"><h4>1. Identificação do colaborador</h4>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           ${campo('sdNome', 'Nome completo do colaborador', r.nome || c.nome)}
