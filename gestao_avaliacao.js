@@ -1,4 +1,4 @@
-// gestao_avaliacao.js — Avaliação de Experiência (30 / 60 / 90 dias) na página Organograma
+// gestao_avaliacao.js — Avaliação de Experiência (30 / 60 / 90 dias) — aba lateral dentro da página Organograma
 //
 // Lista os técnicos ativos admitidos a partir de ADMISSAO_DESDE (dados.json → colaboradores) e
 // deixa o supervisor preencher a avaliação de cada etapa. A gravação vai para o fluxo do
@@ -108,8 +108,49 @@
   }
 
   // ---------- estrutura ----------
-  function montar() {
+  // Abas do lado, dentro da página Organograma (igual à Preventiva):
+  //   👥 Estrutura (tudo o que já existia na página)  ·  📝 Avaliação de Experiência
+  let abaOrg = 'estrutura';
+  function montarPagina() {
     const pg = document.getElementById('pagina-organograma');
+    if (!pg) return null;
+    if (document.getElementById('org-aba-aval')) return document.getElementById('org-aba-aval');
+    if (!document.getElementById('org-abas-css')) {
+      const css = document.createElement('style'); css.id = 'org-abas-css';
+      css.textContent = `
+        .org-layout{display:flex;gap:20px;align-items:flex-start}
+        .org-menu{width:200px;flex:0 0 200px;background:var(--panel,#fff);border:1px solid var(--line,#e1e5f0);border-radius:14px;padding:10px;position:sticky;top:20px;box-shadow:0 2px 8px rgba(27,36,64,.06)}
+        .org-menu .nav-group{margin-bottom:0}
+        .org-menu .nav-group-label{cursor:default}
+        .org-conteudo{flex:1;min-width:0}
+        @media (max-width:860px){.org-layout{flex-direction:column}.org-menu{width:100%;position:static}}`;
+      document.head.appendChild(css);
+    }
+    const estrutura = document.createElement('div'); estrutura.id = 'org-aba-estrutura';
+    while (pg.firstChild) estrutura.appendChild(pg.firstChild);
+    const aval = document.createElement('div'); aval.id = 'org-aba-aval'; aval.style.display = 'none';
+    const layout = document.createElement('div'); layout.className = 'org-layout';
+    layout.innerHTML = `<nav class="org-menu"><div class="nav-group"><div class="nav-group-label"><span>Organograma</span></div><div class="nav-group-items">
+        <div class="nav-item org-aba active" data-aba="estrutura"><span class="nav-icon">👥</span> Estrutura</div>
+        <div class="nav-item org-aba" data-aba="aval"><span class="nav-icon">📝</span> Avaliação de Experiência</div>
+      </div></div></nav><div class="org-conteudo"></div>`;
+    layout.querySelector('.org-conteudo').appendChild(estrutura);
+    layout.querySelector('.org-conteudo').appendChild(aval);
+    pg.appendChild(layout);
+    layout.querySelectorAll('.org-aba').forEach(b => b.addEventListener('click', () => trocarAbaOrg(b.dataset.aba)));
+    return aval;
+  }
+  function trocarAbaOrg(aba) {
+    abaOrg = aba;
+    document.querySelectorAll('#pagina-organograma .org-aba').forEach(b => b.classList.toggle('active', b.dataset.aba === aba));
+    document.getElementById('org-aba-estrutura').style.display = aba === 'estrutura' ? '' : 'none';
+    document.getElementById('org-aba-aval').style.display = aba === 'aval' ? '' : 'none';
+    if (aba === 'aval') iniciar();
+    else if (typeof renderHeadcount === 'function') renderHeadcount();
+  }
+
+  function montar() {
+    const pg = montarPagina();
     if (!pg || document.getElementById('avalExpSecao')) return;
     if (!document.getElementById('aval-css')) {
       const css = document.createElement('style'); css.id = 'aval-css';
@@ -147,7 +188,7 @@
       document.head.appendChild(css);
     }
     const sec = document.createElement('div');
-    sec.className = 'panel'; sec.id = 'avalExpSecao'; sec.style.marginTop = '16px';
+    sec.className = 'panel'; sec.id = 'avalExpSecao';
     sec.innerHTML = `
       <h2>🧭 Avaliação de Experiência — técnicos novos (30 / 60 / 90 dias)</h2>
       <div class="hint">Técnicos ativos admitidos a partir de ${br(ADMISSAO_DESDE)}. Clique na etapa para o supervisor preencher a avaliação; o RH acompanha aqui o que já foi avaliado e a decisão.</div>
@@ -158,8 +199,7 @@
       </div>
       <div style="overflow:auto; border-radius:8px;"><table id="avTabela"></table></div>
       ${FLUXO_AVALIACAO ? '' : '<div class="mono" style="font-size:12px; color:#b45309; margin-top:10px;">⚠ O envio ainda não está ligado: falta colar a URL do fluxo “Avaliação Experiência – Gravar” em FLUXO_AVALIACAO (gestao_avaliacao.js).</div>'}`;
-    const ref = document.getElementById('headcountSecao');
-    if (ref && ref.parentNode === pg) pg.insertBefore(sec, ref.nextSibling); else pg.appendChild(sec);
+    pg.appendChild(sec);
     document.getElementById('avSup').addEventListener('change', e => { estado.sup = e.target.value; render(); });
     document.getElementById('avBusca').addEventListener('input', e => { estado.busca = e.target.value; render(); });
     sec.addEventListener('click', e => {
@@ -303,19 +343,13 @@
     });
   }
 
-  // ---------- liga na página Organograma ----------
+  // ---------- página própria no menu, logo abaixo de Organograma ----------
   function iniciar() {
     montar();
     render();
-    carregar().then(render);
+    if (!carregado) carregar().then(render);
   }
-  const antes = window.mostrarPagina;
-  if (typeof antes === 'function') {
-    window.mostrarPagina = function (p) {
-      const r = antes.apply(this, arguments);
-      if (p === 'organograma') { if (!document.getElementById('avalExpSecao')) iniciar(); else if (!carregado) carregar().then(render); }
-      return r;
-    };
-  }
-  if (document.readyState !== 'loading') setTimeout(() => { if (document.getElementById('pagina-organograma') && document.getElementById('pagina-organograma').style.display !== 'none') iniciar(); }, 0);
+  const prep = () => montarPagina();
+  // o script fica no fim do <body>: a página Organograma já existe → monta as abas já
+  if (document.getElementById('pagina-organograma')) prep(); else document.addEventListener('DOMContentLoaded', prep);
 })();
