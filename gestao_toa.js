@@ -42,6 +42,22 @@
   function isoDeData(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
   function dataDeIso(iso){ const p = iso.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
   function somarDias(iso, n){ const d = dataDeIso(iso); d.setDate(d.getDate() + n); return isoDeData(d); }
+  // ALTERADO (06/11/2026): a data da presença pode vir em vários formatos (2026-11-06T10:00:00,
+  // 06/11/2026, 06/11/2026 10:00, número serial do Excel). Converte tudo para aaaa-mm-dd.
+  function dataIsoPres(v){
+    if(v == null || v === '') return '';
+    if(typeof v === 'number' || /^\d{5}(\.\d+)?$/.test(String(v).trim())){
+      const d = new Date(Math.round((Number(v) - 25569) * 86400000));
+      return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+    }
+    const t = String(v).trim();
+    let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if(m) return m[1] + '-' + pad2(+m[2]) + '-' + pad2(+m[3]);
+    m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if(m) return m[3] + '-' + pad2(+m[2]) + '-' + pad2(+m[1]);
+    const d = new Date(t);
+    return isNaN(d) ? '' : isoDeData(d);
+  }
   function fmtData(iso){ const p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
   function fmtDiaCurto(iso){ const p = iso.split('-'); return p[2] + '/' + p[1]; }
   function diaSemana(iso){ return dataDeIso(iso).getDay(); }
@@ -562,7 +578,12 @@
           return true;
         });
         const presJunta = {};
-        (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).concat(d.__presExtra || []).forEach(p => { if(p && p.data && p.recurso) presJunta[p.data + '|' + p.recurso] = p; });
+        (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).concat(d.__presExtra || []).forEach(p => {
+          if(!p) return;
+          const data = dataIsoPres(p.data != null ? p.data : (p.Data != null ? p.Data : p.dia));
+          const recurso = String(p.recurso || p.Recurso || p.tecnico || p.nome || '').trim();
+          if(data && recurso) presJunta[data + '|' + semAcento(recurso)] = { data, recurso };
+        });
         PRES = Object.values(presJunta).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
         ajustarNomesPres();
         ajustarNomesToa();
@@ -962,7 +983,7 @@
       .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || (a.logou - b.logou) || a.nome.localeCompare(b.nome, 'pt-BR'));
     document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? '🟢 ' + nSim + ' logaram · 🔴 ' + nNao + ' não logaram' + (nAg ? ' · ⏳ ' + nAg + ' entram depois' : '') + (nFol ? ' · 📅 ' + nFol + ' de folga' : '') + (nRes ? ' · ⛔ ' + nRes + ' sem acesso' : '') : 'sem presença no dia';
     tabela.innerHTML = !temPresDia
-      ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.</td></tr></tbody>`
+      ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.${PRES.length ? '<br>Dias com presença na base: ' + [...new Set(PRES.map(p => p.data))].sort().slice(-7).map(fmtData).join(', ') : '<br>A base de presença veio vazia (dados.json → toaPresenca e dados_toa_presenca.json).'}</td></tr></tbody>`
       : !naoLog.length
         ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico nesse filtro.</td></tr></tbody>`
         : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Presença</th><th>Escala</th><th>Horário</th><th>Restrição</th></tr></thead><tbody>' +
