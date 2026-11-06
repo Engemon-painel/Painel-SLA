@@ -16,6 +16,8 @@
   const FLUXO_AVALIACAO = 'https://defaultc54e138a79f54294aa9bb004cf8d7f.f7.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/11/workflows/8ac7331ffa21496caf9fbb84763a05ae/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=jnwHYpz7ZOuYh2QtvqebFXDA-H7ln30RcRt_Hvu6Pd8';
   const ADMISSAO_DESDE = '2026-10-01';   // técnicos admitidos a partir desta data
   const CHAVE_LOCAL = 'avalExpLocais_v1';
+  const DESLIG_DESDE = '2026-10-01';    // saídas a partir desta data
+  const CHAVE_LOCAL_SAIDA = 'saidaLocais_v1';
 
   const ESCALA = [
     [1, 'Não Satisfatório'], [2, 'Em Desenvolvimento'], [3, 'Satisfatório'], [4, 'Bom'], [5, 'Excepcional']
@@ -57,6 +59,8 @@
   const ETAPAS = ['30', '60', '90'];
 
   let COLABS = [], AVAL = {}, carregado = false;
+  let DESLIG = [], ATIVOS_TEC = [], AREAS = [], SAIDA = {};
+  const estadoS = { sup: '', busca: '', st: '' };
   const estado = { sup: '', busca: '' };
 
   // ---------- util ----------
@@ -103,9 +107,27 @@
       // cópia salva neste navegador vale até o dados.json trazer uma versão igual ou mais nova
       const l = locais();
       Object.keys(l).forEach(k => { const b = AVAL[k]; if (!b || String(b.__em || '') < String(l[k].__em || '')) AVAL[k] = l[k]; });
+      // ----- saídas (desligamentos) -----
+      const mapC = c => ({ nome: String(c.nome).trim(), mat: matNum(c.matricula), sup: String(c.supervisor || '').trim(), coord: String(c.coordenador || '').trim(),
+        contrato: String(c.contrato || '').trim(), un: String(c.unidadeNegocio || '').trim(), cargo: String(c.descFuncao || c.areaTecnica || '').trim(),
+        area: String(c.areaTecnica || ''), adm: String(c.dataAdmis || '').slice(0, 10), dem: String(c.dataDemissao || '').slice(0, 10) });
+      const ehTec = c => /tecnic|lid/.test(semAcento(c.areaTecnica));
+      DESLIG = cols.filter(c => c && c.nome && ehTec(c) && String(c.dataDemissao || '') >= DESLIG_DESDE).map(mapC);
+      ATIVOS_TEC = cols.filter(c => c && c.nome && c.ativo && ehTec(c)).map(mapC).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+      AREAS = [...new Set(cols.map(c => String(c.unidadeNegocio || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+      SAIDA = {};
+      (d && Array.isArray(d.entrevistasDesligamento) ? d.entrevistasDesligamento : []).forEach(x => {
+        try { const o = typeof x === 'string' ? JSON.parse(x) : x; const r = typeof o.r === 'string' ? JSON.parse(o.r) : (o.r || o); r.__em = o.em || ''; SAIDA[matNum(r.matricula)] = r; } catch (e) { }
+      });
+      const ls = locaisSaida();
+      Object.keys(ls).forEach(k => { const b = SAIDA[k]; if (!b || String(b.__em || '') < String(ls[k].__em || '')) SAIDA[k] = ls[k]; });
+      // quem preencheu a saída de alguém que ainda não está como desligado no Organograma também aparece
+      Object.values(SAIDA).forEach(r => { if (!DESLIG.some(x => x.mat === matNum(r.matricula))) DESLIG.push({ nome: r.nome, mat: matNum(r.matricula), sup: r.supervisor, coord: r.coordenador, contrato: r.contrato, un: r.areaProjeto, cargo: r.cargo, adm: r.dataAdmissao, dem: r.dataDesligamento }); });
       carregado = true;
     });
   }
+  function locaisSaida() { try { return JSON.parse(localStorage.getItem(CHAVE_LOCAL_SAIDA) || '{}'); } catch (e) { return {}; } }
+  function salvarLocalSaida(chave, r) { try { const l = locaisSaida(); l[chave] = r; localStorage.setItem(CHAVE_LOCAL_SAIDA, JSON.stringify(l)); } catch (e) { } }
 
   // ---------- estrutura ----------
   // Abas do lado, dentro da página Organograma (igual à Preventiva):
@@ -133,9 +155,12 @@
     layout.innerHTML = `<nav class="org-menu"><div class="nav-group"><div class="nav-group-label"><span>Organograma</span></div><div class="nav-group-items">
         <div class="nav-item org-aba active" data-aba="estrutura"><span class="nav-icon">👥</span> Estrutura</div>
         <div class="nav-item org-aba" data-aba="aval"><span class="nav-icon">📝</span> Avaliação de Experiência</div>
+        <div class="nav-item org-aba" data-aba="saida"><span class="nav-icon">🚪</span> Saída do Técnico</div>
       </div></div></nav><div class="org-conteudo"></div>`;
     layout.querySelector('.org-conteudo').appendChild(estrutura);
     layout.querySelector('.org-conteudo').appendChild(aval);
+    const saida = document.createElement('div'); saida.id = 'org-aba-saida'; saida.style.display = 'none';
+    layout.querySelector('.org-conteudo').appendChild(saida);
     pg.appendChild(layout);
     layout.querySelectorAll('.org-aba').forEach(b => b.addEventListener('click', () => trocarAbaOrg(b.dataset.aba)));
     return aval;
@@ -145,7 +170,9 @@
     document.querySelectorAll('#pagina-organograma .org-aba').forEach(b => b.classList.toggle('active', b.dataset.aba === aba));
     document.getElementById('org-aba-estrutura').style.display = aba === 'estrutura' ? '' : 'none';
     document.getElementById('org-aba-aval').style.display = aba === 'aval' ? '' : 'none';
+    document.getElementById('org-aba-saida').style.display = aba === 'saida' ? '' : 'none';
     if (aba === 'aval') iniciar();
+    else if (aba === 'saida') iniciarSaida();
     else if (typeof renderHeadcount === 'function') renderHeadcount();
   }
 
@@ -343,11 +370,186 @@
     });
   }
 
+
+  // =====================================================================
+  // 🚪 SAÍDA DO TÉCNICO — entrevista de desligamento preenchida pelo supervisor
+  // =====================================================================
+  const PERGUNTAS_SAIDA = [
+    { id: 'q1', txt: '1. Qual foi o tipo de desligamento?', ops: ['Pedido de demissão', 'Demissão sem justa causa', 'Demissão por justa causa', 'Abandono'] },
+    { id: 'q2', txt: '2. O supervisor tinha conhecimento da intenção de saída do colaborador?', ops: ['Sim, já havia sinalizado anteriormente', 'Sim, comunicou próximo ao desligamento', 'Não, foi uma decisão inesperada'] },
+    { id: 'q3', txt: '3. O colaborador apresentou algum motivo para sua saída?', ops: ['Sim', 'Não', 'Não foi possível identificar'] },
+    { id: 'q4', txt: '4. Qual foi o principal motivo informado para o desligamento?', outros: true, ops: ['Proposta de outra empresa', 'Remuneração / benefícios', 'Oportunidade de crescimento profissional', 'Mudança de cidade ou região', 'Questões pessoais', 'Insatisfação com a liderança', 'Insatisfação com as atividades exercidas', 'Condições de trabalho', 'Jornada / escala de trabalho', 'Desempenho ou adaptação à função', 'Outros'] },
+    { id: 'q5', txt: '5. Como você avalia o desempenho do colaborador durante o período na empresa?', ops: ['Excelente', 'Bom', 'Regular', 'Abaixo do esperado'] },
+    { id: 'q6', txt: '6. Como era o relacionamento do colaborador com a equipe?', ops: ['Muito bom', 'Bom', 'Regular', 'Apresentava dificuldades de relacionamento'] },
+    { id: 'q7', txt: '7. O colaborador demonstrava interesse em permanecer na empresa?', ops: ['Sim', 'Não', 'Parcialmente', 'Não foi possível avaliar'] },
+    { id: 'q8', txt: '8. Na sua avaliação, o desligamento poderia ter sido evitado?', ops: ['Sim', 'Não', 'Talvez'] },
+    { id: 'q9', txt: '9. Caso pudesse ter sido evitado, quais ações poderiam contribuir para a permanência?', multi: true, outros: true, ops: ['Revisão salarial', 'Oportunidade de promoção', 'Mudança de equipe ou projeto', 'Ajuste de escala', 'Outros'] }
+  ];
+  const OBRIG_SAIDA = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8'];
+
+  function montarSaida() {
+    montar();   // garante o CSS do formulário
+    const box = document.getElementById('org-aba-saida');
+    if (!box || document.getElementById('saidaSecao')) return;
+    const sec = document.createElement('div');
+    sec.className = 'panel'; sec.id = 'saidaSecao';
+    sec.innerHTML = `
+      <h2>🚪 Saída do Técnico — entrevista de desligamento</h2>
+      <div class="hint">Técnicos desligados a partir de ${br(DESLIG_DESDE)} (Organograma). O supervisor responde o questionário; o RH acompanha aqui os motivos de saída.</div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:10px 0 12px;">
+        <select id="sdSup" class="mono" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:220px;"><option value="">Supervisor: todos</option></select>
+        <select id="sdSt" class="mono" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text);">
+          <option value="">Situação: todas</option><option value="pend">🔴 Pendentes</option><option value="ok">✅ Preenchidas</option></select>
+        <div class="search"><input id="sdBusca" type="search" placeholder="Buscar colaborador..." aria-label="Buscar colaborador"></div>
+        <button type="button" id="sdNovo" class="av-bt sec" style="margin-left:auto;">+ Registrar saída de outro técnico</button>
+      </div>
+      <div id="sdResumo" class="mono" style="font-size:12px; color:var(--text); margin-bottom:8px;"></div>
+      <div style="overflow:auto; border-radius:8px;"><table id="sdTabela"></table></div>
+      <div id="sdMotivos" style="margin-top:16px;"></div>`;
+    box.appendChild(sec);
+    document.getElementById('sdSup').addEventListener('change', e => { estadoS.sup = e.target.value; renderSaida(); });
+    document.getElementById('sdSt').addEventListener('change', e => { estadoS.st = e.target.value; renderSaida(); });
+    document.getElementById('sdBusca').addEventListener('input', e => { estadoS.busca = e.target.value; renderSaida(); });
+    document.getElementById('sdNovo').addEventListener('click', escolherOutro);
+    sec.addEventListener('click', e => { const b = e.target.closest('[data-sd]'); if (b) abrirSaida(b.dataset.sd); });
+  }
+
+  function renderSaida() {
+    const tb = document.getElementById('sdTabela');
+    if (!tb) return;
+    const sups = [...new Set(DESLIG.map(c => c.sup).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    document.getElementById('sdSup').innerHTML = '<option value="">Supervisor: todos</option>' + sups.map(x => `<option value="${esc(x)}"${x === estadoS.sup ? ' selected' : ''}>${esc(x)}</option>`).join('');
+    if (!carregado) { tb.innerHTML = '<tbody><tr><td>Carregando…</td></tr></tbody>'; return; }
+    const q = semAcento(estadoS.busca);
+    const base = DESLIG.filter(c => (!estadoS.sup || c.sup === estadoS.sup) && (!q || semAcento(c.nome + ' ' + c.sup).includes(q)));
+    const lista = base.filter(c => !estadoS.st || (estadoS.st === 'ok' ? !!SAIDA[c.mat] : !SAIDA[c.mat]))
+      .sort((a, b) => (b.dem || '').localeCompare(a.dem || '') || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const feitos = base.filter(c => SAIDA[c.mat]).length;
+    document.getElementById('sdResumo').innerHTML = `${base.length} desligamento(s) · ✅ ${feitos} preenchido(s) · <span style="color:#b91c1c; font-weight:700;">🔴 ${base.length - feitos} pendente(s)</span>`;
+    tb.innerHTML = !lista.length ? '<tbody><tr><td style="color:var(--muted);">Nenhum desligamento nesse filtro.</td></tr></tbody>' :
+      '<thead><tr><th>Colaborador</th><th>Supervisor</th><th>Área / Projeto</th><th>Admissão</th><th>Desligamento</th><th>Tipo</th><th>Principal motivo</th><th>Poderia evitar?</th><th></th></tr></thead><tbody>' +
+      lista.map(c => {
+        const r = SAIDA[c.mat];
+        const motivo = r ? (r.q4 === 'Outros' && r.q4_outros ? 'Outros: ' + r.q4_outros : r.q4) : '';
+        return `<tr><td><b>${esc(c.nome)}</b><div style="font-size:11px; color:var(--muted);">${esc(c.mat)} · ${esc(c.cargo)}</div></td>
+          <td>${esc(c.sup) || '—'}</td><td>${esc(c.un) || '—'}</td><td class="mono">${br(c.adm)}</td><td class="mono">${br(c.dem) || '—'}</td>
+          <td>${r ? esc(r.q1) : '—'}</td><td>${r ? esc(motivo) : '—'}</td><td>${r ? esc(r.q8) : '—'}</td>
+          <td><button type="button" class="av-bt ${r ? 'sec' : 'pri'}" data-sd="${esc(c.mat)}">${r ? '✅ Ver / editar' : '🔴 Preencher'}</button></td></tr>`;
+      }).join('') + '</tbody>';
+    // resumo dos motivos (o que o RH quer ver)
+    const resp = base.map(c => SAIDA[c.mat]).filter(Boolean);
+    const cont = id => { const m = {}; resp.forEach(r => { const v = r[id]; (Array.isArray(v) ? v : [v]).filter(Boolean).forEach(x => m[x] = (m[x] || 0) + 1); }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+    const bloco = (tit, id) => { const l = cont(id); return `<div style="flex:1 1 260px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:var(--panel);">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text); margin-bottom:6px;">${tit}</div>
+        ${l.length ? l.map(([k, n]) => `<div style="display:flex; gap:8px; align-items:center; font-size:12.5px; margin:3px 0;"><span style="flex:1;">${esc(k)}</span><b>${n}</b>
+          <span style="display:inline-block; height:8px; width:${Math.round(n / resp.length * 90)}px; background:#1e3a8a; border-radius:4px;"></span></div>`).join('') : '<span style="font-size:12px; color:var(--muted);">Sem respostas ainda.</span>'}</div>`; };
+    document.getElementById('sdMotivos').innerHTML = resp.length ? `<div style="display:flex; gap:12px; flex-wrap:wrap;">${bloco('Tipo de desligamento', 'q1')}${bloco('Principal motivo', 'q4')}${bloco('Poderia ter sido evitado?', 'q8')}${bloco('Ações para permanência', 'q9')}</div>` : '';
+  }
+
+  function escolherOutro() {
+    const fundo = document.createElement('div');
+    fundo.className = 'av-modal-fundo';
+    fundo.innerHTML = `<div class="av-modal" style="width:min(560px,100%);"><div style="padding:18px 22px;"><h3>Registrar saída de outro técnico</h3>
+      <div style="font-size:12.5px; color:#374151; margin:6px 0 10px;">Para quem ainda não aparece como desligado no Organograma.</div>
+      <select id="sdEsc">${ATIVOS_TEC.map(c => `<option value="${esc(c.mat)}">${esc(c.nome)} — ${esc(c.sup)}</option>`).join('')}</select></div>
+      <div class="av-rodape"><button type="button" class="av-bt sec" data-x>Cancelar</button><button type="button" class="av-bt pri" data-ok>Continuar</button></div></div>`;
+    document.body.appendChild(fundo);
+    fundo.querySelector('[data-x]').addEventListener('click', () => fundo.remove());
+    fundo.querySelector('[data-ok]').addEventListener('click', () => { const m = fundo.querySelector('#sdEsc').value; fundo.remove(); abrirSaida(m); });
+  }
+
+  function abrirSaida(mat) {
+    const c = DESLIG.find(x => x.mat === mat) || ATIVOS_TEC.find(x => x.mat === mat);
+    if (!c) return;
+    const r = SAIDA[mat] || {};
+    const contr = r.contrato || (/cirion/i.test(c.contrato) ? 'Cirion' : /claro/i.test(c.contrato) ? 'Claro' : (c.contrato ? 'Outros' : 'Claro'));
+    const areaSel = r.areaProjeto || c.un || '';
+    const areas = AREAS.indexOf(areaSel) === -1 && areaSel ? AREAS.concat([areaSel]) : AREAS;
+    const campo = (id, rot, val, tipo) => `<div><span class="av-l">${rot}</span><input type="${tipo || 'text'}" id="${id}" value="${esc(val || '')}"></div>`;
+    const pergunta = p => {
+      const v = r[p.id];
+      const marcado = o => p.multi ? (Array.isArray(v) && v.indexOf(o) !== -1) : v === o;
+      return `<div style="margin:12px 0 4px; font-size:13.5px; font-weight:700;">${esc(p.txt)}${p.multi ? ' <span style="font-weight:400; color:#6b7280;">(pode marcar mais de uma)</span>' : ''}</div>
+        <div style="display:flex; flex-direction:column; gap:4px;">${p.ops.map(o => `<label style="font-size:13px; cursor:pointer;"><input type="${p.multi ? 'checkbox' : 'radio'}" name="sd_${p.id}" value="${esc(o)}"${marcado(o) ? ' checked' : ''}> ${esc(o)}</label>`).join('')}</div>
+        ${p.outros ? `<input type="text" id="sd_${p.id}_outros" placeholder="Se marcou Outros, descreva" value="${esc(r[p.id + '_outros'] || '')}" style="margin-top:6px;">` : ''}`;
+    };
+    const fundo = document.createElement('div');
+    fundo.className = 'av-modal-fundo';
+    fundo.innerHTML = `<div class="av-modal" role="dialog" aria-label="Entrevista de desligamento">
+      <div style="padding:18px 22px; display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+        <div><h3>Saída do Técnico — entrevista de desligamento</h3><div style="font-size:13px; color:#374151; margin-top:4px;"><b>${esc(c.nome)}</b> · matrícula ${esc(c.mat)}</div></div>
+        <button type="button" class="av-bt sec" data-x>✕</button></div>
+      <div class="av-sec"><h4>1. Identificação do colaborador</h4>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          ${campo('sdNome', 'Nome completo do colaborador', r.nome || c.nome)}
+          ${campo('sdMat', 'Matrícula', r.matricula || c.mat)}
+          <div><span class="av-l">Contrato</span><select id="sdContrato">${['Claro', 'Cirion', 'Outros'].map(o => `<option${o === contr ? ' selected' : ''}>${o}</option>`).join('')}</select></div>
+          <div><span class="av-l">Área / Projeto</span><select id="sdArea"><option value=""></option>${areas.map(o => `<option${o === areaSel ? ' selected' : ''}>${esc(o)}</option>`).join('')}<option${areaSel === 'Outros' ? ' selected' : ''}>Outros</option></select></div>
+          ${campo('sdCargo', 'Cargo', r.cargo || c.cargo)}
+          ${campo('sdSupv', 'Supervisor responsável', r.supervisor || c.sup)}
+          ${campo('sdCoord', 'Coordenador responsável', r.coordenador || c.coord)}
+          <div></div>
+          ${campo('sdAdm', 'Data de admissão', r.dataAdmissao || c.adm, 'date')}
+          ${campo('sdDem', 'Data do desligamento', r.dataDesligamento || c.dem, 'date')}
+        </div>
+      </div>
+      <div class="av-sec"><h4>2. Informações sobre o desligamento</h4>${PERGUNTAS_SAIDA.slice(0, 4).map(pergunta).join('')}</div>
+      <div class="av-sec"><h4>3. Avaliação do supervisor</h4>${PERGUNTAS_SAIDA.slice(4).map(pergunta).join('')}</div>
+      <div class="av-sec"><span class="av-l">Observações (opcional)</span><textarea id="sdObs" placeholder="Algo mais que o RH precise saber sobre essa saída.">${esc(r.observacoes || '')}</textarea>
+        ${campo('sdPor', 'Preenchido por', r.preenchidoPor || c.sup)}</div>
+      <div class="av-rodape"><span id="sdMsg" style="font-size:12.5px; margin-right:auto;"></span>
+        <button type="button" class="av-bt sec" data-print>🖨 Imprimir</button>
+        <button type="button" class="av-bt sec" data-x>Cancelar</button>
+        <button type="button" class="av-bt pri" data-salvar>Salvar</button></div></div>`;
+    document.body.appendChild(fundo);
+    const $ = q => fundo.querySelector(q);
+    const fechar = () => fundo.remove();
+    fundo.querySelectorAll('[data-x]').forEach(b => b.addEventListener('click', fechar));
+    fundo.addEventListener('click', e => { if (e.target === fundo) fechar(); });
+    $('[data-print]').addEventListener('click', () => window.print());
+    $('[data-salvar]').addEventListener('click', async () => {
+      const o = { tipo: 'SAIDA', nome: $('#sdNome').value.trim(), matricula: $('#sdMat').value.trim() || c.mat, contrato: $('#sdContrato').value, areaProjeto: $('#sdArea').value,
+        cargo: $('#sdCargo').value.trim(), supervisor: $('#sdSupv').value.trim(), coordenador: $('#sdCoord').value.trim(), dataAdmissao: $('#sdAdm').value, dataDesligamento: $('#sdDem').value,
+        observacoes: $('#sdObs').value.trim(), preenchidoPor: $('#sdPor').value.trim(), dataPreenchimento: hojeIso() };
+      PERGUNTAS_SAIDA.forEach(p => {
+        const sel = [...fundo.querySelectorAll(`input[name="sd_${p.id}"]:checked`)].map(x => x.value);
+        o[p.id] = p.multi ? sel : (sel[0] || '');
+        if (p.outros) o[p.id + '_outros'] = ($('#sd_' + p.id + '_outros').value || '').trim();
+      });
+      const msg = $('#sdMsg'), bt = $('[data-salvar]');
+      const falta = OBRIG_SAIDA.filter(id => !o[id]);
+      if (falta.length) { msg.innerHTML = `<span style="color:#b91c1c;">Responda a(s) pergunta(s): ${falta.map(x => x.slice(1)).join(', ')}.</span>`; return; }
+      if (!o.dataDesligamento) { msg.innerHTML = '<span style="color:#b91c1c;">Informe a data do desligamento.</span>'; return; }
+      if (!FLUXO_AVALIACAO) { msg.innerHTML = '<span style="color:#b91c1c;">O envio ainda não está ligado (falta a URL do fluxo).</span>'; return; }
+      bt.disabled = true; bt.textContent = 'Gravando…';
+      try {
+        const resp0 = await fetch(FLUXO_AVALIACAO, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(o) });
+        const resp = lerResposta(await resp0.text());
+        if (!resp0.ok) throw new Error('o fluxo respondeu ' + resp0.status);
+        if (resp && resp.ok === false) throw new Error(/etapa/i.test(resp.erro || '') ? 'o Excel ainda está com o script antigo: cole a versão nova do “Avaliação Experiência” (com a Saída)' : (resp.erro || 'o script recusou a gravação'));
+        o.__em = new Date().toISOString().replace('T', ' ').slice(0, 16);
+        const k = matNum(o.matricula);
+        SAIDA[k] = o; salvarLocalSaida(k, o);
+        if (!DESLIG.some(x => x.mat === k)) DESLIG.push({ nome: o.nome, mat: k, sup: o.supervisor, coord: o.coordenador, contrato: o.contrato, un: o.areaProjeto, cargo: o.cargo, adm: o.dataAdmissao, dem: o.dataDesligamento });
+        renderSaida(); fechar();
+      } catch (e) {
+        msg.innerHTML = `<span style="color:#b91c1c;">Não gravou: ${esc(e.message)}</span>`;
+        bt.disabled = false; bt.textContent = 'Salvar';
+      }
+    });
+  }
+
+  function iniciarSaida() {
+    montarSaida();
+    renderSaida();
+    if (!carregado) carregar().then(() => { renderSaida(); render(); });
+  }
+
   // ---------- página própria no menu, logo abaixo de Organograma ----------
   function iniciar() {
     montar();
     render();
-    if (!carregado) carregar().then(render);
+    if (!carregado) carregar().then(() => { render(); renderSaida(); });
   }
   const prep = () => montarPagina();
   // o script fica no fim do <body>: a página Organograma já existe → monta as abas já
