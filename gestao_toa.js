@@ -624,6 +624,12 @@
             : `dados.json → toaPresenca com ${d.toaPresenca.length} linhas (atualize o Office Script do painel para ver o motivo).`);
         if((d.__presExtra || []).length) PRES_INFO += ' · ' + d.__presInfo;
         PRES = Object.values(presJunta).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
+        // diagnóstico do painel: o que chegou do dados.json e o que ficou pelo caminho
+        const brutoPres = d.toaPresenca;
+        PRES_INFO += ` · Painel: toaPresenca é ${Array.isArray(brutoPres) ? 'lista com ' + brutoPres.length : typeof brutoPres}` +
+          `, ${presLidas} lidas, ${presSemDado} sem data/técnico, ${presNaoLogou} não logaram, ${Object.keys(presJunta).length} únicas, ` +
+          `${Object.keys(presJunta).length - PRES.length} fora (Cirion), ${PRES.length} ficaram` +
+          (Array.isArray(brutoPres) && brutoPres.length ? ' · 1ª linha: ' + JSON.stringify(brutoPres[0]).slice(0, 160) : '');
         ajustarNomesPres();
         ajustarNomesToa();
         ultimaCarga = Date.now();
