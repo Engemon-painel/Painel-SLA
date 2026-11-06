@@ -26,7 +26,8 @@
   // Concluída, Não Concluída) ou Refeição = iniciou. Na base sem nenhuma atividade
   // (linha sem status) = não iniciou.
 
-  let PRES = [];     // [{ data, recurso }] técnicos com bonequinho no TOA (rota no dia), mesmo sem atividade
+  let PRES = [];
+  let PRES_INFO = '';   // diagnóstico da carga da presença (mostrado quando a tabela fica vazia)     // [{ data, recurso }] técnicos com bonequinho no TOA (rota no dia), mesmo sem atividade
   let TOA = [];      // [{ data:'aaaa-mm-dd', recurso, supervisor, total, concluidas }]
   let COLABS = [];
   let ultimaCarga = 0;
@@ -57,6 +58,27 @@
     if(m) return m[3] + '-' + pad2(+m[2]) + '-' + pad2(+m[1]);
     const d = new Date(t);
     return isNaN(d) ? '' : isoDeData(d);
+  }
+  // ALTERADO (06/11/2026): o dados_toa_presenca.json pode vir em vários formatos, conforme o fluxo:
+  //   { toaPresenca: [...] }  ·  [ ... ] (lista solta)  ·  { value: [...] } (Listar linhas do Excel)
+  //   ·  { body: { value: [...] } }  ·  ou qualquer outra chave com uma lista de linhas.
+  function listaPresenca(pr){
+    if(!pr) return [];
+    if(typeof pr === 'string'){ try { pr = JSON.parse(pr); } catch(e){ return []; } }
+    if(Array.isArray(pr)) return pr;
+    for(const k of ['toaPresenca', 'TOA_PRESENCA', 'presenca', 'value', 'body', 'dados', 'itens', 'linhas', 'rows']){
+      if(pr[k] != null){ const l = listaPresenca(pr[k]); if(l.length) return l; }
+    }
+    const qualquer = Object.values(pr).find(v => Array.isArray(v) && v.length && typeof v[0] === 'object');
+    return qualquer || [];
+  }
+  // resumo do arquivo, para o aviso da tabela quando não acha presença
+  function infoPresenca(pr){
+    if(pr == null) return 'dados_toa_presenca.json não encontrado (ou não é um JSON válido)';
+    const l = listaPresenca(pr);
+    if(pr && pr.aviso) return 'dados_toa_presenca.json (gerado em ' + String(pr.geradoEm || '?').replace('T', ' ').slice(0, 16) + ' UTC): ' + pr.aviso + (l.length ? ' · ' + l.length + ' linhas' : '');
+    if(!l.length) return 'dados_toa_presenca.json sem linhas (gerado em ' + String((pr && pr.geradoEm) || '?').replace('T', ' ').slice(0, 16) + ' UTC) · chaves do arquivo: ' + (Array.isArray(pr) ? '(lista vazia)' : Object.keys(pr).join(', ') || '(vazio)');
+    return 'dados_toa_presenca.json com ' + l.length + ' linhas · colunas: ' + Object.keys(l[0] || {}).join(', ');
   }
   function fmtData(iso){ const p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
   function fmtDiaCurto(iso){ const p = iso.split('-'); return p[2] + '/' + p[1]; }
@@ -557,7 +579,7 @@
     carregando = fetch('dados.json?_=' + Date.now())
       .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(d => pegarEscala.then(e => { prepararEscala(e); return d; }))
-      .then(d => pegarPresenca.then(pr => { d.__presExtra = pr && Array.isArray(pr.toaPresenca) ? pr.toaPresenca : []; return d; }))
+      .then(d => pegarPresenca.then(pr => { d.__presExtra = listaPresenca(pr); d.__presInfo = infoPresenca(pr); return d; }))
       .then(d => {
         const todosColabs = Array.isArray(d.colaboradores) ? d.colaboradores : [];
         const excluido = c => CONTRATOS_EXCLUIDOS.some(x =>
@@ -578,17 +600,29 @@
           return true;
         });
         const presJunta = {};
-        (Array.isArray(d.toaPresenca) ? d.toaPresenca : []).concat(d.__presExtra || []).forEach(p => {
+        let presLidas = 0, presNaoLogou = 0, presSemDado = 0;
+        listaPresenca(d.toaPresenca).concat(d.__presExtra || []).forEach(p => {
           if(!p) return;
+          presLidas++;
           const data = dataIsoPres(p.data != null ? p.data : (p.Data != null ? p.Data : p.dia));
           const recurso = String(p.recurso || p.Recurso || p.tecnico || p.Tecnico || p['Técnico'] || p.nome || p.Nome || '').trim();
           // Ícone do TOA: "res-ic res_type_10 ..." = bonequinho (logado). "ic ptnon_working_cal" (fora do
           // calendário de trabalho) e "ic ptnon_configured_cal" (sem calendário) = NÃO logado.
           // Sem coluna de ícone (formato antigo) = conta como logado, como antes.
           const icone = String(p.icone != null ? p.icone : (p.Icone != null ? p.Icone : (p['Ícone'] != null ? p['Ícone'] : ''))).toLowerCase();
-          const logou = !icone || (/res_type_/.test(icone) && !/ptnon_/.test(icone));
-          if(data && recurso && logou) presJunta[data + '|' + semAcento(recurso)] = { data, recurso };
+          const logou = p.logou === false ? false : p.logou === true ? true : (!icone || (/res_type_/.test(icone) && !/ptnon_/.test(icone)));
+          if(!data || !recurso){ presSemDado++; return; }
+          if(!logou){ presNaoLogou++; return; }
+          presJunta[data + '|' + semAcento(recurso)] = { data, recurso };
         });
+        // diagnóstico: vem do dados.json (debugToaPresenca, gerado pelo script do painel). O dados_toa_presenca.json
+        // é opcional (só existe se houver um fluxo separado); quando não existe, não aparece no aviso.
+        const dbg = d.debugToaPresenca;
+        PRES_INFO = dbg
+          ? `Script do painel (aba ${dbg.aba || 'TOA_PRESENCA'}): ${dbg.linhas || 0} linhas, ${dbg.logaram || 0} logaram, ${dbg.naoLogaram || 0} sem bonequinho` + (dbg.aviso ? ' · ' + dbg.aviso : '')
+          : (!Array.isArray(d.toaPresenca) ? 'O dados.json não tem toaPresenca: atualize o Office Script do painel e rode o fluxo.'
+            : `dados.json → toaPresenca com ${d.toaPresenca.length} linhas (atualize o Office Script do painel para ver o motivo).`);
+        if((d.__presExtra || []).length) PRES_INFO += ' · ' + d.__presInfo;
         PRES = Object.values(presJunta).filter(p => p && p.data && p.recurso && !chavesNome(p.recurso).some(k => nomesExcluidos.has(k)));
         ajustarNomesPres();
         ajustarNomesToa();
@@ -988,7 +1022,7 @@
       .sort((a, b) => String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || (a.logou - b.logou) || a.nome.localeCompare(b.nome, 'pt-BR'));
     document.getElementById('toaQ' + q + 'Contagem').textContent = temPresDia ? '🟢 ' + nSim + ' logaram · 🔴 ' + nNao + ' não logaram' + (nAg ? ' · ⏳ ' + nAg + ' entram depois' : '') + (nFol ? ' · 📅 ' + nFol + ' de folga' : '') + (nRes ? ' · ⛔ ' + nRes + ' sem acesso' : '') : 'sem presença no dia';
     tabela.innerHTML = !temPresDia
-      ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.${PRES.length ? '<br>Dias com presença na base: ' + [...new Set(PRES.map(p => p.data))].sort().slice(-7).map(fmtData).join(', ') : '<br>A base de presença veio vazia (dados.json → toaPresenca e dados_toa_presenca.json).'}</td></tr></tbody>`
+      ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem dados de presença para ${fmtData(dia)}. O robô grava a aba TOA_PRESENCA no fim do dia.${PRES.length ? '<br>Dias com presença na base: ' + [...new Set(PRES.map(p => p.data))].sort().slice(-7).map(fmtData).join(', ') : '<br>Nenhum técnico logado na base de presença.'}<br><span style="font-size:11px">${esc(PRES_INFO)}</span></td></tr></tbody>`
       : !naoLog.length
         ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico nesse filtro.</td></tr></tbody>`
         : '<thead><tr><th>Supervisor</th><th>Técnico</th><th>Presença</th><th>Escala</th><th>Horário</th><th>Restrição</th></tr></thead><tbody>' +
