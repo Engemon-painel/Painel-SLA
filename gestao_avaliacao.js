@@ -46,7 +46,18 @@
         ['s3', 'Trabalho em Equipe', 'Disponibilizou-se para ajudar um colega que estava com dificuldade em uma corretiva complexa.'],
         ['s4', 'Organização e Planejamento', 'Planeja a rota do dia para otimizar deslocamento e carrega a van com o material necessário.'],
         ['s5', 'Comprometimento com a Segurança', 'Não hesita em parar uma atividade se identificar uma condição insegura.'],
-        ['s6', 'Resolução de Problemas sob Pressão', 'Manteve a calma e resolveu a falha crítica no cliente Z minimizando o tempo de parada.'] ] } ] }
+        ['s6', 'Resolução de Problemas sob Pressão', 'Manteve a calma e resolveu a falha crítica no cliente Z minimizando o tempo de parada.'] ] },
+      // NOVO (06/11/2026): itens do modelo de avaliação por valores que ainda não estavam no formulário
+      // (Comunicação, Colaboração e Segurança já existiam acima e não foram repetidos)
+      { nome: 'Valores e Conduta', itens: [
+        ['s7', 'Ética, Integridade e Confidencialidade', 'Respeita as normas internas, trata bem as pessoas e protege informações da empresa, clientes e colegas.'],
+        ['s8', 'Foco no Cliente Interno e Externo', 'Cuida de prazo, qualidade e postura no atendimento e entende o impacto do seu trabalho na operação.'],
+        ['s9', 'Senso de Dono e Responsabilidade', 'Cumpre horários, acompanha o que assume até o fim e avisa a tempo quando há impedimento.'],
+        ['s10', 'Disciplina na Gestão de Informações', 'Checklists, OS, sistemas e relatórios completos, corretos, no prazo e rastreáveis.'],
+        ['s11', 'Melhoria Contínua e Abertura a Feedback', 'Corrige erros apontados, aplica as orientações recebidas e busca aprender por conta própria.'],
+        ['s12', 'Orientação para Resultados', 'Entrega o combinado com qualidade e no prazo, reduz retrabalho e contribui para as metas da área.'] ] },
+      { nome: 'Aderência ao Cargo', itens: [
+        ['s13', 'Aprendizagem, Adaptação e Aderência à Função', 'Está se adaptando à rotina, entende suas responsabilidades e evolui no ritmo esperado para o cargo.'] ] } ] }
   ];
   const TODOS = SECOES.flatMap(s => s.grupos.flatMap(g => g.itens));
   const HARD = TODOS.filter(i => i[0][0] === 'h').map(i => i[0]);
