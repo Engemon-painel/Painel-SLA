@@ -124,6 +124,8 @@
   };
   const pad2 = n => String(n).padStart(2, '0');
   const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
+  // ordem alfabética pelo nome do colaborador (ignora maiúsc./acentos)
+  const porNome = (a, b) => String((a && a.n) || '').localeCompare(String((b && b.n) || ''), 'pt-BR', { sensitivity: 'base' });
   const unicos = (arr, k) => [...new Set(arr.map(i => i[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const tag = (txt, cor) => {
     const escuro = ['#facc15', '#4ade80', '#84cc16', '#fca5a5', '#94a3b8'].includes(cor);
@@ -803,14 +805,14 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
   function tabelas(pos, neg) {
     const velhas = i => (i.bh[5] || 0) + (i.bh[6] || 0); // horas com mais de 150 dias
     const peso = c => ORDEM_CRIT.indexOf(c) < 0 ? 99 : ORDEM_CRIT.indexOf(c);
-    const p = pos.slice().sort((a, b) => peso(a.cr) - peso(b.cr) || velhas(b) - velhas(a) || b.h - a.h);
-    const n = neg.slice().sort((a, b) => a.h - b.h);
+    const p = pos.slice().sort(porNome);
+    const n = neg.slice().sort(porNome);
     $('#bh-t-pos').innerHTML = p.map(i => `<tr><td>${esc(i.m)}</td><td class="nm" title="${esc(i.n)} · ${esc(i.sup)}">${esc(i.n)}<small>${esc(i.sup)}</small></td>
       <td class="num pos">${hMin(i.h)}</td><td>${esc(rotFx(i))}</td><td class="num">${velhas(i) ? hMin(velhas(i)).replace('+', '') : '—'}</td>
       <td>${tag(nomeCrit(i.cr), corCrit(i.cr))}</td></tr>`).join('') || '<tr><td colspan="6">Nenhum colaborador</td></tr>';
     $('#bh-t-neg').innerHTML = n.map(i => `<tr><td>${esc(i.m)}</td><td class="nm" title="${esc(i.n)} · ${esc(i.sup)}">${esc(i.n)}<small>${esc(i.sup)}</small></td>
       <td class="num neg">${hMin(i.h)}</td><td>${esc(rotFx(i))}</td><td>${tag(nomeCrit(i.cr), corCrit(i.cr))}</td></tr>`).join('') || '<tr><td colspan="5">Nenhum colaborador</td></tr>';
-    $('#bh-sub-pos').textContent = `${nf(p.length)} colaboradores · ordenado por criticidade e horas mais antigas`;
+    $('#bh-sub-pos').textContent = `${nf(p.length)} colaboradores · em ordem alfabética`;
     $('#bh-sub-neg').textContent = `${nf(n.length)} colaboradores · do maior débito para o menor`;
   }
 
@@ -877,10 +879,8 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       faixas.filter(x => x.q).map(x => `<button type="button" class="bh-chip${faixaSel === x.ch ? ' on' : ''}" data-k="${esc(x.ch)}"><span class="bh-dot" style="background:${x.cor}"></span>${esc(x.rot)} · ${nf(x.q)}</button>`).join('');
     chips.querySelectorAll('.bh-chip').forEach(b => b.onclick = () => { faixaSel = b.dataset.k; renderFaixas(ultimosItens); });
 
-    // lista: positivos (horas mais antigas primeiro) e depois negativos (maior débito primeiro)
-    const lista = doTipo.filter(i => !faixaSel || chaveFx(i) === faixaSel).sort((a, b) =>
-      (ehNeg(a) - ehNeg(b)) ||
-      (ehNeg(a) ? a.h - b.h : (FX_POS.indexOf(b.fx) - FX_POS.indexOf(a.fx)) || b.h - a.h));
+    // lista em ordem alfabética pelo nome
+    const lista = doTipo.filter(i => !faixaSel || chaveFx(i) === faixaSel).sort(porNome);
     const somaH = lista.reduce((s, i) => s + i.h, 0);
     $('#bh-fx-sub').textContent = `${nf(lista.length)} funcionários · saldo ${hTot(somaH)} · positivo: faixa = idade das horas mais antigas` +
       (idadeReal ? ' (idade real: dias desde o fechamento da folha em que as horas entraram, débitos saem das mais antigas)' : '') +
@@ -1473,7 +1473,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     if (!pendEsp || !pendEsp.mats.length || !dados) { box.innerHTML = ''; return; }
     const noEsp = new Set(pendEsp.mats.map(mat6));
     const faltam = dados.itens.filter(i => projItem(i) === 'CLARO' && i.st !== 'Demitido' && !noEsp.has(mat6(i.m)))
-      .sort((a, b) => String(a.sup || '').localeCompare(String(b.sup || ''), 'pt-BR') || String(a.n).localeCompare(String(b.n), 'pt-BR'));
+      .sort(porNome);
     if (!faltam.length) { box.innerHTML = ''; return; }
     const per = pendEsp.ini ? ` (espelho de ${dataBr(pendEsp.ini)}${pendEsp.fim ? ' a ' + dataBr(pendEsp.fim) : ''})` : '';
     box.innerHTML = `<div class="bh-aviso" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;margin-bottom:12px">
@@ -1553,7 +1553,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     $('#bh-es-kpis').querySelectorAll('button').forEach(b => b.onclick = () => { espSit = b.dataset.s; renderEspelho(); });
     const ordem = { fora: 0, zero: 1, falta: 2, ok: 3 };
     const lista = linhas.filter(l => !espSit || (espSit === 'alerta' ? l.sit !== 'ok' : l.sit === espSit))
-      .sort((x, y) => ordem[x.sit] - ordem[y.sit] || y.pct - x.pct || (y.dAus || 0) - (x.dAus || 0) || String(x.i.n).localeCompare(String(y.i.n), 'pt-BR'));
+      .sort((x, y) => porNome(x.i, y.i));
     const v = x => x == null ? '—' : nf(x);
     const f1 = x => x.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
     body.innerHTML = lista.map(l => {
@@ -1658,7 +1658,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       return (!pendFiltro.tipo || i.tipo === pendFiltro.tipo) &&
         (!pendFiltro.sit || (pendFiltro.sit === 'tratar' ? ehATratar(s) : pendFiltro.sit === 'devolvido' ? devRH(justDe(i)) : pendFiltro.sit === 'tratada' ? ehTratada(i) : s === pendFiltro.sit)) &&
         (!pendFiltro.semAlmoco || ehSemAlmoco(i));
-    }).sort((a, b) => (devRH(justDe(b)) - devRH(justDe(a))) || ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (b.dias || 0) - (a.dias || 0) || String(a.n).localeCompare(String(b.n), 'pt-BR'));
+    }).sort((a, b) => porNome(a, b) || String(a.d).localeCompare(String(b.d)));
     [...pendSel].forEach(id => { if (!lista.some(i => i.id === id)) pendSel.delete(id); });
 
     $('#bh-pd-sub').textContent = `${nf(lista.length)} pendências na lista · marque várias do mesmo tipo para justificar de uma vez` + (pendGerado ? ' · gerado em ' + new Date(pendGerado).toLocaleString('pt-BR') : '') + (pendFonte ? ' · ' + pendFonte : '') + (pendHistInfo ? ' · ' + pendHistInfo : '');
@@ -1735,7 +1735,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     });
 
     // tabela
-    const lista = base.slice().sort((a, b) => (devRH(justDe(b)) - devRH(justDe(a))) || ORDEM_SIT.indexOf(sitDe(a)) - ORDEM_SIT.indexOf(sitDe(b)) || (+b.horas || 0) - (+a.horas || 0));
+    const lista = base.slice().sort((a, b) => porNome(a, b) || String(a.d).localeCompare(String(b.d)));
     $(P + 'sub').textContent = `${nf(lista.length)} ${T.nome.toLowerCase()} · ${T.regraTab}`;
     $(P + 'head').innerHTML = '<tr><th>Situação</th><th>Colaborador</th><th>Data</th><th>Turno</th>' + T.cols.map(c => `<th class="num">${c[0]}</th>`).join('') + '<th>Supervisor</th><th>Justificativa</th><th></th></tr>';
     $(P + 'body').innerHTML = lista.map(i => {
@@ -2057,7 +2057,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
 
     const ordem = { devolvido: 0, sup: 1, rh: 2, lancado: 3 };
     const lista = base.filter(i => !vtFiltro || sitVT(vtDe(i)) === vtFiltro)
-      .sort((a, c) => ordem[sitVT(vtDe(a))] - ordem[sitVT(vtDe(c))] || String(c.d).localeCompare(String(a.d)) || String(a.n).localeCompare(String(c.n), 'pt-BR'));
+      .sort((a, c) => porNome(a, c) || String(a.d).localeCompare(String(c.d)));
     const MAX = 600, vis = lista.slice(0, MAX), porK = {};
     vis.forEach(i => porK[chaveVT(i)] = i);
     [...vtSel].forEach(k => { if (!porK[k]) vtSel.delete(k); });
@@ -2209,7 +2209,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     $('#bh-rh-kpis').querySelectorAll('button').forEach(bt => bt.onclick = () => { rhFiltro = rhFiltro === bt.dataset.r ? '' : bt.dataset.r; renderRH(); });
 
     const lista = baseT.filter(i => !rhFiltro || (rhFiltro === 'rhresp' ? respRH.includes(i) : grupoRH(justDe(i)) === rhFiltro))
-      .sort((a, c) => (justDe(c).dataResp || '').localeCompare(justDe(a).dataResp || '') || String(c.d).localeCompare(String(a.d)));
+      .sort((a, c) => porNome(a, c) || String(a.d).localeCompare(String(c.d)));
     const vis = new Set(lista.slice(0, 600).map(i => i.id));
     [...rhSel].forEach(id => { if (!vis.has(id)) rhSel.delete(id); });
     $('#bh-rh-sub').innerHTML = `${nf(lista.length)} pendências respondidas pelo gestor · clique em <b>Responder</b> (ou marque várias) para gravar Status_RH e Observacao_RH na planilha` +
@@ -2431,9 +2431,9 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
     const tx = o => o.d ? o.a / o.d * 100 : 0;
     const todos = Object.values(p);
     const lista = todos.filter(o => !(so && so.checked) || o.a > 0)
-      .sort((x, y) => tx(y) - tx(x) || y.a - x.a || String(x.n).localeCompare(String(y.n), 'pt-BR'));
+      .sort(porNome);
     const semCC = !todos.some(o => o.cc || o.esc);
-    $('#bh-absc-sub').textContent = `${nf(lista.length)} de ${nf(todos.length)} colaboradores · dias no período = dias corridos no espelho · % = ausentes registrados ÷ dias no período · ordenado pelo %` +
+    $('#bh-absc-sub').textContent = `${nf(lista.length)} de ${nf(todos.length)} colaboradores · dias no período = dias corridos no espelho · % = ausentes registrados ÷ dias no período · ordem alfabética` +
       (semCC ? ' · centro de custo e turno aparecem depois que o script Pendencias (versão de 28/10) rodar' : '');
     body.innerHTML = lista.map(o => { const t = tx(o), c = t >= 10 ? VERMELHO : t >= 5 ? '#b45309' : '#0f9d58';
       return `<tr><td>${esc(matPadraoP(o.m))}</td><td class="nm">${esc(o.n)}</td><td>${esc(o.cc || '—')}</td><td>${esc(o.esc || '—')}</td>
