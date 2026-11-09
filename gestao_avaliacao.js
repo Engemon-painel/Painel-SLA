@@ -1,4 +1,4 @@
-// gestao_avaliacao.js — Avaliação de Experiência (25 / 50 / 75 dias) — aba lateral dentro da página Organograma
+// gestao_avaliacao.js — Avaliação de Experiência (30 / 50 / 75 dias) — aba lateral dentro da página Organograma
 //
 // Lista os técnicos ativos admitidos a partir de ADMISSAO_DESDE (dados.json → colaboradores) e
 // deixa o supervisor preencher a avaliação de cada etapa. A gravação vai para o fluxo do
@@ -67,7 +67,7 @@
     ['ATENCAO', '⚠️ Em atenção — acompanhar / plano de ação', '#b45309', 'rgba(180,83,9,.12)'],
     ['REPROVADO', '❌ Reprovado — não efetivar', '#b91c1c', 'rgba(185,28,28,.12)']
   ];
-  const ETAPAS = ['25', '50', '75'];   // 3 períodos até 75 dias (janela abre 7 dias antes do prazo)
+  const ETAPAS = ['30', '50', '75'];   // 3 períodos: 30, 50 e 75 dias (janela abre 7 dias antes do prazo)
 
   let COLABS = [], AVAL = {}, carregado = false;
   let DESLIG = [], ATIVOS_TEC = [], AREAS = [], SAIDA = {};
@@ -122,7 +122,9 @@
       const mapC = c => ({ nome: String(c.nome).trim(), mat: matNum(c.matricula), sup: String(c.supervisor || '').trim(), coord: String(c.coordenador || '').trim(),
         contrato: String(c.contrato || '').trim(), un: String(c.unidadeNegocio || '').trim(), cargo: String(c.descFuncao || c.areaTecnica || '').trim(),
         area: String(c.areaTecnica || ''), adm: String(c.dataAdmis || '').slice(0, 10), dem: String(c.dataDemissao || '').slice(0, 10) });
-      const ehTec = c => /tecnic|lid/.test(semAcento(c.areaTecnica));
+      // ALTERADO (09/11/2026): quem é desligado costuma sair da aba D x P e fica sem "Área Técnica" no Organograma;
+      // por isso também vale a função do cadastro (Desc.Funcao do SRA), ex.: "TECNICO DE MANUTENCAO".
+      const ehTec = c => /tecnic|lid/.test(semAcento(c.areaTecnica)) || /tecnic|lider/.test(semAcento(c.descFuncao));
       const porMat = {};
       cols.forEach(c => { if (c && c.matricula != null) porMat[matNum(c.matricula)] = c; });
       // 1) desligamentos do Turnover (dados.json → turnover): tipo, causa e "o que entra" do RH
