@@ -42,6 +42,7 @@
     'ca102ef8c6f2e6b9b176d67dcef66b789c0ab3c400f83a9ecdd8287947d723b1': 'c4b6cbb7ec1cf170e747e7c5f9af9d61c3ea0bedd7d6017abce8928bd0236724',   // anna.vieira
     '29ce113e461a42134b126707387ed6a7cd6f89aab0ad7e649a0b2294eb115014': '1842bf97abf3e646d4e4d48944ea40d9345f07d5d5f80f55f48174273a445e13',   // guilherme.rocha
     '225ee3c551cf4124ea4e064c20634e7c08ab21f6d7e907fbd9c9e85be6d73a4d': '11760f8ce5c532d3deb96b85571904d8a42c7aade83eef577bd93648a42222f1',   // ewerton.silva
+    'c2473941adddc037ac0b0ddcae8ca5f25c9360f47bc0e400d25ec3958fe3851f': '15c8c0a0259cff6f2550ce3b84209a0a2cbf5cbe6438b0466a22396dc16fa424',   // marcelo.remorino
   };
 
   const PAGINA = 'pagina-bancohoras';
