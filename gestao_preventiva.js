@@ -24,6 +24,12 @@
    ALTERADO (07/10/2026): a aba "Capacidade MOP Móvel" ganhou o filtro
    Executor (MOP / EPS / Todos), sempre com Equipe Responsável MÓVEL.
    Saíram o card "Necessário por Dia" e as barras de projeção do gráfico.
+
+   ALTERADO (10/11/2026): TUDO EM D-1. Em todas as abas, "executada" só conta
+   quando a Data Fim - Consolidado (r.d) é até ONTEM (no mês fechado: até o
+   último dia do mês). O que foi fechado hoje fica de fora até amanhã e aparece
+   só no texto de ajuda ("+ N fechadas hoje"). Executada sem Data Fim também
+   não entra (não dá para saber o dia).
    ========================================================================= */
 (function () {
   const ARQUIVO_JSON = 'dados_preventiva.json';
@@ -143,6 +149,11 @@
     if (refMes < mes) return mes + '-00';
     return iso(ontem);
   }
+
+  // NOVO (10/11/2026): executada até D-1 (Data Fim preenchida e até a data de referência)
+  const execAte = ref => r => r.st === 'Executada' && !!r.d && r.d <= ref;
+  // mesma regra, para o mês que está selecionado no filtro
+  const execD1 = r => execAte(dataReferencia(dados.mes))(r);
 
   function estilos() {
     if (document.getElementById('pv-estilos')) return;
@@ -297,18 +308,13 @@
 
     const planejado = regs.length;
     const planD1 = Math.round(planejado * duRef / duMes);
-    const realizado = regs.filter(r => r.st === 'Executada').length;   // cards contam tudo; só os gráficos filtram por data
-    // ALTERADO (28/10/2026): Realizado / Entrega D-1 / Aderência / Saldo contam o executado ATÉ ONTEM (D-1)
-    // + o que foi fechado hoje mas já estava aberto antes de hoje (início da WO até ontem = estava aberta de manhã).
-    // Só fica de fora o que abriu e fechou hoje — aparece à parte ("+ hoje")
-    // ALTERADO (31/10/2026): sem dia útil restante no mês (ex.: sábado 31/10), o D-1 não corta mais nada:
-    // entra tudo que está executado na base (Realizado = Planejado - Pendentes).
-    const fimDeMes = duRef >= duMes;
-    const entraD1 = r => fimDeMes || !r.d || r.d <= ref || (r.ini && String(r.ini).slice(0, 10) <= ref);
-    const realD1 = regs.filter(r => r.st === 'Executada' && entraD1(r)).length;
-    const realAntes = fimDeMes ? 0 : regs.filter(r => r.st === 'Executada' && r.d && r.d > ref && r.ini && String(r.ini).slice(0, 10) <= ref).length;
-    const realHoje = realizado - realD1;
-    const pendentes = planejado - realizado;
+    const realizado = regs.filter(r => r.st === 'Executada').length;   // tudo o que está executado na base agora
+    // ALTERADO (10/11/2026): TUDO EM D-1 — Realizado, Entrega, Aderência, Saldo e Pendentes contam só o que foi
+    // executado com Data Fim até ONTEM. O que fechou hoje (ou está sem Data Fim) entra só amanhã.
+    const realD1 = regs.filter(execAte(ref)).length;
+    const realHoje = regs.filter(r => r.st === 'Executada' && r.d && r.d > ref).length;
+    const realSemData = regs.filter(r => r.st === 'Executada' && !r.d).length;
+    const pendentes = planejado - realD1;
     const aberto = regs.filter(r => r.st === 'Aberta').length;
     // ALTERADO (07/10/2026): Aderência em D-1 — compara o realizado com a mesma
     // meta do card "Realizado / Meta D-1" (dias úteis até ontem).
@@ -329,7 +335,7 @@
         <div class="delta" style="color:${COR.muted}">${duMes} dias úteis no mês</div></div>
       <div class="kpi"><div class="label">✅ Realizado / Meta D-1</div>
         <div style="display:grid;grid-template-columns:auto auto auto;justify-content:start;column-gap:14px;align-items:baseline;">
-          <div class="value" title="Executadas até ontem (D-1)${realAntes ? ' + ' + fmt(realAntes) + ' fechadas hoje que já estavam abertas antes' : ''}${realHoje ? ' · + ' + fmt(realHoje) + ' abertas e fechadas hoje (ainda não entram)' : ''}"><span style="color:${COR.good}">${fmt(realD1)}</span></div>
+          <div class="value" title="Executadas até ontem (D-1)${realHoje ? ' · + ' + fmt(realHoje) + ' fechadas hoje (entram amanhã)' : ''}${realSemData ? ' · ' + fmt(realSemData) + ' executadas sem Data Fim (não entram)' : ''}"><span style="color:${COR.good}">${fmt(realD1)}</span></div>
           <div class="value"><span class="pv-sep">|</span></div>
           <div class="value">${fmt(planD1)}</div>
           <div class="delta" style="color:${COR.muted};white-space:nowrap;">Entrega D-1<br><b style="color:${corAder(ader)}">${pct(entrega)}</b></div>
@@ -344,10 +350,11 @@
         <div class="value"><span style="color:${corAder(ader)}">${pct(ader)}</span></div>
         <div class="delta" style="color:${corAder(ader)}">${ader >= META_ADER ? '▲ meta batida' : ader >= PATAMAR2_ADER ? '● 2º patamar (≥95%)' : '▼ abaixo de 95%'} · saldo ${(saldo > 0 ? '+' : '') + fmt(saldo)}</div>
         <div class="delta" style="color:${COR.muted}">Meta 100% · 2º patamar 95%</div></div>
-      <div class="kpi"><div class="label">⚠️ Pendentes</div>
+      <div class="kpi"><div class="label">⚠️ Pendentes (D-1)</div>
         <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
           <span style="color:${COR.bad}">${fmt(pendentes)}</span><span class="pv-sep">|</span>
-          <span style="font-size:15px;color:${COR.muted};font-weight:600;">Em aberto <span style="color:#1b2440">${fmt(aberto)}</span></span></div></div>`;
+          <span style="font-size:15px;color:${COR.muted};font-weight:600;">Em aberto <span style="color:#1b2440">${fmt(aberto)}</span></span></div>
+        ${realHoje ? `<div class="delta" style="color:${COR.muted}">inclui ${fmt(realHoje)} fechada(s) hoje — saem amanhã</div>` : ''}</div>`;
 
     grafico_(regs, dias, ref, duMes, planejado);
     graficoMensal_();
@@ -366,7 +373,7 @@
       acum += porDia[d.data] || 0;
       rot.push(String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5));
       plan.push(Math.round(planejado * du / duMes));
-      real.push(d.data <= ref || porDia[d.data] ? acum : null);
+      real.push(d.data <= ref ? acum : null);   // ALTERADO (10/11/2026): linha vai só até D-1
     });
 
     const temLabels = typeof ChartDataLabels !== 'undefined';
@@ -414,8 +421,10 @@
     Object.keys(todosMeses).forEach(k => {
       if (fixos.includes(k)) return;   // mês com número oficial fixo no HISTORICO_MENSAL
       const regsMes = todosMeses[k].registros;
+      // ALTERADO (10/11/2026): mês atual conta as executadas só até D-1
+      const refK = dataReferencia(k);
       serie.push({ mes: k, programadas: regsMes.length,
-        executadas: regsMes.filter(executadaEm(k)).length, atual: k === mesBase });
+        executadas: regsMes.filter(r => executadaEm(k)(r) && r.d <= refK).length, atual: k === mesBase });
     });
     serie.sort((a, b) => a.mes.localeCompare(b.mes));
     const rot = serie.map(h => ABREV[+h.mes.slice(5) - 1] + '/' + h.mes.slice(2, 4) + (h.atual ? '*' : ''));
@@ -567,8 +576,6 @@
     opcoesOp();
     const regs = filtrarOp();
     const planejado = regs.length;
-    const realizado = regs.filter(r => r.st === 'Executada').length;
-    const entrega = planejado ? realizado / planejado * 100 : 0;
     const totalRel = regs.filter(r => r.ex === 'EPS').length;
     const relEntregues = regs.filter(temRelatorio).length;
     const expurgo = regs.filter(r => r.xp).length;
@@ -596,9 +603,10 @@
     const restantes = duMes - duRef;
 
     const total = regs.length;
-    const exec = regs.filter(r => r.st === 'Executada');
+    // ALTERADO (10/11/2026): tudo em D-1 — só executadas com Data Fim até ontem
+    const exec = regs.filter(execAte(ref));
     const realizadas = exec.length;
-    const realD1 = exec.filter(r => r.d && r.d <= ref).length;
+    const realD1 = realizadas;
     const media = duRef ? realD1 / duRef : 0;
     const necessario = restantes > 0 ? Math.max(0, total - realD1) / restantes : 0;
     const capacidade = Math.round(realD1 + media * restantes);
@@ -647,7 +655,7 @@
           deficit = necessario - metaOriginal;
         }
       }
-      realDia.push(d.data <= ref || feito ? feito : null);
+      realDia.push(d.data <= ref ? feito : null);   // ALTERADO (10/11/2026): barras só até D-1
       metaDia.push(meta === null ? null : Math.round(meta * 100) / 100);
       deficitAnt.push(deficit);
       const corB = meta === null ? 'rgba(107,117,144,.55)' : feito >= meta - 0.005 ? 'rgba(5,150,105,.8)' : 'rgba(220,38,38,.75)';
@@ -707,7 +715,7 @@
       const k = r.x || 'Sem equipe';
       porEquipe[k] = porEquipe[k] || { feitas: 0, total: 0 };
       porEquipe[k].total++;
-      if (r.st === 'Executada') porEquipe[k].feitas++;
+      if (execAte(ref)(r)) porEquipe[k].feitas++;   // ALTERADO (10/11/2026): D-1
     });
     raiz.querySelector('#pv-op-equipes').innerHTML = Object.keys(porEquipe).sort().map(k => {
       const { feitas, total: tot } = porEquipe[k];
@@ -823,7 +831,7 @@
   }
 
   function tabelaOp(regs) {
-    const lista = regs.filter(r => (!diaOp || (r.st === 'Executada' && r.d === diaOp)) && (!buscaOp ||
+    const lista = regs.filter(r => (!diaOp || (execD1(r) && r.d === diaOp)) && (!buscaOp ||
       [r.w, r.si, r.s, r.ch, r.t, r.ti, r.x, r.m].some(v => String(v ?? '').toLowerCase().includes(buscaOp))))
       .sort((a, b) => String(a.w).localeCompare(String(b.w)));
     raiz.querySelector('#pv-op-qtd').textContent = fmt(lista.length);
@@ -906,14 +914,17 @@
     const regs = dados.registros.filter(r => semAcento(r.x) === 'movel' && (!capExec || r.ex === capExec));
     const rotuloExec = (capExec || 'MOP + EPS') + ' · Móvel';
     const dias = diasDoMes(dados.mes);
-    const hoje = iso(new Date());
+    // ALTERADO (10/11/2026): tudo em D-1 — executadas até ontem; os dias que restam são os depois de D-1
+    const refCap = dataReferencia(dados.mes);
+    // "hoje" = dia seguinte ao D-1 (mês atual: hoje; mês fechado: 1º do mês seguinte, sem dias restantes)
+    const hoje = /-00$/.test(refCap) ? refCap.slice(0, 7) + '-01' : (() => { const d = new Date(refCap + 'T12:00:00'); d.setDate(d.getDate() + 1); return iso(d); })();
     const duMes = dias.filter(d => d.util).length || 1;
     // dias úteis que ainda dá para trabalhar: de hoje (inclusive) até o fim do mês
     const diasRest = dias.filter(d => d.util && d.data >= hoje);
     const nRest = diasRest.length;
 
     const total = regs.length;
-    const executadas = regs.filter(r => r.st === 'Executada').length;
+    const executadas = regs.filter(execAte(refCap)).length;
     const pendentes = total - executadas;
 
     const equipes = EQUIPES_MOP_MOVEL.map(e => ({ ...e, media: MEDIA_POR_DIA[e.tipo] || 0 }));
@@ -937,7 +948,7 @@
     // Ex.: se no ritmo atual vou ficar devendo 150 em 17 dias úteis -> 8,8 WO/dia a mais
     // -> 8,8 ÷ 4 (média por equipe) = 2,2 -> 3 equipes a mais.
     const duDecorridos = dias.filter(d => d.util && d.data < hoje).length;
-    const realizadasAteOntem = regs.filter(r => r.st === 'Executada' && r.d && r.d.slice(0, 7) === dados.mes && r.d < hoje).length;
+    const realizadasAteOntem = regs.filter(r => execAte(refCap)(r) && r.d.slice(0, 7) === dados.mes).length;
     const mediaReal = duDecorridos > 0 ? realizadasAteOntem / duDecorridos : 0;
     const projecaoFim = Math.round(executadas + mediaReal * nRest);
     const devendo = Math.max(0, total - projecaoFim);
@@ -952,7 +963,7 @@
       <div class="kpi"><div class="label">✅ Executadas | Pendentes</div>
         <div class="value" style="display:flex;gap:10px;align-items:baseline;white-space:nowrap;">
           <span style="color:${COR.good}">${fmt(executadas)}</span><span class="pv-sep">|</span><span style="color:${COR.bad}">${fmt(pendentes)}</span></div>
-        <div class="delta" style="color:${COR.muted}">${pct(total ? executadas / total * 100 : 0)} executado</div></div>
+        <div class="delta" style="color:${COR.muted}">${pct(total ? executadas / total * 100 : 0)} executado até D-1</div></div>
       <div class="kpi"><div class="label">📅 Dias Úteis Restantes</div>
         <div class="value">${nRest}</div>
         <div class="delta" style="color:${COR.muted}">contando a partir de hoje</div></div>`;
@@ -1026,7 +1037,7 @@
     equipes.forEach((e, i) => { [e.t1, e.t2].filter(Boolean).forEach(n => { equipeDoTec[chave(n)] = i; }); });
     const realizadasEquipe = equipes.map(() => 0);
     regs.forEach(r => {
-      if (r.st !== 'Executada' || !r.tec) return;
+      if (!execAte(refCap)(r) || !r.tec) return;   // ALTERADO (10/11/2026): D-1
       const i = equipeDoTec[chave(r.tec)];
       if (i !== undefined) realizadasEquipe[i]++;
     });
