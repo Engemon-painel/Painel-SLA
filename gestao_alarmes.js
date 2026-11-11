@@ -26,7 +26,7 @@
   const ORDEM_RES = ['piorou','melhorou','igual','sem','aguardando'];
 
   let PREV = [], VIS = [], INC = [], AFAZ = [], baseAte = '', fonteInc = '', erro = '';
-  const filtro = { base: 'todas', janela: 7, mes: '', tipo: '', area: '', res: '', q: '' };
+  const filtro = { cat: '', base: 'todas', janela: 7, mes: '', tipo: '', area: '', res: '', q: '' };
   let chartTipo = null, linhasAtuais = [];
 
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -34,6 +34,7 @@
   const dataBr = iso => { if(!iso) return ''; const p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
   const diaNum = iso => { const p = String(iso).split('-'); return Date.UTC(+p[0], +p[1]-1, +p[2]) / 86400000; };
   const MES_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const catDe = x => (x.c1 || x.c2) ? [x.c1, x.c2].filter(Boolean).join(' / ') : 'Sem categoria';
   const rotMes = m => { const p = m.split('-'); return MES_PT[+p[1]-1] + '/' + p[0].slice(2); };
   const horaDe = v => { const m = /(\d{1,2}):(\d{2})/.exec(String(v || '')); return m ? m[1].padStart(2,'0') + ':' + m[2] : ''; };
   function isoDe(v){
@@ -96,6 +97,12 @@
       </div>
 
       <div class="panel">
+        <h2>Quedas depois da preventiva — por categoria</h2>
+        <div class="hint">GENERIC_CATEGORIZATION_TIER_1 / TIER_2 das quedas que o site teve <b>depois</b> da preventiva (janela escolhida). Clique numa linha para ver os sites na tabela; clique de novo para limpar.</div>
+        <div id="alCatWrap" style="max-height:300px; overflow:auto;"></div>
+      </div>
+
+      <div class="panel">
         <h2>Sites com preventiva</h2>
         <div class="al-filtros">
           <div class="search" title="Site, WO, município, equipe ou técnico">
@@ -111,6 +118,7 @@
               <th title="Data em que a preventiva foi feita (Data Fim – Consolidado da base de preventiva)">Preventiva feita em</th><th>Site</th><th>Preventivas no dia</th>
               <th class="num" style="background:#fde8e8;" title="① Indisponibilidade (base do ESER) no dia da preventiva">① Indisp.<br>no dia</th><th class="num" style="background:#fde8e8;" id="alThIApos" title="① Indisponibilidade (base do ESER) depois da preventiva">① Indisp.<br>depois</th>
               <th class="num" id="alThAntes">② Antes</th><th class="num">② No dia</th><th class="num" id="alThApos">② Depois</th><th>Resultado</th>
+              <th title="GENERIC_CATEGORIZATION_TIER_2 das quedas depois da preventiva">Quedas depois — categoria</th>
               <th class="num" style="background:#e8eefc;" title="AFAZ aberto no site no dia ou depois da preventiva (dentro da janela)">AFAZ aberto<br>no dia/depois</th><th class="num" style="background:#e8eefc;" title="AFAZ que já estava aberto no site antes da preventiva e continua pendente">AFAZ pendente<br>antes</th>
               <th>Município</th><th>Área</th><th>Equipe / Técnico</th><th>WO</th>
             </tr></thead>
@@ -199,7 +207,7 @@
       const eserPorInc = {}; lista.forEach(x => { if(x && x.incidente) eserPorInc[x.incidente] = x.eser4h || ''; });
       if(Array.isArray(dSla.quedasSite) && dSla.quedasSite.length){
         fonteInc = 'todas';
-        INC = dSla.quedasSite.map(x => ({ site:normSite(x.s), data:isoDe(x.d), hora:horaDe(x.d), inc:x.i || '', t:x.t === 'I' ? 'I' : 'O', eser:eserPorInc[x.i] || '' }));
+        INC = dSla.quedasSite.map(x => ({ site:normSite(x.s), data:isoDe(x.d), hora:horaDe(x.d), inc:x.i || '', t:x.t === 'I' ? 'I' : 'O', eser:eserPorInc[x.i] || '', c1:x.c1 || '', c2:x.c2 || '' }));
       }else if(comData.length){
         fonteInc = 'indisp';
         INC = comData.map(x => ({ site:normSite(x.site), data:isoDe(x.data), hora:horaDe(x.data), inc:x.incidente || '', t:'I', eser:x.eser4h || '' }));
@@ -340,6 +348,7 @@
 
     desenharGrafico(semRes);
     desenharPiores(semRes);
+    desenharCategorias(semRes);
     renderTabela();
   }
 
@@ -388,18 +397,44 @@
     }));
   }
 
+  function desenharCategorias(lista){
+    const w = document.getElementById('alCatWrap'); if(!w) return;
+    const g = {};
+    lista.forEach(l => l.depois.forEach(x => {
+      const k = catDe(x);
+      const c = g[k] = g[k] || { k, c1:x.c1 || '—', c2:x.c2 || '—', quedas:0, sites:new Set(), indisp:0, outros:0 };
+      c.quedas++; c.sites.add(normSite(l.site)); if(x.t === 'I') c.indisp++; else c.outros++;
+    }));
+    const tot = Object.values(g).reduce((a, c) => a + c.quedas, 0);
+    const ls = Object.values(g).sort((a,b) => b.quedas - a.quedas);
+    if(!ls.length){ w.innerHTML = '<div class="hint" style="padding:12px;">Nenhuma queda depois da preventiva no filtro atual.</div>'; return; }
+    w.innerHTML = `<table style="width:100%;"><thead><tr><th>Tier 1</th><th>Tier 2</th><th class="num">Quedas depois</th><th class="num">%</th><th class="num">Indisp.</th><th class="num">Outros</th><th class="num">Sites</th></tr></thead><tbody>` +
+      ls.map(c => `<tr style="cursor:pointer;${filtro.cat === c.k ? ' background:rgba(14,124,134,.12);' : ''}" data-cat="${esc(c.k)}"><td>${esc(c.c1)}</td><td><b>${esc(c.c2)}</b></td>
+        <td class="num" style="font-weight:700;">${c.quedas}</td><td class="num">${Math.round(c.quedas / tot * 100)}%</td>
+        <td class="num">${c.indisp}</td><td class="num">${c.outros}</td><td class="num">${c.sites.size}</td></tr>`).join('') + '</tbody></table>';
+    w.querySelectorAll('tr[data-cat]').forEach(tr => tr.addEventListener('click', () => {
+      filtro.cat = filtro.cat === tr.dataset.cat ? '' : tr.dataset.cat;
+      desenharCategorias(lista); renderTabela();
+      if(filtro.cat) document.getElementById('alTable').scrollIntoView({ behavior:'smooth', block:'start' });
+    }));
+  }
+
   function linhasTabela(){
     const q = filtro.q;
-    return linhasAtuais.filter(l => !q || [l.site, l.siteId, l.wo, l.mun, l.equipe, l.tec].some(v => String(v || '').toLowerCase().indexOf(q) !== -1))
+    return linhasAtuais.filter(l => !filtro.cat || l.depois.some(x => catDe(x) === filtro.cat)).filter(l => !q || [l.site, l.siteId, l.wo, l.mun, l.equipe, l.tec].some(v => String(v || '').toLowerCase().indexOf(q) !== -1))
       .sort((a,b) => ORDEM_RES.indexOf(a.res) - ORDEM_RES.indexOf(b.res) || (b.depois.length - b.antes.length) - (a.depois.length - a.antes.length) || b.data.localeCompare(a.data));
   }
 
   function renderTabela(){
     const tb = document.getElementById('alTbody'); if(!tb) return;
     const ls = linhasTabela();
-    document.getElementById('alContagem').textContent = ls.length + ' site(s) / dia(s) de preventiva';
+    document.getElementById('alContagem').textContent = ls.length + ' site(s) / dia(s) de preventiva' + (filtro.cat ? ' · queda depois: ' + filtro.cat : '');
     document.getElementById('alVazio').style.display = ls.length ? 'none' : '';
-    const lista = arr => arr.map(x => dataBr(x.data) + (x.hora ? ' ' + x.hora : '') + ' · ' + x.inc + (x.t === 'O' ? ' (Outros)' : ' (Indisp.' + (x.eser ? ' · ' + x.eser : '') + ')')).join('\n');
+    const lista = arr => arr.map(x => dataBr(x.data) + (x.hora ? ' ' + x.hora : '') + ' · ' + x.inc + (x.t === 'O' ? ' (Outros)' : ' (Indisp.' + (x.eser ? ' · ' + x.eser : '') + ')') + ((x.c1 || x.c2) ? ' · ' + catDe(x) : '')).join('\n');
+    const resumoCat = (arr, completo) => {
+      const c = {}; arr.forEach(x => { const k = completo ? catDe(x) : (x.c2 || x.c1 || 'Sem categoria'); c[k] = (c[k] || 0) + 1; });
+      return Object.keys(c).sort((a,b) => c[b] - c[a]).map(k => k + (c[k] > 1 ? ' ×' + c[k] : '')).join(completo ? '\n' : ' · ');
+    };
     const listaAfaz = arr => arr.map(a => 'AFAZ ' + a.id + ' · aberto ' + dataBr(a.data) + ' · ' + a.pr + ' · ' + a.st + ' · ' + a.ti).join('\n');
     const cel = (arr, cor, extra) => `<td class="n" title="${esc(lista(arr))}" style="color:${arr.length ? cor : 'var(--muted)'};">${arr.length}${extra || ''}</td>`;
     tb.innerHTML = ls.slice(0, 1500).map(l => {
@@ -411,20 +446,21 @@
         ${cel(l.iDia, '#dc2626', l.iDia.length ? ' ⚡' : '')}${cel(l.iDepois, '#dc2626')}
         ${cel(l.antes, 'var(--text)', TODOS() ? `<span style="font-size:10px; color:var(--muted); font-weight:400;"> /${l.diasAntes}d</span>` : '')}${cel(l.dia, '#d97706')}${cel(l.depois, l.res === 'piorou' ? '#dc2626' : 'var(--text)', obs)}
         <td><span class="pill-al" style="background:${r.bg}; color:${r.cor};">${r.icone} ${r.label}</span></td>
+        <td style="font-size:12px; white-space:normal; min-width:180px;" title="${esc(resumoCat(l.depois, true))}">${esc(resumoCat(l.depois))}</td>
         <td class="n" title="${esc(listaAfaz(l.afazDepois))}" style="color:${l.afazDepois.length ? '#2563eb' : 'var(--muted)'};">${l.afazDepois.length}${l.afazDepois.length ? ' 📝' : ''}</td>
         <td class="n" title="${esc(listaAfaz(l.afazAntes))}" style="color:${l.afazAntes.length ? 'var(--text)' : 'var(--muted)'};">${l.afazAntes.length}</td>
         <td>${esc(l.mun)}</td><td>${esc(l.area)}</td><td>${esc(l.tec || l.equipe)}</td><td class="mono" style="font-size:11px;" title="${esc(l.wo)}">${esc(l.wos.length > 1 ? l.wos.length + ' WOs' : l.wo)}</td>
       </tr>`;
-    }).join('') + (ls.length > 1500 ? `<tr><td colspan="15" class="hint">Mostrando 1500 de ${ls.length}. Use os filtros ou exporte o CSV.</td></tr>` : '');
+    }).join('') + (ls.length > 1500 ? `<tr><td colspan="16" class="hint">Mostrando 1500 de ${ls.length}. Use os filtros ou exporte o CSV.</td></tr>` : '');
   }
 
   function exportarCsv(){
     const N = rotJ();
-    const cab = ['Preventiva feita em','Site','Site ID','Municipio','Preventivas no dia','Area','Equipe','Tecnico','WOs','Indisp. no dia',`Indisp. depois (${N})`,`Quedas antes (${N})`,'Quedas no dia',`Quedas depois (${N})`,'Dias antes considerados','Dias depois na base','Resultado','AFAZ aberto no dia/depois','AFAZ pendente antes','Incidentes antes','Incidentes no dia','Incidentes depois'];
+    const cab = ['Preventiva feita em','Site','Site ID','Municipio','Preventivas no dia','Area','Equipe','Tecnico','WOs','Indisp. no dia',`Indisp. depois (${N})`,`Quedas antes (${N})`,'Quedas no dia',`Quedas depois (${N})`,'Dias antes considerados','Dias depois na base','Resultado','Categoria das quedas depois','AFAZ aberto no dia/depois','AFAZ pendente antes','Incidentes antes','Incidentes no dia','Incidentes depois'];
     const q = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
-    const inc = arr => arr.map(x => dataBr(x.data) + (x.hora ? ' ' + x.hora : '') + ' ' + x.inc + (x.t === 'O' ? ' (Outros)' : '')).join(' | ');
+    const inc = arr => arr.map(x => dataBr(x.data) + (x.hora ? ' ' + x.hora : '') + ' ' + x.inc + (x.t === 'O' ? ' (Outros)' : '') + ((x.c1 || x.c2) ? ' ' + catDe(x) : '')).join(' | ');
     const linhas = linhasTabela().map(l => [dataBr(l.data), l.site, l.siteId, l.mun, l.tipo, l.area, l.equipe, l.tec, l.wo,
-      l.iDia.length, l.iDepois.length, l.antes.length, l.dia.length, l.depois.length, l.diasAntes, l.diasDepois, RES[l.res].label, l.afazDepois.map(a => a.id + ' (' + dataBr(a.data) + ' ' + a.st + ')').join(' | '), l.afazAntes.map(a => a.id + ' (' + dataBr(a.data) + ')').join(' | '), inc(l.antes), inc(l.dia), inc(l.depois)].map(q).join(';'));
+      l.iDia.length, l.iDepois.length, l.antes.length, l.dia.length, l.depois.length, l.diasAntes, l.diasDepois, RES[l.res].label, (() => { const c = {}; l.depois.forEach(x => { const k = catDe(x); c[k] = (c[k] || 0) + 1; }); return Object.keys(c).map(k => k + ' x' + c[k]).join(' | '); })(), l.afazDepois.map(a => a.id + ' (' + dataBr(a.data) + ' ' + a.st + ')').join(' | '), l.afazAntes.map(a => a.id + ' (' + dataBr(a.data) + ')').join(' | '), inc(l.antes), inc(l.dia), inc(l.depois)].map(q).join(';'));
     const blob = new Blob(['﻿' + cab.map(q).join(';') + '\n' + linhas.join('\n')], { type:'text/csv;charset=utf-8' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'acompanhamento_alarmes_por_site.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
