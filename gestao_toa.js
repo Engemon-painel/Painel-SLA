@@ -109,8 +109,26 @@
     if(!base) return [];
     const partes = base.split(' ').filter(x => PALAVRAS_IGNORADAS.indexOf(x) === -1);
     const out = [base];
-    if(partes.length >= 2) out.push(partes[0] + ' ' + partes[partes.length - 1]);
+    if(partes.length >= 2){
+      const curta = partes[0] + ' ' + partes[partes.length - 1];
+      // ALTERADO (11/11/2026): "primeiro + último nome" só vale se for de UM técnico do Organograma.
+      // Ex.: RODRIGO DE LIMA SILVA e RODRIGO GUIMARAES DA SILVA viram os dois "rodrigo silva" →
+      // não usa a chave curta, senão um aparece como logado pelo outro.
+      if(!CURTAS_AMBIGUAS.has(curta)) out.push(curta);
+    }
     return out;
+  }
+  let CURTAS_AMBIGUAS = new Set();
+  function montarCurtasAmbiguas(lista){
+    const cont = {};
+    lista.forEach(c => {
+      const base = semAcento(String(c && c.nome || '').replace(/\(.*?\)/g, ' ')).replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+      const p = base.split(' ').filter(x => x && PALAVRAS_IGNORADAS.indexOf(x) === -1);
+      if(p.length < 2) return;
+      const k = p[0] + ' ' + p[p.length - 1];
+      (cont[k] = cont[k] || new Set()).add(base);
+    });
+    CURTAS_AMBIGUAS = new Set(Object.keys(cont).filter(k => cont[k].size > 1));
   }
   // Presença TOA: o console do TOA traz o nome completo e o Organograma às vezes corta o nome
   // (30 letras) ou tem sobrenome a menos. Se um nome começa com o outro (e só existe 1 candidato),
@@ -465,11 +483,14 @@
   }
   // Escala padrão por supervisor, para equipes que não estão na Gestão de Escala nem têm Escala/Horário no Organograma
   const ESCALA_PADRAO_SUP = {
-    'cleiton de souza cardoso': { escala: '5X2', horario: '08:00–18:00' }
+    'cleiton de souza cardoso': { escala: '5X2', horario: '08:00–18:00' },
+    'marcelo carrano remorino': { escala: '5X2 seg a sex', horario: '08:00–18:00', forcar: true }   // NOVO (11/11/2026): vale mesmo se o Organograma tiver outra
   };
+  // NOVO (11/11/2026): supervisores que não entram no painel TOA
+  const SUPERVISORES_FORA_TOA = ['alexandre catanho'];
   function infoEscala(c, dia){
     const pad = ESCALA_PADRAO_SUP[semAcento(c.supervisor)];
-    if(pad) c = Object.assign({}, c, { escala: c.escala || pad.escala, horario: c.horario || pad.horario });
+    if(pad) c = Object.assign({}, c, pad.forcar ? { escala: pad.escala, horario: pad.horario } : { escala: c.escala || pad.escala, horario: c.horario || pad.horario });
     const tec = escalaDoTecnico(c.nome);
     const cod = tec ? codigoEscala(tec, dia) : '';
     let escalado = false, fonte = '';
@@ -617,8 +638,11 @@
       .then(d => pegarPresenca.then(pr => { d.__presExtra = listaPresenca(pr); d.__presInfo = infoPresenca(pr); return d; }))
       .then(d => {
         const todosColabs = Array.isArray(d.colaboradores) ? d.colaboradores : [];
+        // ALTERADO (11/11/2026): equipe do supervisor Alexandre Catanho fora do painel TOA
         const excluido = c => CONTRATOS_EXCLUIDOS.some(x =>
-          semAcento(c.contrato).includes(x) || semAcento(c.unidadeNegocio).includes(x));
+          semAcento(c.contrato).includes(x) || semAcento(c.unidadeNegocio).includes(x)) ||
+          SUPERVISORES_FORA_TOA.some(x => semAcento(c.supervisor).includes(x));
+        montarCurtasAmbiguas(todosColabs);
         // Organograma sem Cirion (equipes, supervisores e aderência)
         COLABS = todosColabs.filter(c => !excluido(c));
         // TOA sem os técnicos que são da Cirion no Organograma
