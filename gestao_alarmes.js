@@ -69,7 +69,7 @@
         <label class="al-lbl" for="alBase">Comparar com</label>
         <select id="alBase"><option value="todas">Indisponibilidade + Outros</option><option value="I">Só Indisponibilidade (ESER)</option></select>
         <label class="al-lbl" for="alJanela" style="margin-left:8px;">Janela</label>
-        <select id="alJanela"><option value="7">7 dias antes x 7 depois</option><option value="15">15 dias antes x 15 depois</option><option value="30">30 dias antes x 30 depois</option></select>
+        <select id="alJanela"><option value="7">7 dias antes x 7 depois</option><option value="15">15 dias antes x 15 depois</option><option value="30">30 dias antes x 30 depois</option><option value="0">Todos (todo o período antes x depois)</option></select>
         <label class="al-lbl" for="alMes" style="margin-left:8px;">Mês da preventiva</label>
         <select id="alMes" style="min-width:110px;"></select>
         <label class="al-lbl" for="alTipo" style="margin-left:8px;">Teve preventiva de</label>
@@ -90,7 +90,7 @@
         </div>
         <div class="panel">
           <h2>Sites que mais pioraram</h2>
-          <div class="hint">Diferença de quedas (depois − antes), somando as preventivas do site.</div>
+          <div class="hint"><b>Quedas antes</b> = quedas no site antes da preventiva · <b>Quedas depois</b> = depois da preventiva · <b>Aumento</b> = depois − antes. Clique no site para ver na tabela.</div>
           <div id="alPioresWrap" style="max-height:290px; overflow:auto;"></div>
         </div>
       </div>
@@ -230,9 +230,12 @@
   }
 
   // ---------------------------------------------------------------- cálculo
+  const TODOS = () => !filtro.janela;
+  const rotJ = () => TODOS() ? 'todo período' : filtro.janela + 'd';
   function calcular(){
-    const N = filtro.janela;
+    const N = TODOS() ? 1e9 : filtro.janela;
     const porSite = {};
+    const inicioBase = INC.length ? INC.reduce((m, x) => { const d = diaNum(x.data); return d < m ? d : m; }, Infinity) : null;
     INC.forEach(x => { (porSite[x.site] = porSite[x.site] || []).push(x); });
     const limite = baseAte ? diaNum(baseAte) : null;
     const naBase = x => filtro.base === 'todas' || x.t === 'I';
@@ -251,7 +254,8 @@
         else if(dif > 0 && dif <= N) depois.push(x);
       });
       const diasDepois = limite === null ? N : Math.max(0, Math.min(N, limite - dp));
-      const tAntes = antes.length / N;
+      const diasAntes = TODOS() ? Math.max(1, inicioBase === null ? 1 : dp - inicioBase) : N;
+      const tAntes = antes.length / diasAntes;
       const tDepois = diasDepois > 0 ? depois.length / diasDepois : 0;
       let res;
       if(diasDepois === 0) res = 'aguardando';
@@ -259,7 +263,7 @@
       else if(tDepois > tAntes + 1e-9) res = 'piorou';
       else if(tDepois < tAntes - 1e-9) res = 'melhorou';
       else res = 'igual';
-      return Object.assign({}, p, { antes, dia, depois, iDia, iDepois, diasDepois, res });
+      return Object.assign({}, p, { antes, dia, depois, iDia, iDepois, diasAntes, diasDepois, res });
     });
   }
 
@@ -278,8 +282,7 @@
     if(!info) return;
     if(erro){ info.textContent = 'Não foi possível carregar: ' + erro; return; }
     if(!PREV.length && !INC.length){ info.textContent = 'Carregando...'; return; }
-    const N = filtro.janela;
-    info.textContent = `${VIS.length} sites com preventiva (${PREV.length} preventivas executadas) · ${INC.length} quedas na base (${INC.filter(x => x.t === 'I').length} indisponibilidade, ${INC.filter(x => x.t === 'O').length} outros) · base de incidentes até ${dataBr(baseAte)} · janela de ${N} dias`;
+    info.textContent = `${VIS.length} sites com preventiva (${PREV.length} preventivas executadas) · ${INC.length} quedas na base (${INC.filter(x => x.t === 'I').length} indisponibilidade, ${INC.filter(x => x.t === 'O').length} outros) · base de incidentes até ${dataBr(baseAte)} · janela: ${TODOS() ? 'todo o período' : filtro.janela + ' dias'}`;
     if(fonteInc === 'indisp'){
       aviso.style.display = '';
       aviso.style.background = 'rgba(37,99,235,.10)'; aviso.style.color = '#1e3a8a';
@@ -289,9 +292,9 @@
       aviso.style.background = 'rgba(217,119,6,.12)'; aviso.style.color = '#92400e';
       aviso.innerHTML = '⚠ <b>Parcial:</b> o dados.json ainda não traz o dia de cada incidente, então aqui entram só os incidentes <b>fora do prazo</b> (FCA). Atualize o Office Script do painel (versão de 11/11) e rode o fluxo para usar a base completa de incidentes medidos no ESER.';
     }else aviso.style.display = 'none';
-    document.getElementById('alThAntes').textContent = `② Antes (${N}d)`;
-    document.getElementById('alThApos').textContent = `② Depois (${N}d)`;
-    document.getElementById('alThIApos').innerHTML = `① Indisp.<br>depois (${N}d)`;
+    document.getElementById('alThAntes').textContent = `② Antes (${rotJ()})`;
+    document.getElementById('alThApos').textContent = `② Depois (${rotJ()})`;
+    document.getElementById('alThIApos').innerHTML = `① Indisp.<br>depois (${rotJ()})`;
 
     const todas = calcular();
     const semRes = filtradas(todas, true);
@@ -346,14 +349,21 @@
   function desenharPiores(lista){
     const porSite = {};
     lista.filter(l => l.res === 'piorou').forEach(l => {
-      const s = porSite[l.site] = porSite[l.site] || { site:l.site, mun:l.mun, prev:0, antes:0, depois:0, tipos:new Set() };
-      s.prev++; s.antes += l.antes.length; s.depois += l.depois.length; l.tipos.forEach(t => s.tipos.add(t));
+      const s = porSite[l.site] = porSite[l.site] || { site:l.site, mun:l.mun, prev:0, antes:0, depois:0, tipos:new Set(), datas:[] };
+      // site com mais de uma preventiva: mostra a visita que mais piorou (sem somar, para não contar a mesma queda duas vezes)
+      s.prev++; l.tipos.forEach(t => s.tipos.add(t)); s.datas.push(l.data);
+      if(s.prev === 1 || (l.depois.length - l.antes.length) > (s.depois - s.antes)){ s.antes = l.antes.length; s.depois = l.depois.length; }
     });
     const top = Object.values(porSite).sort((a,b) => (b.depois - b.antes) - (a.depois - a.antes) || b.depois - a.depois).slice(0, 15);
     const w = document.getElementById('alPioresWrap');
     if(!top.length){ w.innerHTML = '<div class="hint" style="padding:12px;">Nenhum site piorou no filtro atual. 🎉</div>'; return; }
-    w.innerHTML = `<table style="width:100%;"><thead><tr><th>Site</th><th>Município</th><th>Tipo</th><th class="num">Antes</th><th class="num">Depois</th><th class="num">+</th></tr></thead><tbody>` +
-      top.map(s => `<tr style="cursor:pointer;" data-site="${esc(s.site)}"><td><b>${esc(s.site)}</b></td><td>${esc(s.mun)}</td><td>${esc(Array.from(s.tipos).join(', '))}</td>
+    const dm = iso => iso.slice(8,10) + '/' + iso.slice(5,7);
+    w.innerHTML = `<table style="width:100%;"><thead><tr><th>Site</th><th>Preventiva em</th><th>Tipo</th>
+        <th class="num" title="Quedas no site ANTES da preventiva (${rotJ()})">Quedas antes</th>
+        <th class="num" title="Quedas no site DEPOIS da preventiva (${rotJ()})">Quedas depois</th>
+        <th class="num" title="Quantas quedas a mais depois da preventiva (depois − antes)">Aumento</th></tr></thead><tbody>` +
+      top.map(s => `<tr style="cursor:pointer;" data-site="${esc(s.site)}" title="${esc(s.mun)}"><td><b>${esc(s.site)}</b></td>
+        <td class="mono" style="font-size:12px;">${s.datas.sort().map(dm).join(', ')}</td><td>${esc(Array.from(s.tipos).join(', '))}</td>
         <td class="num">${s.antes}</td><td class="num" style="color:#dc2626; font-weight:700;">${s.depois}</td><td class="num" style="color:#dc2626;">+${s.depois - s.antes}</td></tr>`).join('') +
       '</tbody></table>';
     w.querySelectorAll('tr[data-site]').forEach(tr => tr.addEventListener('click', () => {
@@ -377,12 +387,12 @@
     const cel = (arr, cor, extra) => `<td class="n" title="${esc(lista(arr))}" style="color:${arr.length ? cor : 'var(--muted)'};">${arr.length}${extra || ''}</td>`;
     tb.innerHTML = ls.slice(0, 1500).map(l => {
       const r = RES[l.res];
-      const obs = l.res !== 'aguardando' && l.diasDepois < filtro.janela ? `<span style="font-size:10px; color:var(--muted); font-weight:400;"> /${l.diasDepois}d</span>` : '';
+      const obs = l.res !== 'aguardando' && (TODOS() || l.diasDepois < filtro.janela) ? `<span style="font-size:10px; color:var(--muted); font-weight:400;"> /${l.diasDepois}d</span>` : '';
       return `<tr>
         <td>${dataBr(l.data)}</td><td><b>${esc(l.site)}</b>${l.siteId && l.siteId !== l.site ? `<span style="font-size:11px; color:var(--muted);"> ${esc(l.siteId)}</span>` : ''}</td>
         <td>${esc(l.tipo)}</td>
         ${cel(l.iDia, '#dc2626', l.iDia.length ? ' ⚡' : '')}${cel(l.iDepois, '#dc2626')}
-        ${cel(l.antes, 'var(--text)')}${cel(l.dia, '#d97706')}${cel(l.depois, l.res === 'piorou' ? '#dc2626' : 'var(--text)', obs)}
+        ${cel(l.antes, 'var(--text)', TODOS() ? `<span style="font-size:10px; color:var(--muted); font-weight:400;"> /${l.diasAntes}d</span>` : '')}${cel(l.dia, '#d97706')}${cel(l.depois, l.res === 'piorou' ? '#dc2626' : 'var(--text)', obs)}
         <td><span class="pill-al" style="background:${r.bg}; color:${r.cor};">${r.icone} ${r.label}</span></td>
         <td>${esc(l.mun)}</td><td>${esc(l.area)}</td><td>${esc(l.tec || l.equipe)}</td><td class="mono" style="font-size:11px;" title="${esc(l.wo)}">${esc(l.wos.length > 1 ? l.wos.length + ' WOs' : l.wo)}</td>
       </tr>`;
@@ -390,12 +400,12 @@
   }
 
   function exportarCsv(){
-    const N = filtro.janela;
-    const cab = ['Data preventiva','Site','Site ID','Municipio','Preventivas no dia','Area','Equipe','Tecnico','WOs','Indisp. no dia',`Indisp. depois (${N}d)`,`Quedas antes (${N}d)`,'Quedas no dia',`Quedas depois (${N}d)`,'Dias depois na base','Resultado','Incidentes antes','Incidentes no dia','Incidentes depois'];
+    const N = rotJ();
+    const cab = ['Data preventiva','Site','Site ID','Municipio','Preventivas no dia','Area','Equipe','Tecnico','WOs','Indisp. no dia',`Indisp. depois (${N})`,`Quedas antes (${N})`,'Quedas no dia',`Quedas depois (${N})`,'Dias antes considerados','Dias depois na base','Resultado','Incidentes antes','Incidentes no dia','Incidentes depois'];
     const q = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
     const inc = arr => arr.map(x => dataBr(x.data) + (x.hora ? ' ' + x.hora : '') + ' ' + x.inc + (x.t === 'O' ? ' (Outros)' : '')).join(' | ');
     const linhas = linhasTabela().map(l => [dataBr(l.data), l.site, l.siteId, l.mun, l.tipo, l.area, l.equipe, l.tec, l.wo,
-      l.iDia.length, l.iDepois.length, l.antes.length, l.dia.length, l.depois.length, l.diasDepois, RES[l.res].label, inc(l.antes), inc(l.dia), inc(l.depois)].map(q).join(';'));
+      l.iDia.length, l.iDepois.length, l.antes.length, l.dia.length, l.depois.length, l.diasAntes, l.diasDepois, RES[l.res].label, inc(l.antes), inc(l.dia), inc(l.depois)].map(q).join(';'));
     const blob = new Blob(['﻿' + cab.map(q).join(';') + '\n' + linhas.join('\n')], { type:'text/csv;charset=utf-8' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'acompanhamento_alarmes_por_site.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
