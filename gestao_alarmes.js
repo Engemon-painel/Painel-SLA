@@ -25,7 +25,7 @@
   };
   const ORDEM_RES = ['piorou','melhorou','igual','sem','aguardando'];
 
-  let PREV = [], VIS = [], INC = [], baseAte = '', fonteInc = '', erro = '';
+  let PREV = [], VIS = [], INC = [], AFAZ = [], baseAte = '', fonteInc = '', erro = '';
   const filtro = { base: 'todas', janela: 7, mes: '', tipo: '', area: '', res: '', q: '' };
   let chartTipo = null, linhasAtuais = [];
 
@@ -108,9 +108,10 @@
         <div style="overflow:auto; max-height:70vh; border-radius:8px;">
           <table id="alTable">
             <thead><tr>
-              <th>Data da preventiva</th><th>Site</th><th>Preventivas no dia</th>
+              <th title="Data em que a preventiva foi feita (Data Fim – Consolidado da base de preventiva)">Preventiva feita em</th><th>Site</th><th>Preventivas no dia</th>
               <th class="num" style="background:#fde8e8;" title="① Indisponibilidade (base do ESER) no dia da preventiva">① Indisp.<br>no dia</th><th class="num" style="background:#fde8e8;" id="alThIApos" title="① Indisponibilidade (base do ESER) depois da preventiva">① Indisp.<br>depois</th>
               <th class="num" id="alThAntes">② Antes</th><th class="num">② No dia</th><th class="num" id="alThApos">② Depois</th><th>Resultado</th>
+              <th class="num" style="background:#e8eefc;" title="AFAZ aberto no site no dia ou depois da preventiva (dentro da janela)">AFAZ aberto<br>no dia/depois</th><th class="num" style="background:#e8eefc;" title="AFAZ que já estava aberto no site antes da preventiva e continua pendente">AFAZ pendente<br>antes</th>
               <th>Município</th><th>Área</th><th>Equipe / Técnico</th><th>WO</th>
             </tr></thead>
             <tbody id="alTbody"></tbody>
@@ -161,6 +162,12 @@
         fetch('dados_preventiva.json?v=' + Date.now(), { cache:'no-store' }).then(r => { if(!r.ok) throw new Error('dados_preventiva.json ' + r.status); return r.json(); }),
         fetch('dados.json?v=' + Date.now(), { cache:'no-store' }).then(r => { if(!r.ok) throw new Error('dados.json ' + r.status); return r.json(); })
       ]);
+      // AFAZ (dados_afaz.json → itens = AFAZ que ainda estão em aberto)
+      try{
+        const dAf = await fetch('dados_afaz.json?v=' + Date.now(), { cache:'no-store' }).then(r => r.ok ? r.json() : null);
+        AFAZ = ((dAf && dAf.itens) || []).filter(a => a && a.s && a.ab).map(a => ({
+          site:normSite(a.s), data:isoDe(a.ab), id:a.id, pr:a.pr || '', st:a.st || '', ti:a.ti || '', ar:a.ar || '', resp:a.resp || '' }));
+      }catch(e){ AFAZ = []; console.warn('[Alarmes] dados_afaz.json', e); }
       // preventivas: mês atual + meses guardados (sem repetir WO)
       const vistos = new Set(); PREV = [];
       const add = lista => (lista || []).forEach(r => {
@@ -168,7 +175,7 @@
         const d = isoDe(r.d); if(!d) return;
         const k = (r.w || '') + '|' + d + '|' + (r.s || '');
         if(vistos.has(k)) return; vistos.add(k);
-        PREV.push({ wo:r.w || '', site:r.s || '', siteId:r.si || '', mun:r.m || '', tipo:r.t || '', area:r.x || '', equipe:r.e || '', tec:r.tec || '', data:d });
+        PREV.push({ wo:r.w || '', site:r.s || '', siteId:r.si || '', mun:r.m || '', tipo:r.t || '', area:r.x || '', equipe:r.e || '', tec:r.tec || '', data:d, ini:isoDe(r.ini) });
       });
       add(dPrev.registros);
       (dPrev.meses || []).forEach(m => add(m.registros));
@@ -177,9 +184,9 @@
       const vis = {};
       PREV.forEach(p => {
         const k = normSite(p.site) + '|' + p.data;
-        const v = vis[k] = vis[k] || { site:p.site, siteId:p.siteId, mun:p.mun, area:p.area, data:p.data, tipos:[], tecs:[], wos:[], equipes:[] };
+        const v = vis[k] = vis[k] || { site:p.site, siteId:p.siteId, mun:p.mun, area:p.area, data:p.data, tipos:[], tecs:[], wos:[], equipes:[], inis:[] };
         const pus = (arr, x) => { if(x && arr.indexOf(x) === -1) arr.push(x); };
-        pus(v.tipos, p.tipo); pus(v.tecs, p.tec); pus(v.wos, p.wo); pus(v.equipes, p.equipe);
+        pus(v.inis, p.ini); pus(v.tipos, p.tipo); pus(v.tecs, p.tec); pus(v.wos, p.wo); pus(v.equipes, p.equipe);
       });
       VIS = Object.values(vis).map(v => Object.assign(v, { tipo:v.tipos.join(', '), tec:v.tecs.join(', '), wo:v.wos.join(', '), equipe:v.equipes.join(', ') }));
 
@@ -239,10 +246,16 @@
     INC.forEach(x => { (porSite[x.site] = porSite[x.site] || []).push(x); });
     const limite = baseAte ? diaNum(baseAte) : null;
     const naBase = x => filtro.base === 'todas' || x.t === 'I';
+    const afazPorSite = {};
+    AFAZ.forEach(a => { (afazPorSite[a.site] = afazPorSite[a.site] || []).push(a); });
     return VIS.map(p => {
       const dp = diaNum(p.data);
       const lst = (porSite[normSite(p.site)] || []).concat(p.siteId && normSite(p.siteId) !== normSite(p.site) ? (porSite[normSite(p.siteId)] || []) : []);
       const antes = [], dia = [], depois = [], iDia = [], iDepois = [];
+      // AFAZ do site: aberto no dia/depois da preventiva, ou que já estava pendente antes
+      const afs = (afazPorSite[normSite(p.site)] || []).concat(p.siteId && normSite(p.siteId) !== normSite(p.site) ? (afazPorSite[normSite(p.siteId)] || []) : []);
+      const afazDepois = afs.filter(a => { const dif = diaNum(a.data) - dp; return dif >= 0 && dif <= N; });
+      const afazAntes = afs.filter(a => diaNum(a.data) < dp);
       lst.forEach(x => {
         const d = diaNum(x.data), dif = d - dp;
         // 1) ESER – só Indisponibilidade: teve queda no dia / depois da preventiva?
@@ -263,7 +276,7 @@
       else if(tDepois > tAntes + 1e-9) res = 'piorou';
       else if(tDepois < tAntes - 1e-9) res = 'melhorou';
       else res = 'igual';
-      return Object.assign({}, p, { antes, dia, depois, iDia, iDepois, diasAntes, diasDepois, res });
+      return Object.assign({}, p, { antes, dia, depois, iDia, iDepois, afazDepois, afazAntes, diasAntes, diasDepois, res });
     });
   }
 
@@ -282,7 +295,7 @@
     if(!info) return;
     if(erro){ info.textContent = 'Não foi possível carregar: ' + erro; return; }
     if(!PREV.length && !INC.length){ info.textContent = 'Carregando...'; return; }
-    info.textContent = `${VIS.length} sites com preventiva (${PREV.length} preventivas executadas) · ${INC.length} quedas na base (${INC.filter(x => x.t === 'I').length} indisponibilidade, ${INC.filter(x => x.t === 'O').length} outros) · base de incidentes até ${dataBr(baseAte)} · janela: ${TODOS() ? 'todo o período' : filtro.janela + ' dias'}`;
+    info.textContent = `${VIS.length} sites com preventiva (${PREV.length} preventivas executadas) · ${INC.length} quedas na base (${INC.filter(x => x.t === 'I').length} indisponibilidade, ${INC.filter(x => x.t === 'O').length} outros) · ${AFAZ.length} AFAZ em aberto · base de incidentes até ${dataBr(baseAte)} · janela: ${TODOS() ? 'todo o período' : filtro.janela + ' dias'}`;
     if(fonteInc === 'indisp'){
       aviso.style.display = '';
       aviso.style.background = 'rgba(37,99,235,.10)'; aviso.style.color = '#1e3a8a';
@@ -303,6 +316,7 @@
     const cont = {}; ORDEM_RES.forEach(k => cont[k] = 0);
     semRes.forEach(l => cont[l.res]++);
     const comQuedaDia = semRes.filter(l => l.iDia.length || l.iDepois.length).length;
+    const comAfaz = semRes.filter(l => l.afazDepois.length).length;
     const kpi = (k, titulo, valor, cor, sub) => `
       <div class="kpi${filtro.res === k ? ' sel' : ''}" data-res="${k}" title="Clique para filtrar">
         <div class="label">${titulo}</div>
@@ -313,14 +327,16 @@
     document.getElementById('alKpiRow').innerHTML =
       kpi('', '📡 Sites com preventiva', semRes.length, 'var(--text)', '') +
       kpi('dia', '⚡ Indisp. no dia ou depois', comQuedaDia, '#dc2626', pct(comQuedaDia)) +
+      kpi('afaz', '📝 Abriu AFAZ no dia/depois', comAfaz, '#2563eb', pct(comAfaz)) +
       ORDEM_RES.map(k => kpi(k, RES[k].icone + ' ' + RES[k].label, cont[k], RES[k].cor, pct(cont[k]))).join('');
     document.querySelectorAll('#alKpiRow .kpi').forEach(el => el.addEventListener('click', () => {
       const k = el.dataset.res;
-      filtro.res = (k === 'dia' || filtro.res === k) ? (k === 'dia' && filtro.res !== 'dia' ? 'dia' : '') : k;
+      filtro.res = filtro.res === k ? '' : k;
       document.getElementById('alRes').value = RES[filtro.res] ? filtro.res : '';
       render();
     }));
     if(filtro.res === 'dia') linhasAtuais = semRes.filter(l => l.iDia.length || l.iDepois.length);
+    if(filtro.res === 'afaz') linhasAtuais = semRes.filter(l => l.afazDepois.length);
 
     desenharGrafico(semRes);
     desenharPiores(semRes);
@@ -357,8 +373,8 @@
     const top = Object.values(porSite).sort((a,b) => (b.depois - b.antes) - (a.depois - a.antes) || b.depois - a.depois).slice(0, 15);
     const w = document.getElementById('alPioresWrap');
     if(!top.length){ w.innerHTML = '<div class="hint" style="padding:12px;">Nenhum site piorou no filtro atual. 🎉</div>'; return; }
-    const dm = iso => iso.slice(8,10) + '/' + iso.slice(5,7);
-    w.innerHTML = `<table style="width:100%;"><thead><tr><th>Site</th><th>Preventiva em</th><th>Tipo</th>
+    const dm = iso => dataBr(iso);
+    w.innerHTML = `<table style="width:100%;"><thead><tr><th>Site</th><th title="Data em que a preventiva foi feita no site">Preventiva feita em</th><th>Tipo</th>
         <th class="num" title="Quedas no site ANTES da preventiva (${rotJ()})">Quedas antes</th>
         <th class="num" title="Quedas no site DEPOIS da preventiva (${rotJ()})">Quedas depois</th>
         <th class="num" title="Quantas quedas a mais depois da preventiva (depois − antes)">Aumento</th></tr></thead><tbody>` +
@@ -384,28 +400,31 @@
     document.getElementById('alContagem').textContent = ls.length + ' site(s) / dia(s) de preventiva';
     document.getElementById('alVazio').style.display = ls.length ? 'none' : '';
     const lista = arr => arr.map(x => dataBr(x.data) + (x.hora ? ' ' + x.hora : '') + ' · ' + x.inc + (x.t === 'O' ? ' (Outros)' : ' (Indisp.' + (x.eser ? ' · ' + x.eser : '') + ')')).join('\n');
+    const listaAfaz = arr => arr.map(a => 'AFAZ ' + a.id + ' · aberto ' + dataBr(a.data) + ' · ' + a.pr + ' · ' + a.st + ' · ' + a.ti).join('\n');
     const cel = (arr, cor, extra) => `<td class="n" title="${esc(lista(arr))}" style="color:${arr.length ? cor : 'var(--muted)'};">${arr.length}${extra || ''}</td>`;
     tb.innerHTML = ls.slice(0, 1500).map(l => {
       const r = RES[l.res];
       const obs = l.res !== 'aguardando' && (TODOS() || l.diasDepois < filtro.janela) ? `<span style="font-size:10px; color:var(--muted); font-weight:400;"> /${l.diasDepois}d</span>` : '';
       return `<tr>
-        <td>${dataBr(l.data)}</td><td><b>${esc(l.site)}</b>${l.siteId && l.siteId !== l.site ? `<span style="font-size:11px; color:var(--muted);"> ${esc(l.siteId)}</span>` : ''}</td>
+        <td title="${l.inis.filter(x => x && x !== l.data).length ? 'Iniciada em ' + l.inis.filter(x => x && x !== l.data).map(dataBr).join(', ') + ' · concluída em ' + dataBr(l.data) : 'Feita em ' + dataBr(l.data)}"><b>${dataBr(l.data)}</b>${l.inis.some(x => x && x !== l.data) ? '<span style="font-size:10px; color:var(--muted);"> (início ' + l.inis.filter(x => x && x !== l.data).map(x => x.slice(8,10) + '/' + x.slice(5,7)).join(', ') + ')</span>' : ''}</td><td><b>${esc(l.site)}</b>${l.siteId && l.siteId !== l.site ? `<span style="font-size:11px; color:var(--muted);"> ${esc(l.siteId)}</span>` : ''}</td>
         <td>${esc(l.tipo)}</td>
         ${cel(l.iDia, '#dc2626', l.iDia.length ? ' ⚡' : '')}${cel(l.iDepois, '#dc2626')}
         ${cel(l.antes, 'var(--text)', TODOS() ? `<span style="font-size:10px; color:var(--muted); font-weight:400;"> /${l.diasAntes}d</span>` : '')}${cel(l.dia, '#d97706')}${cel(l.depois, l.res === 'piorou' ? '#dc2626' : 'var(--text)', obs)}
         <td><span class="pill-al" style="background:${r.bg}; color:${r.cor};">${r.icone} ${r.label}</span></td>
+        <td class="n" title="${esc(listaAfaz(l.afazDepois))}" style="color:${l.afazDepois.length ? '#2563eb' : 'var(--muted)'};">${l.afazDepois.length}${l.afazDepois.length ? ' 📝' : ''}</td>
+        <td class="n" title="${esc(listaAfaz(l.afazAntes))}" style="color:${l.afazAntes.length ? 'var(--text)' : 'var(--muted)'};">${l.afazAntes.length}</td>
         <td>${esc(l.mun)}</td><td>${esc(l.area)}</td><td>${esc(l.tec || l.equipe)}</td><td class="mono" style="font-size:11px;" title="${esc(l.wo)}">${esc(l.wos.length > 1 ? l.wos.length + ' WOs' : l.wo)}</td>
       </tr>`;
-    }).join('') + (ls.length > 1500 ? `<tr><td colspan="13" class="hint">Mostrando 1500 de ${ls.length}. Use os filtros ou exporte o CSV.</td></tr>` : '');
+    }).join('') + (ls.length > 1500 ? `<tr><td colspan="15" class="hint">Mostrando 1500 de ${ls.length}. Use os filtros ou exporte o CSV.</td></tr>` : '');
   }
 
   function exportarCsv(){
     const N = rotJ();
-    const cab = ['Data preventiva','Site','Site ID','Municipio','Preventivas no dia','Area','Equipe','Tecnico','WOs','Indisp. no dia',`Indisp. depois (${N})`,`Quedas antes (${N})`,'Quedas no dia',`Quedas depois (${N})`,'Dias antes considerados','Dias depois na base','Resultado','Incidentes antes','Incidentes no dia','Incidentes depois'];
+    const cab = ['Preventiva feita em','Site','Site ID','Municipio','Preventivas no dia','Area','Equipe','Tecnico','WOs','Indisp. no dia',`Indisp. depois (${N})`,`Quedas antes (${N})`,'Quedas no dia',`Quedas depois (${N})`,'Dias antes considerados','Dias depois na base','Resultado','AFAZ aberto no dia/depois','AFAZ pendente antes','Incidentes antes','Incidentes no dia','Incidentes depois'];
     const q = v => '"' + String(v ?? '').replace(/"/g,'""') + '"';
     const inc = arr => arr.map(x => dataBr(x.data) + (x.hora ? ' ' + x.hora : '') + ' ' + x.inc + (x.t === 'O' ? ' (Outros)' : '')).join(' | ');
     const linhas = linhasTabela().map(l => [dataBr(l.data), l.site, l.siteId, l.mun, l.tipo, l.area, l.equipe, l.tec, l.wo,
-      l.iDia.length, l.iDepois.length, l.antes.length, l.dia.length, l.depois.length, l.diasAntes, l.diasDepois, RES[l.res].label, inc(l.antes), inc(l.dia), inc(l.depois)].map(q).join(';'));
+      l.iDia.length, l.iDepois.length, l.antes.length, l.dia.length, l.depois.length, l.diasAntes, l.diasDepois, RES[l.res].label, l.afazDepois.map(a => a.id + ' (' + dataBr(a.data) + ' ' + a.st + ')').join(' | '), l.afazAntes.map(a => a.id + ' (' + dataBr(a.data) + ')').join(' | '), inc(l.antes), inc(l.dia), inc(l.depois)].map(q).join(';'));
     const blob = new Blob(['﻿' + cab.map(q).join(';') + '\n' + linhas.join('\n')], { type:'text/csv;charset=utf-8' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'acompanhamento_alarmes_por_site.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
