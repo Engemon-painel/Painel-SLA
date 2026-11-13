@@ -1,0 +1,74 @@
+# Gera os JSONs do painel a partir das planilhas que a macro do Excel envia
+# para o repositório privado Painel-dados (release "bases"). Sem Power Automate.
+name: Gerar painel
+
+on:
+  repository_dispatch:
+    types: [bases-atualizadas]
+  workflow_dispatch:
+    inputs:
+      arquivos:
+        description: "Planilhas (ex.: afaz.xlsx,bh.xlsx) ou todos"
+        default: "todos"
+      modo:
+        description: "teste (grava em _teste/) ou producao (atualiza o painel)"
+        default: "teste"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gerar-painel
+  cancel-in-progress: false
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: UTC
+      ARQUIVOS: ${{ github.event.client_payload.arquivos || inputs.arquivos || 'todos' }}
+      MODO: ${{ inputs.modo || vars.MODO_GERADOR || 'teste' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar
+        run: cd gerador && npm install --no-audit --no-fund
+
+      - name: Baixar as planilhas (repositório privado)
+        env:
+          GH_TOKEN: ${{ secrets.DADOS_TOKEN }}
+        run: |
+          mkdir -p /tmp/bases
+          gh release download bases --repo "${{ github.repository_owner }}/Painel-dados" --dir /tmp/bases --clobber --pattern "*.xlsx"
+          ls -la /tmp/bases
+
+      - name: Gerar os JSONs
+        id: gerar
+        run: |
+          set +e
+          node --max-old-space-size=6000 gerador/gerar.js --entrada /tmp/bases --saida . --arquivos "$ARQUIVOS" --modo "$MODO"
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar
+        run: |
+          git config user.name "gerador-painel"
+          git config user.email "gerador-painel@users.noreply.github.com"
+          git add -A -- '*.json'
+          if git diff --cached --quiet; then echo "Nada mudou."; exit 0; fi
+          git commit -m "Atualização automática (gerador) – $ARQUIVOS [$MODO]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" && git push && exit 0
+            sleep 10
+          done
+          exit 1
+
+      - name: Avisar se alguma planilha falhou
+        if: steps.gerar.outputs.status != '0'
+        run: |
+          echo "Alguma planilha não foi publicada. Veja o RESULTADO no passo 'Gerar os JSONs'."
+          exit 1
