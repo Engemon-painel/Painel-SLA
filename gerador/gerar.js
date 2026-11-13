@@ -22,7 +22,8 @@ const TAREFAS = [
   // dados.json: Base com Historico + Organograma/PJ (planilha Organograma) + Controle (planilha de Vagas), se forem enviadas
   { planilha: "base_historico.xlsx", saida: "dados.json", script: "dados.ts", tipo: "dados",
     extras: [{ planilha: "organograma.xlsx", abas: ["Organograma", "PJ"] },
-             { planilha: "vagas.xlsx", abas: ["Controle"] }] },
+             { planilha: "vagas.xlsx", abas: ["Controle"] },
+             { planilha: "fca.xlsx", abas: ["FCA"] }] },
   { planilha: "afaz.xlsx", saida: "dados_afaz.json", script: "afaz.ts" },
   { planilha: "preventiva.xlsx", saida: "dados_preventiva.json", script: "preventiva.ts", anterior: true },
   { planilha: "nr.xlsx", saida: "base_nr.json", script: "nr.ts" },
@@ -78,7 +79,17 @@ function argsDados(wb, atualTxt) {
     const u = aba.getUsedRange(true);
     if (u) {
       const v = u.getValues();
-      const cab = v[0].map(x => String(x).trim());
+      // cabeçalhos do Forms ("Número do incidente", "Qual a causa?", "Ação tomada"...) → campos do script
+      const campo = h => {
+        const t = sem(h);
+        if (/tomada/.test(t)) return "acaoTomada";
+        if (/incidente|incident/.test(t)) return "incidente";
+        if (/\bfato\b/.test(t)) return "fato";
+        if (/\bcausa\b/.test(t)) return "causa";
+        if (/\bacao\b|\bacoes\b/.test(t)) return "acao";
+        return String(h).trim();
+      };
+      const cab = v[0].map(x => campo(x));
       for (let i = 1; i < v.length; i++) {
         const item = {}; let tem = false;
         cab.forEach((c, j) => { if (!c) return; const val = String(v[i][j] == null ? "" : v[i][j]).trim(); item[c] = val; if (val) tem = true; });
