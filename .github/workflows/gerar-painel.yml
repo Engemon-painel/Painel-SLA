@@ -34,10 +34,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Instalar
-        run: cd gerador && npm install --no-audit --no-fund
+        run: |
+          rm -rf gerador/node_modules gerador/package-lock.json
+          cd gerador && npm install --no-audit --no-fund --no-package-lock
 
       - name: Baixar as planilhas (repositório privado)
         env:
@@ -58,7 +60,10 @@ jobs:
         run: |
           git config user.name "gerador-painel"
           git config user.email "gerador-painel@users.noreply.github.com"
-          git add -A -- '*.json'
+          # só os JSONs do painel (raiz) e da pasta _teste — nunca a pasta node_modules
+          git rm -r -q --cached --ignore-unmatch gerador/node_modules gerador/package-lock.json
+          git add -A -- ':(glob)*.json'
+          if [ -d _teste ]; then git add -A -- _teste; fi
           if git diff --cached --quiet; then echo "Nada mudou."; exit 0; fi
           git commit -m "Atualização automática (gerador) – $ARQUIVOS [$MODO]"
           for i in 1 2 3 4 5; do
