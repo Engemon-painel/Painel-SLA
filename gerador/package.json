@@ -1,0 +1,9 @@
+{
+  "name": "gerador-painel",
+  "private": true,
+  "description": "Gera os JSONs do Painel-SLA rodando os mesmos Office Scripts, sem Power Automate",
+  "dependencies": {
+    "jszip": "3.10.1",
+    "typescript": "5.4.5"
+  }
+}
