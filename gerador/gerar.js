@@ -19,7 +19,9 @@ const { abrirPasta, ExcelScript } = require("./excel");
 // Qual planilha (nome no GitHub) gera qual arquivo do painel
 // ---------------------------------------------------------------------
 const TAREFAS = [
-  { planilha: "base_historico.xlsx", saida: "dados.json", script: "dados.ts", tipo: "dados" },
+  // dados.json: Base com Historico + abas Organograma e PJ da planilha do Organograma (se for enviada)
+  { planilha: "base_historico.xlsx", saida: "dados.json", script: "dados.ts", tipo: "dados",
+    extras: [{ planilha: "organograma.xlsx", abas: ["Organograma", "PJ"] }] },
   { planilha: "afaz.xlsx", saida: "dados_afaz.json", script: "afaz.ts" },
   { planilha: "preventiva.xlsx", saida: "dados_preventiva.json", script: "preventiva.ts", anterior: true },
   { planilha: "nr.xlsx", saida: "base_nr.json", script: "nr.ts" },
@@ -130,7 +132,8 @@ async function main() {
   let falhas = 0;
 
   for (const t of TAREFAS) {
-    if (!todos && lista.indexOf(t.planilha) < 0) continue;
+    const gatilhos = [t.planilha].concat((t.extras || []).map(e => e.planilha));
+    if (!todos && !gatilhos.some(g => lista.indexOf(g) >= 0)) continue;
     const arqXlsx = path.join(entrada, t.planilha);
     if (!fs.existsSync(arqXlsx)) { relatorio.push("· " + t.saida + ": planilha " + t.planilha + " não foi enviada (pulei)"); continue; }
     if (!fs.existsSync(path.join(__dirname, "scripts", t.script))) { relatorio.push("· " + t.saida + ": falta o script " + t.script + " (pulei)"); continue; }
@@ -139,6 +142,21 @@ async function main() {
       console.log("→ " + t.saida + " (" + t.planilha + ")");
       // cada script recebe a planilha "limpa" (o que um script grava não afeta o outro)
       const wb = await abrirPasta(fs.readFileSync(arqXlsx), t.planilha);
+      // abas que vêm de outra planilha (ex.: Organograma) substituem as de mesmo nome
+      for (const e of (t.extras || [])) {
+        const arqExtra = path.join(entrada, e.planilha);
+        if (!fs.existsSync(arqExtra)) continue;
+        const wbE = await abrirPasta(fs.readFileSync(arqExtra), e.planilha);
+        e.abas.forEach((nome, i) => {
+          let aba = wbE.p.abas.find(a => a.nome.trim().toLowerCase() === nome.toLowerCase());
+          if (!aba && i === 0) aba = wbE.p.abas[0];   // sem aba com esse nome: usa a primeira
+          if (!aba) return;
+          wb.p.abas = wb.p.abas.filter(a => a.nome.trim().toLowerCase() !== nome.toLowerCase());
+          aba.nome = nome;
+          wb.p.abas.push(aba);
+          console.log("   aba " + nome + " veio de " + e.planilha);
+        });
+      }
       abertas[t.planilha] = true;
       const main = carregarScript(t.script);
       const atual = lerJsonAtual(saida, t.saida);
