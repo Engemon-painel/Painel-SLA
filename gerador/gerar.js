@@ -19,16 +19,18 @@ const { abrirPasta, ExcelScript } = require("./excel");
 // Qual planilha (nome no GitHub) gera qual arquivo do painel
 // ---------------------------------------------------------------------
 const TAREFAS = [
-  // dados.json: Base com Historico + abas Organograma e PJ da planilha do Organograma (se for enviada)
+  // dados.json: Base com Historico + Organograma/PJ (planilha Organograma) + Controle (planilha de Vagas), se forem enviadas
   { planilha: "base_historico.xlsx", saida: "dados.json", script: "dados.ts", tipo: "dados",
-    extras: [{ planilha: "organograma.xlsx", abas: ["Organograma", "PJ"] }] },
+    extras: [{ planilha: "organograma.xlsx", abas: ["Organograma", "PJ"] },
+             { planilha: "vagas.xlsx", abas: ["Controle"] }] },
   { planilha: "afaz.xlsx", saida: "dados_afaz.json", script: "afaz.ts" },
   { planilha: "preventiva.xlsx", saida: "dados_preventiva.json", script: "preventiva.ts", anterior: true },
   { planilha: "nr.xlsx", saida: "base_nr.json", script: "nr.ts" },
   { planilha: "bh.xlsx", saida: "dados_bh.json", script: "bh.ts" },
   { planilha: "bh.xlsx", saida: "dados_pend_bh.json", script: "pend_bh.ts" },
   { planilha: "combustivel.xlsx", saida: "dados_combustivel.json", script: "combustivel.ts" },
-  { planilha: "escala.xlsx", saida: "dados_escala.json", script: "escala.ts" }
+  { planilha: "escala.xlsx", saida: "dados_escala.json", script: "escala.ts" },
+  { planilha: "faltas.xlsx", saida: "dados_escala_extra.json", script: "escala_extra.ts" }
 ];
 
 function argumento(nome, padrao) {
