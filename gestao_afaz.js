@@ -1293,25 +1293,29 @@
     };
     const cel = (v, c, forte) => {
       const corTxt = c.k === 'atr' && v ? '#dc2626' : '';
-      return `<td style="text-align:center;${forte ? 'font-weight:700;' : ''}${corTxt ? 'color:' + corTxt + ';' : ''}">${v ? nf(v) : '–'}</td>`;
+      return `<td style="text-align:center;font-size:13px;${forte ? 'font-weight:800;' : 'font-weight:600;'}color:${corTxt || (v ? '#0f172a' : '#94a3b8')}">${v ? nf(v) : '–'}</td>`;
     };
     const ehRepor = i => String(i.st || '').trim().toLowerCase() === 'repor material';
     const grupos = [
       { nome: 'Repor Material', cor: '#c2410c', itens: itens.filter(ehRepor) },
       { nome: 'Fila (demais status)', cor: '#1d4ed8', itens: itens.filter(i => !ehRepor(i)) }
     ];
-    const cab = `<tr><th>PRIORIDADE</th>${cols.map(c => `<th style="text-align:center">${esc(c.n)}</th>`).join('')}</tr>`;
-    const corpo = grupos.filter(G => G.itens.length).map(G => {
+    // NOVO (17/11/2026): Repor Material e Fila lado a lado, cada um com a sua tabela
+    const thS = 'text-align:center;color:#0f172a;font-weight:700;font-size:11px;white-space:normal;line-height:1.2';
+    const cab = `<tr><th style="color:#0f172a;font-weight:700;font-size:11px">PRIORIDADE</th>${cols.map(c => `<th style="${thS}">${esc(c.n)}</th>`).join('')}</tr>`;
+    const tabelaDe = G => {
       const linhas = niveis.map(k => {
         const g = G.itens.filter(i => psDe(i) === k);
         if (!g.length) return '';
-        return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${COR_PS[k] || '#94a3b8'};margin-right:6px"></span>${esc(rotPS(k))}</td>${cols.map(c => cel(conta(g, c.k), c, c.k === 'tot')).join('')}</tr>`;
+        return `<tr><td style="color:#0f172a;font-weight:600"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${COR_PS[k] || '#94a3b8'};margin-right:6px"></span>${esc(rotPS(k))}</td>${cols.map(c => cel(conta(g, c.k), c, c.k === 'tot')).join('')}</tr>`;
       }).join('');
-      return `<tr><td colspan="${cols.length + 1}" style="background:${G.cor};color:#fff;font-weight:700">${esc(G.nome)} · ${nf(G.itens.length)} AFAZ</td></tr>` + linhas +
-        `<tr style="background:#f1f5f9"><td><b>Total ${esc(G.nome)}</b></td>${cols.map(c => cel(conta(G.itens, c.k), c, true)).join('')}</tr>`;
-    }).join('');
+      return `<div style="flex:1 1 560px;min-width:0;overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px">
+        <div style="background:${G.cor};color:#fff;font-weight:700;padding:8px 10px;font-size:14px">${esc(G.nome)} · ${nf(G.itens.length)} AFAZ</div>
+        <table style="width:100%"><thead>${cab}</thead><tbody>${linhas}
+        <tr style="background:#f1f5f9"><td style="color:#0f172a"><b>Total</b></td>${cols.map(c => cel(conta(G.itens, c.k), c, true)).join('')}</tr></tbody></table></div>`;
+    };
     alvo.innerHTML = itens.length
-      ? `<table><thead>${cab}</thead><tbody>${corpo}</tbody></table>`
+      ? `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">${grupos.map(tabelaDe).join('')}</div>`
       : '<p class="sub">Nenhum AFAZ em aberto com os filtros da tela.</p>';
   }
 
