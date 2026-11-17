@@ -3045,6 +3045,7 @@ function main(workbook: ExcelScript.Workbook, fcaJson: string, rateioJson: strin
     debugToaPresenca: PRES_TOA.debug, // diagnóstico mostrado no painel
     avaliacoesExperiencia: lerAvaliacoesExperiencia(workbook), // NOVO – avaliação 30/60/90 dias (aba AVALIACAO_EXPERIENCIA)
     entrevistasDesligamento: lerAvaliacoesExperiencia(workbook, "SAIDA_TECNICO"), // NOVO – saída do técnico (aba SAIDA_TECNICO)
+    feriasProgramadas: lerAvaliacoesExperiencia(workbook, "FERIAS_PROGRAMADAS"), // NOVO (17/11/2026) – férias programadas pelo supervisor (aba FERIAS_PROGRAMADAS)
     atualizado_em: atualizadoEm,
     dadosAte: dadosAte,
     semanaFonte: semanaFonte,
