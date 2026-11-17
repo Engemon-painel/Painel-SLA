@@ -295,6 +295,11 @@
             <div class="afz-box"><canvas id="afz-g-ps"></canvas></div>
           </div>
           <div class="afz-card full">
+            <h3>Previsão por PRIORIDADE</h3>
+            <p class="sub">Quantos AFAZ em aberto têm previsão em cada mês · <b>Repor Material</b> separado da <b>fila</b> (demais status) · Atrasado = previsão que já passou (todos os meses anteriores) · os meses mostram só o que ainda está no prazo · segue os filtros da tela</p>
+            <div class="afz-tab" id="afz-prev"></div>
+          </div>
+          <div class="afz-card full">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <h3 style="margin:0">Prioridades em aberto</h3>
               <button type="button" class="afz-limpar" id="afz-ps-exp" style="margin-left:auto;background:#0e7c86;color:#fff">⬇ Exportar (Excel)</button>
@@ -1228,6 +1233,9 @@
       }
     });
 
+    // NOVO (17/11/2026): previsão por PRIORIDADE (Repor Material x fila)
+    tabelaPrevisao(itens, niveis);
+
     // tabela: site mais crítico primeiro, depois o mais parado
     const comPi = false;   // a PRIORIDADE já vem da coluna PRIORIDADE INFRAESTRUTURA: não repete em outra coluna
     const colsClasse = modoPi ? '' : ATRIB.map(a => `<th>${esc(a.nome)}</th>`).join('');
@@ -1259,6 +1267,53 @@
     $('#afz-aba-cont').title = 'Pendências em sites prioridade 0 e 1';
   }
   const k01 = k => k === '0' || k === '1';
+
+  // NOVO (17/11/2026): tabela de datas de previsão por PRIORIDADE, Repor Material separado da fila
+  function tabelaPrevisao(itens, niveis) {
+    const alvo = $('#afz-prev');
+    if (!alvo) return;
+    const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const hoje = hojeISO(), mesHoje = hoje.slice(0, 7);
+    const valida = i => !!i.prev && /^\d{4}-\d{2}/.test(i.prev) && i.prev.slice(0, 4) >= '2020' && i.prev.slice(0, 4) <= '2035';
+    // meses que já passaram entram todos em "Atrasado"; as colunas de mês mostram só o que ainda está no prazo
+    const meses = [...new Set(itens.filter(i => valida(i) && i.prev >= hoje).map(i => i.prev.slice(0, 7)))].sort();
+    const temInv = itens.some(i => i.prev && !valida(i));
+    const rotMes = m => MES[+m.slice(5, 7) - 1] + '/' + m.slice(2, 4) +
+      (m === mesHoje ? ' (a partir de ' + hoje.slice(8, 10) + '/' + hoje.slice(5, 7) + ')' : '');
+    const cols = [{ k: 'tot', n: 'Total' }, { k: 'sem', n: 'Sem previsão' }, { k: 'atr', n: 'Atrasado (prazo já passou)' }, { k: 'prazo', n: 'No prazo' }]
+      .concat(meses.map(m => ({ k: m, n: rotMes(m), mes: true })))
+      .concat(temInv ? [{ k: 'inv', n: 'Data inválida' }] : []);
+    const conta = (g, k) => {
+      if (k === 'tot') return g.length;
+      if (k === 'sem') return g.filter(i => !i.prev).length;
+      if (k === 'atr') return g.filter(i => valida(i) && i.prev < hoje).length;
+      if (k === 'prazo') return g.filter(i => valida(i) && i.prev >= hoje).length;
+      if (k === 'inv') return g.filter(i => i.prev && !valida(i)).length;
+      return g.filter(i => valida(i) && i.prev >= hoje && i.prev.slice(0, 7) === k).length;
+    };
+    const cel = (v, c, forte) => {
+      const corTxt = c.k === 'atr' && v ? '#dc2626' : '';
+      return `<td style="text-align:center;${forte ? 'font-weight:700;' : ''}${corTxt ? 'color:' + corTxt + ';' : ''}">${v ? nf(v) : '–'}</td>`;
+    };
+    const ehRepor = i => String(i.st || '').trim().toLowerCase() === 'repor material';
+    const grupos = [
+      { nome: 'Repor Material', cor: '#c2410c', itens: itens.filter(ehRepor) },
+      { nome: 'Fila (demais status)', cor: '#1d4ed8', itens: itens.filter(i => !ehRepor(i)) }
+    ];
+    const cab = `<tr><th>PRIORIDADE</th>${cols.map(c => `<th style="text-align:center">${esc(c.n)}</th>`).join('')}</tr>`;
+    const corpo = grupos.filter(G => G.itens.length).map(G => {
+      const linhas = niveis.map(k => {
+        const g = G.itens.filter(i => psDe(i) === k);
+        if (!g.length) return '';
+        return `<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${COR_PS[k] || '#94a3b8'};margin-right:6px"></span>${esc(rotPS(k))}</td>${cols.map(c => cel(conta(g, c.k), c, c.k === 'tot')).join('')}</tr>`;
+      }).join('');
+      return `<tr><td colspan="${cols.length + 1}" style="background:${G.cor};color:#fff;font-weight:700">${esc(G.nome)} · ${nf(G.itens.length)} AFAZ</td></tr>` + linhas +
+        `<tr style="background:#f1f5f9"><td><b>Total ${esc(G.nome)}</b></td>${cols.map(c => cel(conta(G.itens, c.k), c, true)).join('')}</tr>`;
+    }).join('');
+    alvo.innerHTML = itens.length
+      ? `<table><thead>${cab}</thead><tbody>${corpo}</tbody></table>`
+      : '<p class="sub">Nenhum AFAZ em aberto com os filtros da tela.</p>';
+  }
 
   // ALTERADO (22/10/2026): exporta a tabela "Prioridades em aberto" com os filtros da tela (todas as linhas)
   let listaPrioExport = [];
