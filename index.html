@@ -8,6 +8,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script>
+  // NOVO (17/11/2026): números e textos dos gráficos mais escuros em todas as abas
+  if (window.Chart) { Chart.defaults.color = '#1e293b'; Chart.defaults.font.weight = '500'; Chart.defaults.borderColor = '#e2e8f0'; }
+</script>
 <style>
   :root{
     --bg: #f3f5fa;
@@ -210,6 +214,12 @@
     color:#000000 !important;
     font-weight:700 !important;
   }
+</style>
+<style id="contraste-geral">
+  /* NOVO (17/11/2026): números e textos das tabelas mais escuros em todas as abas */
+  :root{ --muted:#4a5468; }
+  table td{ color:#0f172a; font-weight:500; font-variant-numeric:tabular-nums; }
+  table th{ color:#334155; font-weight:700; }
 </style>
 </head>
 <body>
@@ -5363,7 +5373,7 @@ setInterval(carregarDados, 5 * 60 * 1000);
 <script src="gestao_escala.js"></script>
 <script src="gestao_turnover.js?v=3"></script>
 <script src="gestao_preventiva.js?v=10"></script>
-<script src="gestao_afaz.js?v=42"></script>
+<script src="gestao_afaz.js?v=43"></script>
 <script src="gestao_combustivel.js?v=9"></script>
 <script src="gestao_bh.js?v=85"></script>
 <script src="gestao_kpis.js?v=5"></script>
