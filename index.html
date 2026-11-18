@@ -13,6 +13,54 @@
   if (window.Chart) { Chart.defaults.color = '#1e293b'; Chart.defaults.font.weight = '500'; Chart.defaults.borderColor = '#e2e8f0'; }
   // NOVO (18/11/2026): sem linhas de grade e sem linhas de eixo atrás dos gráficos, em todas as abas
   if (window.Chart) { Chart.defaults.scale.grid.display = false; Chart.defaults.scale.border.display = false; }
+  // NOVO (18/11/2026): números em cima dos gráficos mais fortes em TODAS as abas
+  // (cor escurecida, letra maior e em negrito, contorno branco para não sumir em cima das linhas).
+  // Números brancos (dentro das barras) ficam brancos.
+  (function () {
+    if (!window.Chart) return;
+    const rgb = c => {
+      if (typeof c !== 'string') return null;
+      let m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim());
+      if (m) { let h = m[1]; if (h.length === 3) h = h.split('').map(x => x + x).join(''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)).concat(1); }
+      m = /^rgba?\(([^)]+)\)/i.exec(c.trim());
+      if (m) { const v = m[1].split(',').map(x => parseFloat(x)); return [v[0], v[1], v[2], v[3] == null ? 1 : v[3]]; }
+      return null;
+    };
+    const luz = v => (0.299 * v[0] + 0.587 * v[1] + 0.114 * v[2]) / 255;
+    const escurecer = c => {
+      const v = rgb(c);
+      if (!v) return c;
+      if (luz(v) > 0.85 && v[3] > 0.5) return c;                 // branco: número dentro da barra
+      let f = luz(v) > 0.55 ? 0.45 : (luz(v) > 0.3 ? 0.68 : 1);   // claro → bem mais escuro
+      const r = v.slice(0, 3).map(x => Math.round(x * f));
+      return 'rgb(' + r.join(',') + ')';
+    };
+    const ajustar = dl => {
+      if (!dl || typeof dl !== 'object' || dl.__forte) return;
+      dl.__forte = true;
+      const c0 = dl.color;
+      if (typeof c0 === 'function') dl.color = function () { return escurecer(c0.apply(this, arguments)); };
+      else if (c0 !== undefined) dl.color = escurecer(c0);
+      const branco = typeof c0 === 'string' && (() => { const v = rgb(c0); return v && luz(v) > 0.85; })();
+      const f0 = dl.font;
+      if (typeof f0 !== 'function') {
+        const f = Object.assign({}, f0 || {});
+        f.weight = '800';
+        f.size = Math.max(Number(f.size) || 11, 11);
+        dl.font = f;
+      }
+      if (!branco && typeof c0 !== 'function' && dl.textStrokeColor === undefined) { dl.textStrokeColor = 'rgba(255,255,255,.95)'; dl.textStrokeWidth = 3; }
+    };
+    Chart.register({
+      id: 'numerosFortes',
+      beforeUpdate(chart) {
+        const cfg = chart.config;
+        const pl = cfg.options && cfg.options.plugins;
+        if (pl && pl.datalabels) ajustar(pl.datalabels);
+        ((cfg.data && cfg.data.datasets) || []).forEach(ds => { if (ds && ds.datalabels) ajustar(ds.datalabels); });
+      }
+    });
+  })();
 </script>
 <style>
   :root{
@@ -5118,6 +5166,9 @@ if(kpiRow){
   const causaWrap = document.getElementById('causaChartWrap');
   if(causaWrap) causaWrap.style.height = Math.max(180, causaLabelsOrdenados.length * 30) + 'px';
 
+  // ALTERADO (18/11/2026): % de cada causa = qtd da causa ÷ total de incidentes do Consolidado do mês (dentro + fora do prazo, todas as SPCs)
+  const totalIncMes = Object.values((mesObj && mesObj.areas) || {}).reduce((s, a) => s + (Number(a && a.dentro) || 0) + (Number(a && a.fora) || 0), 0);
+  const baseCausa = totalIncMes > 0 ? totalIncMes : total;
   const causaTotalLabelEl = document.getElementById('causaTotalLabel');
   if(causaTotalLabelEl){
     const totalNaoReclassificado = Object.values(causaFicouCounts).reduce((a,b) => a+b, 0);
@@ -5125,7 +5176,7 @@ if(kpiRow){
     const totalCausaGeral = totalNaoReclassificado + totalReclassificado;
     causaTotalLabelEl.textContent = 'Total analisado e preenchido: ' + totalCausaGeral.toLocaleString('pt-BR') +
       ' (' + totalNaoReclassificado.toLocaleString('pt-BR') + ' não reclassificação / ' + totalReclassificado.toLocaleString('pt-BR') + ' reclassificação)' +
-      ' · % = (não reclassificação + reclassificação) ÷ total fora do prazo (' + total.toLocaleString('pt-BR') + ')';
+      ' · % = (não reclassificação + reclassificação) ÷ total de incidentes do mês no Consolidado (' + baseCausa.toLocaleString('pt-BR') + ')';
   }
 
   if(causaChart) causaChart.destroy();
@@ -5161,7 +5212,7 @@ if(kpiRow){
         // ALTERADO (28/10/2026): total da causa (não reclassificação + reclassificação) + % sobre o total fora do prazo (ex.: vandalismo 19 ÷ 225)
         formatter: (value, context) => {
           const c = causaLabelsOrdenados[context.dataIndex], fic = causaFicouCounts[c] || 0, tot = fic + (causaSaiuCounts[c] || 0);
-          return tot + (total > 0 ? ' de ' + total + ' · ' + (tot / total * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '');
+          return tot + (baseCausa > 0 ? ' de ' + baseCausa.toLocaleString('pt-BR') + ' · ' + (tot / baseCausa * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '');
         }
       }
     };
@@ -5381,7 +5432,7 @@ setInterval(carregarDados, 5 * 60 * 1000);
 <script src="gestao_kpis.js?v=5"></script>
 <script src="gestao_toa.js?v=37"></script>
 <script src="gestao_avaliacao.js?v=12"></script>
-<script src="gestao_ferias.js?v=2"></script>
+<script src="gestao_ferias.js?v=3"></script>
 <script src="tela_inicial.js?v=2"></script>
 <script src="trava_senha.js?v=2"></script>
 <script src="trava_usuario.js?v=8"></script>
