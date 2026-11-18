@@ -49,7 +49,8 @@
         f.size = Math.max(Number(f.size) || 11, 11);
         dl.font = f;
       }
-      if (!branco && typeof c0 !== 'function' && dl.textStrokeColor === undefined) { dl.textStrokeColor = 'rgba(255,255,255,.95)'; dl.textStrokeWidth = 3; }
+      // contorno branco só em número colorido/escuro com cor definida (nunca no branco de dentro da barra)
+      if (typeof c0 === 'string' && !branco && dl.textStrokeColor === undefined) { dl.textStrokeColor = 'rgba(255,255,255,.9)'; dl.textStrokeWidth = 2; }
     };
     Chart.register({
       id: 'numerosFortes',
