@@ -29,6 +29,20 @@
 
   let TIPO_DESL = {};   // matrícula → 'VOL' | 'INV' (base do Turnover)
   let COLAB = [], BH_HIST = [], BH_ATUAL = [], ABS = [], FOLHA = '', FOLHA_INI = '';
+  // NOVO (18/11/2026): supervisor do Organograma (dados.json) para quem vem sem supervisor no espelho
+  //   (admitidos recentes ficam fora do relatório de BH) — igual à aba Banco de Horas
+  let ORG_MAT = {}, ORG_NOME = {};
+  const SUP_PADRAO = 'Damares de Oliveira Penillo';
+  const kMat = m => String(m || '').replace(/\D/g, '').slice(-6).replace(/^0+/, '');
+  function completarSup(){
+    ABS.forEach(a => {
+      if (String(a.sup || '').trim()) return;
+      const o = ORG_MAT[kMat(a.m)] || ORG_NOME[nomeChave(a.n)];
+      if (o && o.sup) { a.sup = o.sup; if (!String(a.co || '').trim() && o.co) a.co = o.co; }
+      // mesma regra das Pendências (28/10/2026): da Claro sem supervisor no Organograma fica com a Damares
+      else if ((projForcado(a.n) || projDe(a.cc)) === 'CLARO') a.sup = SUP_PADRAO;
+    });
+  }
   const filtro = { pj: 'CLARO',   // ALTERADO (30/10/2026): só Claro (Cirion fica de fora)
     mes: '', modo: 'classico' };
   const charts = {};
@@ -407,9 +421,17 @@
         dataAdmis: String(x.dataAdmis || '').slice(0, 10), dataDemissao: String(x.dataDemissao || '').slice(0, 10) }))
         .filter(x => x.dataAdmis);
       BH_HIST = d.bancoHoras || [];
+      ORG_MAT = {}; ORG_NOME = {};
+      (d.colaboradores || []).forEach(c => {
+        const o = { sup: String(c.supervisor || '').trim(), co: String(c.coordenador || '').trim() };
+        if (!o.sup) return;
+        const k = kMat(c.matricula); if (k) ORG_MAT[k] = o;
+        const nk = nomeChave(c.nome); if (nk) ORG_NOME[nk] = o;
+      });
     }
     if(p){
       ABS = p.absenteismo || [];
+      completarSup();
       FOLHA_INI = p.folhaAtualIni || '';
       FOLHA = p.espelho && p.espelho.fim ? isoParaBr(p.espelho.fim) : '';
     }
