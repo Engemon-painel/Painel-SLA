@@ -192,7 +192,18 @@
       #pagina-kpis .kx-tab th{ text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:5px 6px; border-bottom:1px solid var(--line); white-space:nowrap; }
       #pagina-kpis .kx-tab td{ padding:5px 6px; border-bottom:1px solid var(--line); }
       #pagina-kpis .kx-tab .r{ text-align:right; font-variant-numeric:tabular-nums; }
-      #pagina-kpis .kx-rodape{ font-size:11px; color:var(--muted); padding:0 4px; }`;
+      #pagina-kpis .kx-rodape{ font-size:11px; color:var(--muted); padding:0 4px; }
+      /* ALTERADO (18/11/2026): textos e números mais escuros e um pouco maiores */
+      #pagina-kpis{ --muted:#334155; }
+      #pagina-kpis .kx-sub, #pagina-kpis .kx-rodape{ font-size:12px; color:#334155; }
+      #pagina-kpis .kx-tile .d{ font-size:12.5px; color:#1e293b; }
+      #pagina-kpis .kx-tile .l{ color:#334155; }
+      #pagina-kpis .kx-rk{ font-size:13px; font-weight:600; color:#0f172a; }
+      #pagina-kpis .kx-rk .n small{ font-size:11.5px; font-weight:500; color:#334155; }
+      #pagina-kpis .kx-rk .p{ font-weight:800; font-size:13px; }
+      #pagina-kpis .kx-tab td{ color:#0f172a; font-weight:500; }
+      #pagina-kpis .kx-tab th{ color:#334155; font-weight:700; }
+      #pagina-kpis .kx-dest{ font-size:13px; color:#0f172a; }`;
     document.head.appendChild(st);
 
         document.querySelectorAll('#kxModo button').forEach(b => b.onclick = () => { filtro.modo = b.dataset.modo; render(); });
@@ -215,7 +226,29 @@
     };
   }
 
+  // ALTERADO (18/11/2026): eixos e legendas escuros e maiores em todos os gráficos desta página
+  function escurecerCfg(cfg){
+    const o = cfg.options || (cfg.options = {});
+    const sc = o.scales || {};
+    Object.keys(sc).forEach(k => {
+      const ax = sc[k];
+      ax.ticks = Object.assign({ color:'#0f172a', font:{ size:12, weight:'600' } }, ax.ticks || {});
+      if (!ax.ticks.color) ax.ticks.color = '#0f172a';
+      if (ax.title) ax.title = Object.assign({ color:'#0f172a', font:{ size:12, weight:'600' } }, ax.title);
+    });
+    const pl = o.plugins || (o.plugins = {});
+    if (pl.legend && pl.legend.display !== false) {
+      pl.legend.labels = Object.assign({}, pl.legend.labels || {}, { color:'#0f172a', font:{ size:12, weight:'600' } });
+    }
+    return cfg;
+  }
   function novoChart(id, cfg){
+    escurecerCfg(cfg);
+    if (window.ChartDataLabels) {
+      cfg.plugins = (cfg.plugins || []).concat([ChartDataLabels]);
+      const pl = cfg.options.plugins;
+      if (!pl.datalabels) pl.datalabels = { display:false };
+    }
     if(charts[id]){ charts[id].destroy(); delete charts[id]; }
     const el = document.getElementById(id);
     if(!el || typeof Chart === 'undefined') return;
@@ -335,7 +368,9 @@
       },
       options: {
         responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
-        plugins:{ datalabels:{ display:false }, legend:{ display:false },
+        layout:{ padding:{ top:26, right:14 } },
+        plugins:{ datalabels:{ display: c => c.datasetIndex === 0, align:'top', anchor:'end', offset:4, color:'#0f172a',
+            font:{ size:11, weight:'800' }, formatter: v => v.toLocaleString('pt-BR', { minimumFractionDigits:1, maximumFractionDigits:1 }) + '%' }, legend:{ display:false },
           tooltip:{ callbacks:{ label: c => c.datasetIndex ? ' Meta: ' + pct(c.raw) : ` Turnover: ${pct(c.raw)} · ${serie[c.dataIndex].adm} adm · ${serie[c.dataIndex].des} desl · HC ${serie[c.dataIndex].hc}` } } },
         scales:{ y:{ beginAtZero:true, ticks:{ callback: v => v + '%' }, grid:{ color:'rgba(0,0,0,.05)' } }, x:{ grid:{ display:false } } }
       }
@@ -364,7 +399,8 @@
       },
       options: {
         responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
-        plugins:{ datalabels:{ display:false }, legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:11 } } },
+        plugins:{ datalabels:{ display: c => c.dataset.type === 'bar' && c.dataset.data[c.dataIndex] > 0, color:'#ffffff', font:{ size:12, weight:'800' } },
+          legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:11 } } },
           tooltip:{ callbacks:{ label: c => c.dataset.yAxisID === 'y1' ? ' ' + c.dataset.label + ': ' + pct(c.raw) : ' ' + c.dataset.label + ': ' + c.raw } } },
         scales:{ y:{ stacked:true, beginAtZero:true, title:{ display:true, text:'Desligamentos' }, grid:{ color:'rgba(0,0,0,.05)' } },
           y1:{ beginAtZero:true, position:'right', ticks:{ callback: v => v + '%' }, grid:{ display:false } }, x:{ stacked:true, grid:{ display:false } } }
