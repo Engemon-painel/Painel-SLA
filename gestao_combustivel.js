@@ -173,7 +173,9 @@
     const alvo = document.getElementById('frotaMatrizAreaTipo');
     if (!alvo) return;
     const c = contratoAtual();
-    const lista = c ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === c) : FROTA;
+    // ALTERADO (18/11/2026): também segue o filtro "Gestor operação" do topo
+    const g = typeof frotaGestorFiltroAtual === 'string' ? frotaGestorFiltroAtual : '';
+    const lista = FROTA.filter(v => (!c || (canonOperacaoFrota(v.operacao) || 'Sem operação') === c) && (!g || normFrota(v.gestor) === g));
     const tipos = Array.from(new Set(lista.map(v => normFrota(v.tipo) || 'Sem tipo'))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
     const linhas = {};
     lista.forEach(v => {
@@ -188,8 +190,8 @@
     alvo.innerHTML = `<table>
       <thead><tr><th>Área / Contrato</th>${tipos.map(t => `<th class="num">${esc(t)}</th>`).join('')}<th class="num">Total</th></tr></thead>
       <tbody>
-        ${areas.map(a => `<tr><td>${esc(a)}</td>${tipos.map(t => `<td class="num">${linhas[a][t] || '—'}</td>`).join('')}<td class="num" style="font-weight:700;">${linhas[a].total}</td></tr>`).join('')}
-        <tr style="font-weight:700; border-top:2px solid ${cor.line};"><td>Total</td>${tipos.map(t => `<td class="num">${totTipo[t]}</td>`).join('')}<td class="num">${lista.length}</td></tr>
+        ${areas.map(a => `<tr><td style="font-weight:700; color:#0f172a;">${esc(a)}</td>${tipos.map(t => linhas[a][t] ? `<td class="num" style="font-weight:800; color:#0f172a; font-size:13px;">${linhas[a][t]}</td>` : `<td class="num" style="color:#cbd5e1;">–</td>`).join('')}<td class="num" style="font-weight:900; color:#0f172a; font-size:13px;">${linhas[a].total}</td></tr>`).join('')}
+        <tr style="font-weight:900; color:#0f172a; background:#f1f5f9; border-top:2px solid ${cor.line};"><td>Total</td>${tipos.map(t => `<td class="num" style="font-weight:900; color:#0f172a; font-size:13px;">${totTipo[t]}</td>`).join('')}<td class="num" style="font-weight:900; color:#0f172a; font-size:13px;">${lista.length}</td></tr>
       </tbody></table>`;
   }
 
@@ -304,7 +306,13 @@
     grade.style.gridTemplateColumns = '1.4fr 1fr';
     grade.innerHTML = `<div class="panel"><h2>Veículos por Área e Tipo</h2><div id="frotaMatrizAreaTipo" style="overflow:auto;"></div></div>`;
     abaV.appendChild(grade);
-    if (pTipo) grade.appendChild(pTipo);
+    // ALTERADO (18/11/2026): coluna da direita = Distribuição por Tipo + Veículos por Modelo (embaixo)
+    const colDir = document.createElement('div');
+    colDir.style.cssText = 'display:flex; flex-direction:column; gap:16px; min-width:0;';
+    grade.appendChild(colDir);
+    if (pTipo) colDir.appendChild(pTipo);
+    const pModelo = painelDe('frotaModeloChart');
+    if (pModelo) colDir.appendChild(pModelo);
 
     // Combustível: custos + painel de combustível + gasto por contrato + ranking
     const custos = document.createElement('div');
