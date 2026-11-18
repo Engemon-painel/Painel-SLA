@@ -448,16 +448,16 @@
     if (!supSelecionado || !porSup[supSelecionado]) supSelecionado = topSup.length ? normC(topSup[0].nome) : normC(lista[0].nome);
     wrap.style.height = Math.max(200, topSup.length * 30 + 60) + 'px';
     const rotuloDentro = { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 1500, color: '#fff', anchor: 'center', align: 'center',
-      font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => brlCurto(v) };
+      font: { size: 12, family: 'JetBrains Mono', weight: '800' }, formatter: v => brlCurto(v) };
     const totalFim = (arr) => ({ label: 'Total', data: arr.map(() => 0), backgroundColor: 'rgba(0,0,0,0)', stack: 's',
-      datalabels: { anchor: 'end', align: 'right', offset: 4, color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+      datalabels: { anchor: 'end', align: 'right', offset: 4, color: '#000', font: { size: 12, family: 'JetBrains Mono', weight: '800' },
         formatter: (v, ctx) => brl(arr[ctx.dataIndex].frota + arr[ctx.dataIndex].gmg) } });
     const opcoes = (aoClicar) => ({
       indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 95 } }, onClick: aoClicar,
-      plugins: { legend: { labels: { color: cor.muted, font: { family: 'Inter', size: 11 }, filter: i => i.text !== 'Total' } },
+      plugins: { legend: { labels: { color: '#0f172a', font: { family: 'Inter', size: 12, weight: '600' }, filter: i => i.text !== 'Total' } },
         datalabels: { display: true }, tooltip: { filter: i => i.dataset.label !== 'Total', callbacks: { label: ctx => ctx.dataset.label + ': ' + brl(ctx.parsed.x) } } },
       scales: { x: { stacked: true, beginAtZero: true, ticks: { display: false }, grid: { display: false } },
-        y: { stacked: true, ticks: { color: cor.text, font: { size: 10, weight: 'bold' } }, grid: { display: false } } }
+        y: { stacked: true, ticks: { color: '#0f172a', font: { size: 12, weight: 'bold' } }, grid: { display: false } } }
     });
     if (chartSup) chartSup.destroy();
     chartSup = new Chart(document.getElementById('combSupChart'), {
@@ -569,27 +569,27 @@
         data: { labels: COMB.meses.map(rotuloMes), datasets: [
           { type: 'bar', label: 'Valor (R$)', data: valores, borderRadius: 4, yAxisID: 'y', order: 2,
             backgroundColor: COMB.meses.map(m => corMes(corBase, m)),
-            datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
+            datalabels: { anchor: 'end', align: 'top', color: '#000', font: { size: 13, family: 'JetBrains Mono', weight: '800' },
               formatter: (v, ctx) => brlCurto(v) + variacao(valores, ctx.dataIndex) } },
           { type: 'line', label: 'Litros', data: litros, yAxisID: 'y1', order: 1,
             borderColor: '#5e34b5', backgroundColor: '#5e34b5', pointRadius: 5, pointBackgroundColor: '#5e34b5', tension: .3, borderWidth: 3,
-            datalabels: { align: 'bottom', offset: 6, color: '#5e34b5', backgroundColor: 'rgba(255,255,255,.92)', borderRadius: 4, padding: 3,
-              font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+            datalabels: { align: 'bottom', offset: 6, color: '#4c1d95', backgroundColor: '#ffffff', borderColor: '#4c1d95', borderWidth: 1, borderRadius: 4, padding: 3,
+              font: { size: 12, family: 'JetBrains Mono', weight: '800' },
               formatter: (v, ctx) => v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) + ' L' + variacao(litros, ctx.dataIndex) } }
         ] },
         plugins: [ChartDataLabels],
         options: {
           responsive: true, maintainAspectRatio: false, layout: { padding: { top: 24 } },
-          plugins: { legend: { labels: { color: cor.muted, font: { family: 'Inter', size: 11 } } }, datalabels: { display: true },
+          plugins: { legend: { labels: { color: '#0f172a', font: { family: 'Inter', size: 12, weight: '600' } } }, datalabels: { display: true },
             tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' +
               (ctx.dataset.yAxisID === 'y' ? brl(ctx.parsed.y) : ctx.parsed.y.toLocaleString('pt-BR') + ' L'),
               afterBody: items => { const i = items[0].dataIndex; return litros[i] ? 'Preço médio: R$ ' + (valores[i] / litros[i]).toLocaleString('pt-BR', { maximumFractionDigits: 3 }) + '/L' : ''; } } } },
           scales: {
-            x: { ticks: { color: cor.text, font: { weight: 'bold' } }, grid: { display: false } },
-            y: { beginAtZero: true, ticks: { color: cor.text, callback: v => brlCurto(v) }, grid: { color: cor.line } },
+            x: { ticks: { color: '#0f172a', font: { size: 13, weight: 'bold' } }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { color: '#0f172a', font: { size: 12, weight: '600' }, callback: v => brlCurto(v) }, grid: { color: cor.line } },
             // escala dos litros mais alta para a linha passar no meio das barras, longe dos valores
             y1: { position: 'right', beginAtZero: true, max: Math.ceil(maxL * 1.9 / 1000) * 1000,
-              ticks: { color: '#5e34b5', callback: v => (v / 1000).toLocaleString('pt-BR') + ' mil L' }, grid: { display: false } }
+              ticks: { color: '#4c1d95', font: { size: 12, weight: '600' }, callback: v => (v / 1000).toLocaleString('pt-BR') + ' mil L' }, grid: { display: false } }
           }
         }
       });
@@ -614,11 +614,11 @@
           info.innerHTML = `
             <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:8px;">
               <div class="kpi" style="padding:10px 12px;"><div class="label">Valor ${mA} → ${mB}</div>
-                <div class="mono" style="font-weight:700; color:${corDelta(dv, true)};">${fmtPct(dv)}</div></div>
+                <div class="mono" style="font-weight:800; font-size:17px; color:${corDelta(dv, true)};">${fmtPct(dv)}</div></div>
               <div class="kpi" style="padding:10px 12px;"><div class="label">Litros ${mA} → ${mB}</div>
-                <div class="mono" style="font-weight:700; color:${cor.text};">${fmtPct(dl)}</div></div>
+                <div class="mono" style="font-weight:800; font-size:17px; color:${cor.text};">${fmtPct(dl)}</div></div>
               <div class="kpi" style="padding:10px 12px;"><div class="label">Preço médio / litro</div>
-                <div class="mono" style="font-weight:700; color:${corDelta(dp, true)};">${preco(pa)} → ${preco(pb)} (${fmtPct(dp)})</div></div>
+                <div class="mono" style="font-weight:800; font-size:17px; color:${corDelta(dp, true)};">${preco(pa)} → ${preco(pb)} (${fmtPct(dp)})</div></div>
             </div>
             <div style="font-size:12.5px; color:${corF}; padding:8px 10px; border-left:3px solid ${corF}; background:${corF}12; border-radius:4px;">${frase}</div>`;
         }
@@ -634,7 +634,7 @@
       const mesAMes = !mesComb && top.length && top[0].porMes;
       document.getElementById(tituloId).textContent = tituloBase + ' — ' + (mesAMes ? 'mês a mês' : periodo);
       const rotuloBarra = { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) > 0, color: '#fff', anchor: 'center', align: 'center',
-        font: { size: 10, family: 'JetBrains Mono', weight: '700' }, formatter: v => brlCurto(v) };
+        font: { size: 12, family: 'JetBrains Mono', weight: '800' }, formatter: v => brlCurto(v) };
       const datasets = mesAMes
         ? [
             ...COMB.meses.map((m, i) => ({
@@ -642,13 +642,13 @@
               backgroundColor: PALETA_MESES[i % PALETA_MESES.length], borderRadius: 3, datalabels: rotuloBarra
             })),
             { label: 'Total', data: top.map(() => 0), backgroundColor: 'rgba(0,0,0,0)',
-              datalabels: { anchor: 'end', align: 'right', offset: 4, color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+              datalabels: { anchor: 'end', align: 'right', offset: 4, color: '#000', font: { size: 12, family: 'JetBrains Mono', weight: '800' },
                 formatter: (v, ctx) => brl(top[ctx.dataIndex].valor) } }
           ]
         : [{
             label: 'Valor', data: top.map(t => t.valor),
             backgroundColor: top.map((_, i) => i === 0 ? cor.bad : corBarra), borderRadius: 4,
-            datalabels: { anchor: 'end', align: 'right', color: '#000', font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+            datalabels: { anchor: 'end', align: 'right', color: '#000', font: { size: 12, family: 'JetBrains Mono', weight: '800' },
               formatter: v => brl(v) }
           }];
       if (chartAtual) chartAtual.destroy();
@@ -659,7 +659,7 @@
         options: {
           indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 90 } },
           plugins: {
-            legend: { display: !!mesAMes, labels: { color: cor.muted, font: { family: 'Inter', size: 11 }, filter: i => i.text !== 'Total' } },
+            legend: { display: !!mesAMes, labels: { color: '#0f172a', font: { family: 'Inter', size: 12, weight: '600' }, filter: i => i.text !== 'Total' } },
             datalabels: { display: true },
             tooltip: { filter: i => i.dataset.label !== 'Total', callbacks: {
               label: ctx => (mesAMes ? ctx.dataset.label + ': ' : '') + brl(ctx.parsed.x),
@@ -671,7 +671,7 @@
           },
           scales: {
             x: { stacked: !!mesAMes, beginAtZero: true, ticks: { display: false }, grid: { display: false } },
-            y: { stacked: !!mesAMes, ticks: { color: cor.text, font: { size: 10, weight: 'bold' } }, grid: { display: false } }
+            y: { stacked: !!mesAMes, ticks: { color: '#0f172a', font: { size: 12, weight: 'bold' } }, grid: { display: false } }
           }
         }
       });
