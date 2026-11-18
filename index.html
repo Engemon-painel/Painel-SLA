@@ -817,6 +817,10 @@
           <select id="frotaContratoTopo" class="mono" onchange="filtrarFrotaPorOperacaoEKpi(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:280px;">
             <option value="">Todos os contratos</option>
           </select>
+          <label for="frotaGestorTopo" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:10px;">Gestor operação</label>
+          <select id="frotaGestorTopo" class="mono" onchange="filtrarFrotaPorGestorTopo(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:240px;">
+            <option value="">Todos os gestores</option>
+          </select>
           <span id="frotaFiltroInfo" class="mono" style="font-size:11px; color:var(--muted);"></span>
         </div>
 
@@ -848,7 +852,7 @@
           </div>
           <div class="panel">
             <h2>Distribuição por Tipo</h2>
-            <div style="position:relative; height:260px;">
+            <div style="position:relative; height:340px;">
               <canvas id="frotaTipoChart"></canvas>
             </div>
           </div>
@@ -2910,7 +2914,15 @@ function filtrarFrotaPorTipo(valor){
 function filtrarFrotaPorGestor(valor){
   frotaGestorFiltroAtual = valor;
   frotaPaginaAtual = 1;
-  renderFrotaTabela();
+  renderFrota();
+}
+// NOVO (18/11/2026): filtro "Gestor operação" no topo — vale para os cards, tabelas e gráficos da frota
+function filtrarFrotaPorGestorTopo(valor){
+  frotaGestorFiltroAtual = valor;
+  frotaPaginaAtual = 1;
+  const sel = document.getElementById('frotaGestorFiltro');
+  if(sel) sel.value = valor;
+  renderFrota();
 }
 function filtrarFrotaPorCombustivel(valor){
   frotaCombustivelFiltroAtual = valor;
@@ -3108,18 +3120,32 @@ function renderFrota(){
     frotaFiltrosPopulados = true;
   }
 
-  const total = FROTA.length;
+  // Filtro de gestor (topo): vale para tudo, inclusive os cards de contrato
+  const FROTA_G = frotaGestorFiltroAtual ? FROTA.filter(v => normFrota(v.gestor) === frotaGestorFiltroAtual) : FROTA;
+  const total = FROTA_G.length;
+  const selectGestorTopo = document.getElementById('frotaGestorTopo');
+  if(selectGestorTopo){
+    const porGestor = {};
+    FROTA.forEach(v => { const g = normFrota(v.gestor); if(g) porGestor[g] = (porGestor[g] || 0) + 1; });
+    const escG = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    selectGestorTopo.innerHTML = '<option value="">Todos os gestores (' + FROTA.length + ')</option>' +
+      Object.keys(porGestor).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(g => `<option value="${escG(g)}">${escG(g)} (${porGestor[g]})</option>`).join('');
+    selectGestorTopo.value = frotaGestorFiltroAtual;
+  }
+  const selGestorTabela = document.getElementById('frotaGestorFiltro');
+  if(selGestorTabela) selGestorTabela.value = frotaGestorFiltroAtual;
   // Filtro de contrato: tudo abaixo dos cards de contrato usa só a frota do contrato selecionado.
   const FROTA_F = frotaOperacaoFiltroAtual
-    ? FROTA.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === frotaOperacaoFiltroAtual)
-    : FROTA;
+    ? FROTA_G.filter(v => (canonOperacaoFrota(v.operacao) || 'Sem operação') === frotaOperacaoFiltroAtual)
+    : FROTA_G;
   const totalF = FROTA_F.length;
 
   const porOperacao = {};
-  FROTA.forEach(v => {
+  FROTA_G.forEach(v => {
     const k = canonOperacaoFrota(v.operacao) || 'Sem operação';
     porOperacao[k] = (porOperacao[k] || 0) + 1;
   });
+  if(frotaOperacaoFiltroAtual && porOperacao[frotaOperacaoFiltroAtual] === undefined) porOperacao[frotaOperacaoFiltroAtual] = 0;
   const operacoesOrdenadas = Object.keys(porOperacao).sort((a,b)=> porOperacao[b]-porOperacao[a]);
 
   // seletor de contrato no topo (sincronizado com os cards e com o filtro da tabela)
@@ -3132,8 +3158,8 @@ function renderFrota(){
   }
   const infoFiltroFrota = document.getElementById('frotaFiltroInfo');
   if(infoFiltroFrota){
-    infoFiltroFrota.textContent = frotaOperacaoFiltroAtual
-      ? ('Mostrando ' + totalF + ' de ' + total + ' veículos — ' + frotaOperacaoFiltroAtual)
+    infoFiltroFrota.textContent = (frotaOperacaoFiltroAtual || frotaGestorFiltroAtual)
+      ? ('Mostrando ' + totalF + ' de ' + FROTA.length + ' veículos — ' + [frotaOperacaoFiltroAtual, frotaGestorFiltroAtual].filter(Boolean).join(' · '))
       : '';
   }
 
@@ -3246,11 +3272,11 @@ function renderFrota(){
   });
   const modelosTop10 = Object.keys(porModelo)
     .map(k => ({ modelo: k, total: porModelo[k] }))
-    .sort((a,b) => b.total - a.total)
-    .slice(0, 10);
+    .sort((a,b) => b.total - a.total);   // ALTERADO (18/11/2026): todos os modelos (antes só os 10 maiores)
 
   const modeloCanvas = document.getElementById('frotaModeloChart');
   if(modeloCanvas){
+    if(modeloCanvas.parentElement) modeloCanvas.parentElement.style.height = Math.max(260, modelosTop10.length * 26 + 30) + 'px';
     if(frotaModeloChartInst) frotaModeloChartInst.destroy();
     frotaModeloChartInst = new Chart(modeloCanvas, {
       type: 'bar',
@@ -3258,13 +3284,14 @@ function renderFrota(){
         labels: modelosTop10.map(m => m.modelo),
         datasets: [{
           label: 'Veículos', data: modelosTop10.map(m => m.total),
-          backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
-          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          backgroundColor: '#1d4ed8', borderRadius: 4,
+          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }]
       },
       plugins: [ChartDataLabels],
       options: {
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        layout: { padding: { right: 30 } },
         plugins: { legend: { display:false }, datalabels: { display:true } },
         scales: {
           x: { ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
@@ -3320,12 +3347,16 @@ function renderFrota(){
           borderWidth: 0
         }]
       },
+      plugins: [ChartDataLabels],
       options: {
         responsive: true, maintainAspectRatio: false,
-        cutout: '68%',
+        cutout: '58%',
         plugins: {
-          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
-          datalabels: { display:false }
+          // ALTERADO (18/11/2026): legenda escura e maior + quantidade em cada fatia
+          legend: { position:'bottom', labels:{ color: '#0f172a', font:{family:'Inter', size:12, weight:'600'}, boxWidth:12,
+            generateLabels: ch => Chart.overrides.doughnut.plugins.legend.labels.generateLabels(ch).map(l => Object.assign(l, { text: l.text + ' (' + ch.data.datasets[0].data[l.index] + ')', fontColor: '#0f172a' })) } },
+          datalabels: { display: ctx => (ctx.dataset.data[ctx.dataIndex] || 0) / Math.max(1, ctx.dataset.data.reduce((a,b)=>a+b,0)) >= 0.04,
+            color:'#ffffff', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }
       }
     });
@@ -5444,7 +5475,7 @@ setInterval(carregarDados, 5 * 60 * 1000);
 <script src="gestao_turnover.js?v=3"></script>
 <script src="gestao_preventiva.js?v=10"></script>
 <script src="gestao_afaz.js?v=43"></script>
-<script src="gestao_combustivel.js?v=9"></script>
+<script src="gestao_combustivel.js?v=10"></script>
 <script src="gestao_bh.js?v=85"></script>
 <script src="gestao_kpis.js?v=5"></script>
 <script src="gestao_toa.js?v=37"></script>
