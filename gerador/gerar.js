@@ -23,7 +23,10 @@ const TAREFAS = [
   { planilha: "base_historico.xlsx", saida: "dados.json", script: "dados.ts", tipo: "dados",
     extras: [{ planilha: "organograma.xlsx", abas: ["Organograma", "PJ"] },
              { planilha: "vagas.xlsx", abas: ["Controle"] },
-             { planilha: "fca.xlsx", abas: ["FCA"] }] },
+             { planilha: "fca.xlsx", abas: ["FCA"] },
+             // Frota: planilha da Tamires (CONTROLE DE FROTA - CONSOLIDADA). Vira a aba "Placa" que o script lê;
+             // pega a aba que tem a coluna "Placa" e começa a tabela na linha desse cabeçalho.
+             { planilha: "frota.xlsx", abas: ["Placa"], cabecalho: "Placa" }] },
   { planilha: "afaz.xlsx", saida: "dados_afaz.json", script: "afaz.ts" },
   { planilha: "preventiva.xlsx", saida: "dados_preventiva.json", script: "preventiva.ts", anterior: true },
   { planilha: "nr.xlsx", saida: "base_nr.json", script: "nr.ts" },
@@ -31,8 +34,12 @@ const TAREFAS = [
   { planilha: "bh.xlsx", saida: "dados_pend_bh.json", script: "pend_bh.ts" },
   { planilha: "combustivel.xlsx", saida: "dados_combustivel.json", script: "combustivel.ts" },
   { planilha: "escala.xlsx", saida: "dados_escala.json", script: "escala.ts" },
-  { planilha: "faltas.xlsx", saida: "dados_escala_extra.json", script: "escala_extra.ts" }
+  // Faltas/Atestados: aba VOLANTE (planilha do Thiago) + aba RESIDENTE (planilha dos residentes, se for enviada)
+  { planilha: "faltas.xlsx", saida: "dados_escala_extra.json", script: "escala_extra.ts",
+    extras: [{ planilha: "faltas_residente.xlsx", abas: ["RESIDENTE"], semPrimeira: true }] }
 ];
+
+const sem = v => String(v == null ? "" : v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 
 function argumento(nome, padrao) {
   const i = process.argv.indexOf("--" + nome);
@@ -162,7 +169,30 @@ async function main() {
         const wbE = await abrirPasta(fs.readFileSync(arqExtra), e.planilha);
         e.abas.forEach((nome, i) => {
           let aba = wbE.p.abas.find(a => a.nome.trim().toLowerCase() === nome.toLowerCase());
-          if (!aba && i === 0) aba = wbE.p.abas[0];   // sem aba com esse nome: usa a primeira
+          if (e.cabecalho) {
+            // aba com a coluna do cabeçalho (ex.: "Placa"); a tabela passa a começar em A1
+            const alvo = sem(e.cabecalho);
+            const ordem = (aba ? [aba] : []).concat(wbE.p.abas.filter(a => a !== aba && a.visivel === "visible"), wbE.p.abas.filter(a => a.visivel !== "visible"));
+            let achou = null;
+            for (const a of ordem) {
+              for (let r = 0; r < Math.min(a.linhas.length, 40) && !achou; r++) {
+                const l = a.linhas[r] || [];
+                if (l.some(v => sem(v) === alvo)) achou = { a, r };
+              }
+              if (achou) break;
+            }
+            if (!achou) { console.log("   " + e.planilha + ": não achei coluna " + e.cabecalho + " (pulei)"); return; }
+            aba = achou.a;
+            const lin = aba.linhas, hr = achou.r;
+            const c0 = (lin[hr] || []).findIndex(v => v !== undefined && v !== null && String(v).trim() !== "");
+            aba.linhas = []; aba.horas = new Set(); aba._usado = null; aba._usadoV = null;
+            for (let r = hr; r < lin.length; r++) {
+              const l = lin[r] || [];
+              for (let c = Math.max(c0, 0); c < l.length; c++) if (l[c] !== undefined && l[c] !== null && l[c] !== "") aba.set(r - hr, c - Math.max(c0, 0), l[c]);
+            }
+            console.log("   " + e.planilha + ": cabeçalho na linha " + (hr + 1) + " da aba " + achou.a.nome);
+          }
+          if (!aba && i === 0 && !e.semPrimeira) aba = wbE.p.abas[0];   // sem aba com esse nome: usa a primeira
           if (!aba) return;
           wb.p.abas = wb.p.abas.filter(a => a.nome.trim().toLowerCase() !== nome.toLowerCase());
           aba.nome = nome;
