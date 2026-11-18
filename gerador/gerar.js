@@ -26,7 +26,7 @@ const TAREFAS = [
              { planilha: "fca.xlsx", abas: ["FCA"] },
              // Frota: planilha da Tamires (CONTROLE DE FROTA - CONSOLIDADA). Vira a aba "Placa" que o script lê;
              // pega a aba que tem a coluna "Placa" e começa a tabela na linha desse cabeçalho.
-             { planilha: "frota.xlsx", abas: ["Placa"], cabecalho: "Placa" }] },
+             { planilha: "frota.xlsx", abas: ["Placa"], cabecalho: "Placa", preferida: "Base ativa" }] },
   { planilha: "afaz.xlsx", saida: "dados_afaz.json", script: "afaz.ts" },
   { planilha: "preventiva.xlsx", saida: "dados_preventiva.json", script: "preventiva.ts", anterior: true },
   { planilha: "nr.xlsx", saida: "base_nr.json", script: "nr.ts" },
@@ -172,6 +172,8 @@ async function main() {
           if (e.cabecalho) {
             // aba com a coluna do cabeçalho (ex.: "Placa"); a tabela passa a começar em A1
             const alvo = sem(e.cabecalho);
+            const pref = e.preferida ? wbE.p.abas.find(a => sem(a.nome) === sem(e.preferida)) : null;
+            if (!aba && pref) aba = pref;
             const ordem = (aba ? [aba] : []).concat(wbE.p.abas.filter(a => a !== aba && a.visivel === "visible"), wbE.p.abas.filter(a => a.visivel !== "visible"));
             let achou = null;
             for (const a of ordem) {
