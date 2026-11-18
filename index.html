@@ -876,6 +876,10 @@
             <select id="frotaOperacaoFiltro" class="mono" onchange="filtrarFrotaPorOperacao(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
               <option value="">Todos</option>
             </select>
+            <label for="frotaGestorFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Gestor operação</label>
+            <select id="frotaGestorFiltro" class="mono" onchange="filtrarFrotaPorGestor(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:160px;">
+              <option value="">Todos</option>
+            </select>
             <label for="frotaStatusFiltro" class="mono" style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-left:8px;">Status</label>
             <select id="frotaStatusFiltro" class="mono" onchange="filtrarFrotaPorStatus(this.value)" style="font-size:12px; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); min-width:140px;">
               <option value="">Todos</option>
@@ -908,6 +912,7 @@
                 <tr>
                   <th>Placa</th>
                   <th>Operação</th>
+                  <th>Gestor operação</th>
                   <th>Condutor</th>
                   <th>Marca</th>
                   <th>Modelo</th>
@@ -2867,6 +2872,7 @@ let frotaOperacaoFiltroAtual = '';
 let frotaModeloFiltroAtual = '';
 let frotaTipoFiltroAtual = '';
 let frotaCombustivelFiltroAtual = '';
+let frotaGestorFiltroAtual = ''; // NOVO (18/11/2026): coluna "Gestor operação" da planilha de frota
 let frotaFiltrosPopulados = false;
 let frotaPaginaAtual = 1;
 const FROTA_POR_PAGINA = 10;
@@ -2898,6 +2904,11 @@ function filtrarFrotaPorModelo(valor){
 }
 function filtrarFrotaPorTipo(valor){
   frotaTipoFiltroAtual = valor;
+  frotaPaginaAtual = 1;
+  renderFrotaTabela();
+}
+function filtrarFrotaPorGestor(valor){
+  frotaGestorFiltroAtual = valor;
   frotaPaginaAtual = 1;
   renderFrotaTabela();
 }
@@ -2945,8 +2956,9 @@ function frotaFiltrada(){
     if(frotaModeloFiltroAtual && normFrota(v.modelo) !== frotaModeloFiltroAtual) return false;
     if(frotaTipoFiltroAtual && normFrota(v.tipo) !== frotaTipoFiltroAtual) return false;
     if(frotaCombustivelFiltroAtual && normFrota(v.combustivel) !== frotaCombustivelFiltroAtual) return false;
+    if(frotaGestorFiltroAtual && normFrota(v.gestor) !== frotaGestorFiltroAtual) return false;
     if(q){
-      const hay = [v.placa, v.condutor, v.marca, v.modelo].map(x => normFrota(x).toLowerCase()).join(' ');
+      const hay = [v.placa, v.condutor, v.marca, v.modelo, v.gestor, v.operacao].map(x => normFrota(x).toLowerCase()).join(' ');
       if(!hay.includes(q)) return false;
     }
     return true;
@@ -2991,6 +3003,7 @@ function renderFrotaTabela(){
     return `<tr>
     <td class="mono">${esc(v.placa) || '—'}</td>
     <td>${esc(v.operacao) || '—'}</td>
+    <td>${esc(v.gestor) || '—'}</td>
     <td>${esc(v.condutor) || '—'}</td>
     <td>${esc(v.marca) || '—'}</td>
     <td>${esc(v.modelo) || '—'}</td>
@@ -3030,7 +3043,7 @@ function exportarFrotaCsv(){
       alert('Nenhum veículo para exportar com os filtros atuais.');
       return;
     }
-    const colunas = ['Placa','Operacao','Condutor','Marca','Modelo','Combustivel','Tipo','Status','ValorAluguelCompra','ValorCombustivel','Total'];
+    const colunas = ['Placa','Operacao','GestorOperacao','Condutor','Marca','Modelo','Combustivel','Tipo','Status','ValorAluguelCompra','ValorCombustivel','Total'];
     function csvEsc(v){
       const s = String(v ?? '');
       if(/[",;\n\r]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
@@ -3039,7 +3052,7 @@ function exportarFrotaCsv(){
     const linhas = [colunas.map(csvEsc).join(';')];
     itens.forEach(v => {
       const totalPlaca = extrairNumeroValorFrota(v.valor) + extrairNumeroValorFrota(v.valorCombustivel);
-      linhas.push([v.placa, v.operacao, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor), formatarValorFrota(v.valorCombustivel), formatarValorFrota(totalPlaca)].map(csvEsc).join(';'));
+      linhas.push([v.placa, v.operacao, v.gestor, v.condutor, v.marca, v.modelo, v.combustivel, v.tipo, v.status, formatarValorFrota(v.valor), formatarValorFrota(v.valorCombustivel), formatarValorFrota(totalPlaca)].map(csvEsc).join(';'));
     });
     const csvContent = '\uFEFF' + linhas.join('\r\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -3068,6 +3081,9 @@ function renderFrota(){
     const selectModelo = document.getElementById('frotaModeloFiltro');
     const selectTipo = document.getElementById('frotaTipoFiltro');
     const selectCombustivel = document.getElementById('frotaCombustivelFiltro');
+    const selectGestor = document.getElementById('frotaGestorFiltro');
+    const gestoresUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.gestor)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(selectGestor) selectGestor.innerHTML = '<option value="">Todos</option>' + gestoresUnicos.map(s => `<option value="${s}">${s}</option>`).join('');
 
     const statusUnicos = Array.from(new Set(FROTA.map(v => normFrota(v.status)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     const operacoesUnicas = Array.from(new Set(FROTA.map(v => canonOperacaoFrota(v.operacao)).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'pt-BR'));
