@@ -11,6 +11,8 @@
 <script>
   // NOVO (17/11/2026): números e textos dos gráficos mais escuros em todas as abas
   if (window.Chart) { Chart.defaults.color = '#1e293b'; Chart.defaults.font.weight = '500'; Chart.defaults.borderColor = '#e2e8f0'; }
+  // NOVO (18/11/2026): sem linhas de grade e sem linhas de eixo atrás dos gráficos, em todas as abas
+  if (window.Chart) { Chart.defaults.scale.grid.display = false; Chart.defaults.scale.border.display = false; }
 </script>
 <style>
   :root{
