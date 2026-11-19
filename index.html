@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <script>
   // NOVO (17/11/2026): números e textos dos gráficos mais escuros em todas as abas
-  if (window.Chart) { Chart.defaults.color = '#1e293b'; Chart.defaults.font.weight = '500'; Chart.defaults.borderColor = '#e2e8f0'; }
+  if (window.Chart) { Chart.defaults.color = '#0f172a'; Chart.defaults.font.weight = '600'; Chart.defaults.font.size = 12; Chart.defaults.borderColor = '#e2e8f0'; }
   // NOVO (18/11/2026): sem linhas de grade e sem linhas de eixo atrás dos gráficos, em todas as abas
   if (window.Chart) { Chart.defaults.scale.grid.display = false; Chart.defaults.scale.border.display = false; }
   // NOVO (18/11/2026): números em cima dos gráficos mais fortes em TODAS as abas
@@ -46,7 +46,7 @@
       if (typeof f0 !== 'function') {
         const f = Object.assign({}, f0 || {});
         f.weight = '800';
-        f.size = Math.max(Number(f.size) || 11, 11);
+        f.size = Math.max(Number(f.size) || 12, 12);
         dl.font = f;
       }
       // contorno branco só em número colorido/escuro com cor definida (nunca no branco de dentro da barra)
@@ -2160,14 +2160,14 @@ function renderHeadcount(){
         labels: meses8.map(m => m.label),
         datasets: [
           { type:'bar', label: 'Admitidos', data: admPorMes, backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4, order:2, yAxisID:'y',
-            datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'700'} } },
+            datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} } },
           { type:'bar', label: 'Demitidos', data: demPorMes, backgroundColor: cor.bad, borderRadius: 4, order:2, yAxisID:'y',
-            datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'700'} } },
+            datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} } },
           { type:'line', label: 'Turnover (%)', data: turnoverPct,
             borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
             tension:.3, pointRadius:4, yAxisID:'y1', order:1,
             datalabels: {
-              color: cor.warn, align:'top', offset:8, font:{size:10, family:'JetBrains Mono', weight:'700'},
+              color: cor.warn, align:'top', offset:8, font:{size:12, family:'JetBrains Mono', weight:'800'},
               formatter: v => v === null ? '' : v.toFixed(1) + '%'
             } }
         ]
@@ -2175,7 +2175,7 @@ function renderHeadcount(){
       plugins: [ChartDataLabels],
       options: {
         responsive: true,
-        plugins: { legend: { labels: { color: cor.muted, font: {family:'Inter', size:11} } }, datalabels: { display:true } },
+        plugins: { legend: { labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'} } }, datalabels: { display:true } },
         scales: {
           x: { ticks: {color: cor.text}, grid: {display:false} },
           y: { ticks: {color: cor.text}, grid: {color: cor.line}, beginAtZero:true },
@@ -2195,7 +2195,7 @@ function renderHeadcount(){
         datasets: [{
           label: 'Headcount', data: evolucaoDados,
           backgroundColor: 'rgba(107,117,144,.6)', borderRadius: 4,
-          datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }]
       },
       plugins: [ChartDataLabels],
@@ -2281,7 +2281,7 @@ function renderHeadcount(){
             backgroundColor: 'rgba(37,99,235,.85)', borderRadius: 4,
             datalabels: {
               display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
-              color: '#ffffff', anchor:'center', align:'center', font:{size:10, family:'JetBrains Mono', weight:'700'}
+              color: '#ffffff', anchor:'center', align:'center', font:{size:12, family:'JetBrains Mono', weight:'800'}
             }
           },
           {
@@ -2289,7 +2289,7 @@ function renderHeadcount(){
             backgroundColor: cor.warn, borderRadius: 4,
             datalabels: {
               display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
-              color: '#ffffff', anchor:'center', align:'center', font:{size:10, family:'JetBrains Mono', weight:'700'}
+              color: '#ffffff', anchor:'center', align:'center', font:{size:12, family:'JetBrains Mono', weight:'800'}
             }
           }
         ]
@@ -2632,7 +2632,7 @@ function renderVagas(){
       options: {
         responsive: true, maintainAspectRatio: false, cutout: '60%',
         plugins: {
-          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          legend: { position:'bottom', labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'}, boxWidth:10 } },
           datalabels: { display:false }
         }
       }
@@ -2656,7 +2656,7 @@ function renderVagas(){
           label: 'Requisições', data: statusReqOrd.map(k => porStatusReq[k]),
           backgroundColor: statusReqOrd.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
           borderRadius: 4,
-          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }]
       },
       plugins: [ChartDataLabels],
@@ -2687,7 +2687,7 @@ function renderVagas(){
         datasets: [{
           label: 'Requisições', data: etapasOrd.map(k => porEtapa[k]),
           backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
-          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }]
       },
       plugins: [ChartDataLabels],
@@ -2721,7 +2721,7 @@ function renderVagas(){
           label: 'Requisições', data: etapasFunil.map(e => e.valor),
           backgroundColor: etapasFunil.map((_,i) => PALETA_FROTA[i % PALETA_FROTA.length].text),
           borderRadius: 4,
-          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }]
       },
       plugins: [ChartDataLabels],
@@ -2784,21 +2784,21 @@ function renderVagas(){
           {
             label: 'Aprovadas', data: chavesOrd.map(k => porMes[k].aprovadas),
             borderColor: cor.good, backgroundColor: cor.good, tension:.3, pointRadius:4,
-            datalabels: { color: cor.good, align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+            datalabels: { color: cor.good, align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
           },
           {
             label: 'Pendentes', data: chavesOrd.map(k => porMes[k].pendentes),
             borderColor: cor.warn, backgroundColor: cor.warn, tension:.3, pointRadius:4,
-            datalabels: { color: cor.warn, align:'bottom', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+            datalabels: { color: cor.warn, align:'bottom', font:{size:12, family:'JetBrains Mono', weight:'800'} }
           }
         ]
       },
       plugins: [ChartDataLabels],
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels:{ color: cor.muted, font:{family:'Inter', size:10} } }, datalabels: { display:true } },
+        plugins: { legend: { labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'} } }, datalabels: { display:true } },
         scales: {
-          x: { ticks:{color:cor.text, font:{size:10, weight:'bold'}}, grid:{display:false} },
+          x: { ticks:{color:'#0f172a', font:{size:12, weight:'bold'}}, grid:{display:false} },
           y: { ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true }
         }
       }
@@ -2821,7 +2821,7 @@ function renderVagas(){
         datasets: [{
           label: 'Requisições', data: areasOrd.map(k => porArea[k]),
           backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 4,
-          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          datalabels: { color: '#000000', anchor:'end', align:'right', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }]
       },
       plugins: [ChartDataLabels],
@@ -3319,7 +3319,7 @@ function renderFrota(){
         responsive: true, maintainAspectRatio: false,
         cutout: '68%',
         plugins: {
-          legend: { position:'bottom', labels:{ color: cor.muted, font:{family:'Inter', size:10}, boxWidth:10 } },
+          legend: { position:'bottom', labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'}, boxWidth:10 } },
           datalabels: { display:false }
         }
       }
@@ -3882,7 +3882,7 @@ function renderBancoHoras(){
             type:'bar', label:'Saldo Atual (h)',
             data: competenciasEvolucao.map(k => (porCompetencia[k] || {saldo:0}).saldo),
             backgroundColor: cor.accent, borderRadius: 4, order: 2,
-            datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) }
+            datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'}, formatter: v => v.toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}) }
           },
           {
             type:'line', label:'Tendência',
@@ -3897,11 +3897,11 @@ function renderBancoHoras(){
       options: {
         responsive: true,
         plugins: {
-          legend: { labels: { color: cor.muted, font: {family:'Inter', size:11} } },
+          legend: { labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'} } },
           datalabels: { display:true }
         },
         scales: {
-          x: { ticks: {color: cor.text, font:{weight:'bold', size:10}}, grid: {display:false} },
+          x: { ticks:{color:'#0f172a', font:{weight:'bold', size:12}}, grid: {display:false} },
           y: { ticks: {color: cor.text, font:{weight:'bold'}}, grid: {color: cor.line} }
         }
       }
@@ -4139,18 +4139,18 @@ function renderDailyWeekly(){
         {
           type:'bar', label:'Dentro', data: diarioFiltrado.map(d=>d.dentro),
           backgroundColor:'rgba(107,117,144,.6)', borderRadius:4, order:2,
-          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         },
         {
           type:'bar', label:'Fora', data: diarioFiltrado.map(d=>d.fora),
           backgroundColor: cor.bad, borderRadius:4, order:2,
-          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         },
         {
           type:'line', label:'% Dentro', data: diarioFiltrado.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
           borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
           tension:.3, pointRadius:3, yAxisID:'y1', order:1,
-          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toFixed(0)+'%' }
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:12, family:'JetBrains Mono', weight:'800'}, formatter: v => v.toFixed(0)+'%' }
         },
       ]
     },
@@ -4158,7 +4158,7 @@ function renderDailyWeekly(){
     options:{ responsive:true,
       plugins:{ legend:{ labels:{ color: cor.muted, font:{family:"Inter", size:11} } }, datalabels:{ display:true } },
       scales:{
-        x:{ stacked:false, ticks:{color:cor.text, font:{size:10, weight:'bold'}}, grid:{display:false} },
+        x:{ stacked:false, ticks:{color:'#0f172a', font:{size:12, weight:'bold'}}, grid:{display:false} },
         y:{ stacked:false, ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true },
         y1:{ position:'right', min:0, max:100, ticks:{color:cor.text, font:{weight:'bold'}, callback:v=>v+'%'}, grid:{display:false} }
       }
@@ -4173,18 +4173,18 @@ function renderDailyWeekly(){
         {
           type:'bar', label:'Dentro', data: SEMANAL.map(d=>d.dentro),
           backgroundColor:'rgba(107,117,144,.6)', borderRadius:5, order:2,
-          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         },
         {
           type:'bar', label:'Fora', data: SEMANAL.map(d=>d.fora),
           backgroundColor: cor.bad, borderRadius:5, order:2,
-          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         },
         {
           type:'line', label:'% Dentro', data: SEMANAL.map(d=> d.dentro/(d.dentro+d.fora)*100 ),
           borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
           tension:.3, pointRadius:4, yAxisID:'y1', order:1,
-          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toFixed(0)+'%' }
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:12, family:'JetBrains Mono', weight:'800'}, formatter: v => v.toFixed(0)+'%' }
         },
         {
           type:'line', label:'Meta 85%', data: SEMANAL.map(()=>85),
@@ -4302,7 +4302,7 @@ function render(){
         backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2, yAxisID:'y',
         datalabels:{
           color: '#000000', anchor:'end', align:'top',
-          font:{ size:10, family:'JetBrains Mono', weight:'700' }
+          font:{size:12, family:'JetBrains Mono', weight:'800'}
         }
       },
       {
@@ -4310,7 +4310,7 @@ function render(){
         backgroundColor: cor.bad, borderRadius:5, order:2, yAxisID:'y',
         datalabels:{
           color: '#000000', anchor:'end', align:'top',
-          font:{ size:10, family:'JetBrains Mono', weight:'700' }
+          font:{size:12, family:'JetBrains Mono', weight:'800'}
         }
       },
       {
@@ -4320,7 +4320,7 @@ function render(){
         yAxisID:'y1', order:1,
         datalabels:{
           color: cor.warn, align:'top', offset:8,
-          font:{ size:10, family:'JetBrains Mono', weight:'700' },
+          font:{size:12, family:'JetBrains Mono', weight:'800'},
           formatter: v => v.toFixed(0) + '%'
         }
       },
@@ -4333,7 +4333,7 @@ function render(){
       yAxisID:'y1', order:1,
       datalabels:{
         color: '#5e34b5', align:'bottom', offset:8,
-        font:{ size:10, family:'JetBrains Mono', weight:'700' },
+        font:{size:12, family:'JetBrains Mono', weight:'800'},
         formatter: v => v === null ? '' : v.toFixed(0) + '%'
       }
     });
@@ -4385,11 +4385,11 @@ function render(){
       options: {
         responsive: true,
         plugins: {
-          legend: { labels: { color: cor.muted, font:{family:'Inter', size:10} } },
+          legend: { labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'} } },
           datalabels: { display:false }
         },
         scales: {
-          x: { stacked:true, ticks:{color:cor.text, font:{size:10, weight:'bold'}}, grid:{display:false} },
+          x: { stacked:true, ticks:{color:'#0f172a', font:{size:12, weight:'bold'}}, grid:{display:false} },
           y: { stacked:true, ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true }
         }
       }
@@ -4410,18 +4410,18 @@ function render(){
         {
           type:'bar', label:'Dentro', data: monthlyDentro,
           backgroundColor: 'rgba(107,117,144,.6)', borderRadius:5, order:2,
-          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         },
         {
           type:'bar', label:'Fora', data: monthlyFora,
           backgroundColor: cor.bad, borderRadius:5, order:2,
-          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'} }
+          datalabels:{ color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         },
         {
           type:'line', label:'% Dentro', data: monthlyPct,
           borderColor: cor.warn, backgroundColor: cor.warn, pointBackgroundColor: cor.warn,
           tension:.3, pointRadius:4, yAxisID:'y1', order:1,
-          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v.toFixed(1)+'%' }
+          datalabels:{ color: cor.warn, align:'top', offset:6, font:{size:12, family:'JetBrains Mono', weight:'800'}, formatter: v => v.toFixed(1)+'%' }
         },
         {
           type:'line', label:'Meta 85%', data: monthlyMeta,
@@ -4636,12 +4636,12 @@ function render(){
 
     const rotuloClaro = {
       color: '#000000', anchor:'end', align:'right',
-      font:{size:10, family:'JetBrains Mono', weight:'700'},
+      font:{size:12, family:'JetBrains Mono', weight:'800'},
       display: (ctx) => ctx.dataset.data[ctx.dataIndex] !== null
     };
     const rotuloEngemon = {
       color: '#000000', anchor:'end', align:'right',
-      font:{size:10, family:'JetBrains Mono', weight:'700'},
+      font:{size:12, family:'JetBrains Mono', weight:'800'},
       display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0
     };
 
@@ -4739,7 +4739,7 @@ function render(){
         datalabels: {
           display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
           color: '#ffffff', anchor: 'center', align: 'center',
-          font: { size: 10, family: 'JetBrains Mono', weight: '700' },
+          font:{size:12, family:'JetBrains Mono', weight:'800'},
           formatter: v => v
         }
       };
@@ -4752,7 +4752,7 @@ function render(){
       backgroundColor: 'rgba(0,0,0,0)',
       datalabels: {
         anchor: 'end', align: 'right', offset: 4,
-        color: '#000000', font: { size: 11, family: 'JetBrains Mono', weight: '700' },
+        color: '#000000', font:{size:12, family:'JetBrains Mono', weight:'800'},
         formatter: (value, context) => {
           let total = 0;
           datasetsPorMes.forEach(ds => { total += ds.data[context.dataIndex] || 0; });
@@ -4773,9 +4773,7 @@ function render(){
         indexAxis: 'y', responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: {
-            labels: {
-              color: cor.muted,
-              font: { family: 'Inter', size: 10 },
+            labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'},
               filter: (item) => item.text !== 'Total'
             }
           },
@@ -4803,7 +4801,7 @@ function render(){
           data: itens.map(i => i.total),
           backgroundColor: itens.map((_, idx) => paletaCores[idx % paletaCores.length]),
           borderRadius: 4,
-          datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:10, family:'JetBrains Mono', weight:'700'} }
+          datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }]
       },
       plugins: [ChartDataLabels],
@@ -4811,7 +4809,7 @@ function render(){
         responsive: true,
         plugins: { legend: { display:false }, datalabels: { display:true } },
         scales: {
-          x: { ticks:{color:cor.text, font:{size:9, weight:'bold'}, maxRotation:60, minRotation:60}, grid:{display:false} },
+          x: { ticks:{color:'#0f172a', font:{size:12, weight:'bold'}, maxRotation:60, minRotation:60}, grid:{display:false} },
           y: { ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true }
         }
       }
@@ -5074,7 +5072,7 @@ function renderPendenciasFca(){
           {
             label: 'Fora do prazo', data: foraArr,
             backgroundColor: cor.bad, borderRadius: 4,
-            datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:9, family:'JetBrains Mono', weight:'700'}, formatter: v => v > 0 ? v : '' }
+            datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'}, formatter: v => v > 0 ? v : '' }
           }
         ]
       },
@@ -5082,7 +5080,7 @@ function renderPendenciasFca(){
       options: {
         responsive: true,
         plugins: {
-          legend: { labels: { color: cor.muted, font:{family:'Inter', size:10} } },
+          legend: { labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'} } },
           datalabels: { display:true },
           tooltip: {
             callbacks: {
@@ -5103,7 +5101,7 @@ function renderPendenciasFca(){
           }
         },
         scales: {
-          x: { ticks:{color:cor.text, font:{size:10, weight:'bold'}}, grid:{display:false} },
+          x: { ticks:{color:'#0f172a', font:{size:12, weight:'bold'}}, grid:{display:false} },
           y: { ticks:{color:cor.text, font:{weight:'bold'}}, grid:{display:false}, beginAtZero:true }
         }
       }
@@ -5237,7 +5235,7 @@ if(kpiRow){
       datalabels: {
         display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
         color: '#ffffff', anchor:'center', align:'center',
-        font: { size:10, family:'JetBrains Mono', weight:'700' }
+        font:{size:12, family:'JetBrains Mono', weight:'800'}
       }
     };
     const datasetSaiu = {
@@ -5247,7 +5245,7 @@ if(kpiRow){
       datalabels: {
         display: (ctx) => (ctx.dataset.data[ctx.dataIndex] || 0) > 0,
         color: '#ffffff', anchor:'center', align:'center',
-        font: { size:10, family:'JetBrains Mono', weight:'700' }
+        font:{size:12, family:'JetBrains Mono', weight:'800'}
       }
     };
     const datasetTotalCausa = {
@@ -5256,7 +5254,7 @@ if(kpiRow){
       backgroundColor: 'rgba(0,0,0,0)',
       datalabels: {
         anchor:'end', align:'right', offset:4,
-        color: '#000000', font:{size:11, family:'JetBrains Mono', weight:'700'},
+        color: '#000000', font:{size:12, family:'JetBrains Mono', weight:'800'},
         // ALTERADO (28/10/2026): total da causa (não reclassificação + reclassificação) + % sobre o total fora do prazo (ex.: vandalismo 19 ÷ 225)
         formatter: (value, context) => {
           const c = causaLabelsOrdenados[context.dataIndex], fic = causaFicouCounts[c] || 0, tot = fic + (causaSaiuCounts[c] || 0);
@@ -5276,7 +5274,7 @@ if(kpiRow){
         indexAxis: 'y', responsive: true, maintainAspectRatio: false, layout: { padding: { right: 130 } },
         plugins: {
           legend: {
-            labels:{ color: cor.muted, font:{family:'Inter', size:11} },
+            labels:{ color:'#0f172a', font:{family:'Inter', size:12, weight:'600'} },
             filter: (item) => item.text !== 'Total'
           },
           tooltip: { callbacks: { afterBody: (its) => { const c = causaLabelsOrdenados[its[0].dataIndex], tt = (causaFicouCounts[c] || 0) + (causaSaiuCounts[c] || 0);
@@ -5329,7 +5327,7 @@ if(kpiRow){
         datasets: [{
           label: 'Ocorrências', data: acaoEntries.map(e => e[1]),
           backgroundColor: 'rgba(37,99,235,.75)', borderRadius: 5,
-          datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:11, family:'JetBrains Mono', weight:'700'} }
+          datalabels: { color: '#000000', anchor:'end', align:'top', font:{size:12, family:'JetBrains Mono', weight:'800'} }
         }]
       },
       plugins: [ChartDataLabels],
