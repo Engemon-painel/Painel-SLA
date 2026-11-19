@@ -110,6 +110,43 @@ function argsDados(wb, atualTxt) {
 }
 
 // ---------------------------------------------------------------------
+// NOVO (19/11/2026): ARQUIVO DAS FOLHAS FECHADAS (pendências de ponto)
+// Toda pendência com data ANTES do início da folha atual vai para o
+// historico_pend_bh.json e fica guardada ali para sempre — o painel não
+// depende mais de a base (planilha) continuar com as folhas fechadas.
+// Fonte de cada pendência fechada: o arquivo novo, se ainda tiver; senão o
+// que estava no ar (última versão antes de sair da base); senão o histórico.
+// ---------------------------------------------------------------------
+function arquivarPendencias(novoTxt, atualTxt, histTxt) {
+  const ler = t => { try { return JSON.parse(t || "null"); } catch (e) { return null; } };
+  const novo = ler(novoTxt), atual = ler(atualTxt), hist = ler(histTxt);
+  const itensDe = o => !o ? [] : (Array.isArray(o) ? o : (o.itens || []));
+  const ini = novo && novo.folhaAtualIni ? String(novo.folhaAtualIni).slice(0, 10) : "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ini)) return null;
+  const chave = i => String(i.m || "").replace(/\D/g, "").padStart(6, "0").slice(-6) + "|" + String(i.d || "").slice(0, 10) + "|" + String(i.tipo || "").trim().toUpperCase();
+  const fechada = i => i && i.d && String(i.d).slice(0, 10) < ini;
+  const mapa = new Map();
+  let antes = 0;
+  itensDe(hist).forEach(i => { if (i && i.d) { mapa.set(chave(i), i); antes++; } });
+  // resposta (just) mais completa vence: não perde justificativa que já estava guardada
+  const temResp = i => !!(i && i.just && (i.just.trat || i.just.status));
+  const por = (i, origem) => {
+    const k = chave(i), velho = mapa.get(k);
+    const x = Object.assign({}, i); delete x.hist;
+    if (velho && temResp(velho) && !temResp(x)) x.just = velho.just;
+    x.arquivadoDe = origem;
+    mapa.set(k, x);
+  };
+  itensDe(atual).filter(fechada).forEach(i => por(i, "painel"));
+  itensDe(novo).filter(fechada).forEach(i => por(i, "base"));
+  const itens = Array.from(mapa.values()).sort((a, b) => String(b.d).localeCompare(String(a.d)) || String(a.n || "").localeCompare(String(b.n || "")));
+  const base = (hist && !Array.isArray(hist)) ? hist : {};
+  return { txt: JSON.stringify(Object.assign({}, base, {
+    geradoEm: new Date().toISOString(), fonte: "folhas fechadas guardadas pelo gerador (antes de " + ini + ") + TRATATIVA_GESTORES",
+    total: itens.length, itens: itens })), antes: antes, depois: itens.length };
+}
+
+// ---------------------------------------------------------------------
 // Conferências antes de publicar (não sobe arquivo vazio/quebrado)
 // ---------------------------------------------------------------------
 function conferir(t, txt) {
@@ -214,6 +251,14 @@ async function main() {
       if (problema) { falhas++; relatorio.push("✗ " + t.saida + ": NÃO PUBLICADO — " + problema); continue; }
       const destino = modo === "producao" ? path.join(saida, t.saida) : path.join(pastaTeste, t.saida);
       fs.writeFileSync(destino, txt);
+      if (t.saida === "dados_pend_bh.json") {
+        const ARQ_HIST = "historico_pend_bh.json";
+        const r = arquivarPendencias(txt, atual, lerJsonAtual(saida, ARQ_HIST));
+        if (r) {
+          fs.writeFileSync(modo === "producao" ? path.join(saida, ARQ_HIST) : path.join(pastaTeste, ARQ_HIST), r.txt);
+          relatorio.push("✓ " + ARQ_HIST + ": " + r.antes + " → " + r.depois + " pendências guardadas (folhas fechadas)");
+        }
+      }
       const seg = ((Date.now() - ini) / 1000).toFixed(1);
       relatorio.push("✓ " + t.saida + " (" + Math.round(txt.length / 1024) + " KB, " + seg + " s)" +
         (modo !== "producao" ? "\n     novo:  " + resumo(txt) + "\n     no ar: " + resumo(atual) : ""));
