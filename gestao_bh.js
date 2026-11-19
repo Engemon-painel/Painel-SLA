@@ -1416,7 +1416,7 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
       const hItens = h ? (Array.isArray(h) ? h : (h.itens || [])) : [];
       pendHistInfo = h ? `histórico: ${nf(hItens.length)} pendências` : 'histórico: arquivo ' + ARQ_PEND_HIST + ' não encontrado';
       if (hItens.length) {
-        let aplicadas = 0, soHist = 0, foraPeriodo = 0, ignoradas = 0;
+        let aplicadas = 0, soHist = 0, foraPeriodo = 0, ignoradas = 0, fechadas = 0;
         const porChave = {};
         pend.forEach(i => { porChave[chaveP(i)] = i; });
         // ALTERADO (19/10/2026): última data coberta pela base de pendências atual. Pendência do histórico
@@ -1441,12 +1441,15 @@ ${C} .bh-modal-pe{display:flex;gap:8px;align-items:center;margin-top:10px;flex-w
             const st = x.just && COR_SIT[x.just.status] ? x.just.status : calcularStatus(x.just || {}, x.hePerm, x.tipo)[1];
             if (st === 'Justificado') { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; soHist++; }
             else if (!fimBase || String(x.d || '') > fimBase) { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; foraPeriodo++; }
+            // NOVO (19/11/2026): folha FECHADA guardada pelo gerador (data antes do início da base atual) = continua no painel
+            else if (pendIniBase && String(x.d || '').slice(0, 10) < pendIniBase) { x.hist = true; pend.push(x); porChave[chaveP(x)] = x; fechadas++; }
             // dentro do período da base e sem justificativa: sumiu da base = resolvido no ponto
             else ignoradas++;
           }
         });
         pendHistInfo += ` (${nf(aplicadas)} respostas aplicadas na base atual, ${nf(soHist)} justificadas que saíram da base` +
           (foraPeriodo ? `, ${nf(foraPeriodo)} a tratar com data depois da base atual${fimBase ? ' (' + dataBr(fimBase) + ')' : ''}` : '') +
+          (fechadas ? ', ' + nf(fechadas) + ' de folhas fechadas guardadas' : '') +
           (ignoradas ? ', ' + nf(ignoradas) + ' sem justificativa que saíram da base (ignoradas)' : '') + ')';
       }
       pendGerado = (d && d.geradoEm) || '';
