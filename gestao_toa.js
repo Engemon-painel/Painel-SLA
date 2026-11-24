@@ -294,7 +294,7 @@
           <div class="grid">
             <div class="panel">
               <h2>Média de atividades concluídas por técnico/dia — por supervisor</h2>
-              <div class="hint">Concluídas ÷ (técnicos × dias com lançamento). Supervisor da aba TOA.</div>
+              <div class="hint">Concluídas ÷ (técnicos × dias com lançamento). Supervisor da aba TOA; quando vazio, o do Organograma.</div>
               <div id="toaSupChartWrap" style="position:relative; height:300px;"><canvas id="toaSupChart"></canvas></div>
             </div>
             <div class="panel">
@@ -574,7 +574,17 @@
     const nomesToa = {};
     TOA.forEach(t => { if(!nomesToa[t.recurso]) nomesToa[t.recurso] = semAcento(t.supervisor); });
 
+    // NOVO (24/11/2026): nome do Organograma cortado em 30 letras (ex.: FLAVIO FERNANDO DE LIMA FERREI) —
+    // o nome completo do TOA começa com ele. Vem antes da regra "primeiro + último nome", que poderia
+    // pegar outro técnico (ex.: FLAVIO DANTAS FERREIRA).
+    const orgBase = org.map(o => ({ nome: o.nome, k: chavePrincipal(o.nome) })).filter(o => o.k.length >= 25);
     Object.keys(nomesToa).forEach(nomeToa => {
+      // 0) nome do Organograma cortado: o do TOA começa com ele (e só existe 1 assim)
+      const kt = chavePrincipal(nomeToa);
+      if(kt && !org.some(o => chavePrincipal(o.nome) === kt)){
+        const cand = [...new Set(orgBase.filter(o => kt.length > o.k.length && kt.indexOf(o.k) === 0).map(o => o.nome))];
+        if(cand.length === 1){ resolvido[nomeToa] = cand[0]; return; }
+      }
       // 1) igual (sem acento) ou primeiro + último nome
       const exato = chavesNome(nomeToa).map(k => porChave[k]).find(Boolean);
       if(exato){ resolvido[nomeToa] = exato; return; }
@@ -606,6 +616,26 @@
       }
     });
     AJUSTES.sort((a, b) => a.organograma.localeCompare(b.organograma, 'pt-BR'));
+  }
+
+  // NOVO (24/11/2026): linha do TOA sem supervisor → usa o supervisor do Organograma (o nome do técnico já foi
+  // ajustado para o do Organograma em ajustarNomesToa: nome cortado em 30 letras, sobrenome a mais/a menos etc.).
+  // Assim esses técnicos saem de "Sem supervisor" e entram na equipe certa.
+  let SUP_PREENCHIDOS = [];
+  function preencherSupervisorToa(){
+    SUP_PREENCHIDOS = [];
+    const supPorChave = {};
+    COLABS.filter(c => c.ativo && c.nome && String(c.supervisor || '').trim()).forEach(c =>
+      chavesNome(c.nome).forEach(k => { if(!supPorChave[k]) supPorChave[k] = String(c.supervisor).trim(); }));
+    const vistos = new Set();
+    TOA.forEach(t => {
+      if(String(t.supervisor || '').trim()) return;
+      const sup = chavesNome(t.recurso).map(k => supPorChave[k]).find(Boolean);
+      if(!sup) return;
+      t.supervisor = sup; t.supervisorDoOrg = true;
+      if(!vistos.has(t.recurso)){ vistos.add(t.recurso); SUP_PREENCHIDOS.push({ tecnico: t.recurso, supervisor: sup }); }
+    });
+    SUP_PREENCHIDOS.sort((a, b) => a.tecnico.localeCompare(b.tecnico, 'pt-BR'));
   }
 
   // ---------- dados ----------
@@ -699,6 +729,7 @@
           (Array.isArray(brutoPres) && brutoPres.length ? ' · 1ª linha: ' + JSON.stringify(brutoPres[0]).slice(0, 160) : '');
         ajustarNomesPres();
         ajustarNomesToa();
+        preencherSupervisorToa();
         ultimaCarga = Date.now();
         if(!estado.fim && (TOA.length || PRES.length)){
           // ALTERADO (06/11/2026): abre no MÊS ATUAL (dia 01 até ontem). A produtividade (base de atividades)
@@ -1390,6 +1421,9 @@
     const ne = document.getElementById('toaNaoEncontrados');
     const partes = [];
     if(r.diasSemBase && r.diasSemBase.length) partes.push(`⏳ Sem base do TOA ainda (fora da aderência): ${r.diasSemBase.map(d => fmtDiaCurto(d)).join(', ')}`);
+    if(SUP_PREENCHIDOS.length){
+      partes.push(`✔ ${SUP_PREENCHIDOS.length} técnico(s) sem supervisor no TOA receberam o supervisor do Organograma: <span title="${esc(SUP_PREENCHIDOS.map(x => x.tecnico + ' → ' + x.supervisor).join('\n'))}" style="text-decoration:underline dotted; cursor:help;">ver lista</span>`);
+    }
     if(AJUSTES.length){
       const lista = AJUSTES.map(a => a.toa + ' → ' + a.organograma).join('\n');
       partes.push(`✔ ${AJUSTES.length} nome(s) do TOA ajustados para o nome do Organograma: <span title="${esc(lista)}" style="text-decoration:underline dotted; cursor:help;">ver ajustes</span>`);
