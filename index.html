@@ -290,7 +290,7 @@
     <div class="month-strip">
       <div class="chip active" id="btnSla4h" onclick="trocarSla('4h')">SLA 4h</div>
       <div class="chip" id="btnSla6h" onclick="trocarSla('6h')">SLA 6h</div>
-       <a class="link-base" id="linkBaseEser" href="https://engemonbr-my.sharepoint.com/:x:/g/personal/marcia_nascimento_engemon_com_br/IQAYlXawZtIfQbzg-zp55_yUAT7s3otHfLV5d_nWcdX_4-s?e=9sr2Od" target="_blank" rel="noopener">↗ Abrir base (Excel)</a>
+       <a class="link-base" id="linkBaseEser" href="#" onclick="exportarHistoricoMes(); return false;" title="Baixa os incidentes do mês atual (Histórico) para abrir no Excel">⬇ Exportar base do mês (Excel)</a>
       <a class="link-base" id="linkOrganograma" href="https://engemonbr-my.sharepoint.com/:x:/g/personal/marcia_nascimento_engemon_com_br/IQAYlXawZtIfQbzg-zp55_yUAT7s3otHfLV5d_nWcdX_4-s?e=9sr2Od" target="_blank" rel="noopener">↗ Organograma (Excel)</a>
     </div>
   </div>
@@ -4057,6 +4057,59 @@ function baixarCsvFca(colunas, linhasDados, nomeArquivo){
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+// NOVO (25/11/2026): botão "Exportar base do mês" (ESER) — baixa os incidentes do MÊS ATUAL da aba Historico
+// com TODAS as colunas (arquivo historico_mes.json, gerado junto com o dados.json) + Causa/Ação do FCA do painel.
+// Se o historico_mes.json ainda não existir, baixa a versão resumida (colunas que o painel já tem).
+async function exportarHistoricoMes(){
+  const NM = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const nomeArq = mes => 'Historico_Incidentes_' + NM[+mes.slice(5) - 1] + '-' + mes.slice(0, 4) + '.csv';
+  const det = {}; (PENDENTES_FCA || []).forEach(p => { if(p && p.incidente) det[String(p.incidente).trim().toUpperCase()] = p; });
+  const excl = inc => typeof INCIDENTES_EXCLUIDOS !== 'undefined' && INCIDENTES_EXCLUIDOS.has(String(inc || '').trim().toUpperCase());
+  const num = v => typeof v === 'number' ? String(Math.round(v * 10000) / 10000).replace('.', ',') : (v == null ? '' : v);
+  try{
+    const resp = await fetch('historico_mes.json?_=' + Date.now());
+    if(resp.ok){
+      const h = await resp.json();
+      if(h && Array.isArray(h.colunas) && Array.isArray(h.linhas) && h.linhas.length){
+        const iInc = h.colunas.findIndex(c => String(c).trim().toUpperCase() === 'INCIDENT_NUMBER');
+        const colunas = h.colunas.concat(['Causa (painel FCA)', 'Ação (painel FCA)', 'Ação tomada (painel FCA)']);
+        const linhas = h.linhas.filter(l => !excl(l[iInc])).map(l => {
+          const p = det[String(l[iInc] || '').trim().toUpperCase()] || {};
+          return l.map(num).concat([p.causa || '', p.acao || '', p.acaoTomada || '']);
+        });
+        baixarCsvFca(colunas, linhas, nomeArq(h.mes));
+        return;
+      }
+    }
+  }catch(e){ console.warn('historico_mes.json:', e); }
+  exportarHistoricoMesResumo(det, nomeArq);
+}
+// versão resumida (sem o historico_mes.json): colunas que o painel já tem
+function exportarHistoricoMesResumo(det, nomeArq){
+  const todos = INCIDENTES_POR_SITE || [];
+  if(!todos.length){ alert('A base ainda não carregou. Tente de novo em alguns segundos.'); return; }
+  const hoje = new Date();
+  let mes = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0');
+  if(!todos.some(x => x.mesOrd === mes)) mes = todos.map(x => x.mesOrd).sort().pop();
+  const doMes = todos.filter(x => x.mesOrd === mes);
+  const contSup = {};
+  (PENDENTES_FCA || []).filter(p => p.mesOrd === mes && p.area && p.supervisor).forEach(p => {
+    contSup[p.area] = contSup[p.area] || {}; contSup[p.area][p.supervisor] = (contSup[p.area][p.supervisor] || 0) + 1; });
+  const supArea = a => { const c = contSup[a]; if(!c) return ''; return Object.keys(c).sort((x, y) => c[y] - c[x])[0]; };
+  const hrs = h => (h == null || h === '' || isNaN(+h)) ? '' : (+h).toFixed(2).replace('.', ',');
+  const dataBr = s => { const m = /^(\d{4})-(\d{2})-(\d{2})\s*(\d{2}:\d{2})?/.exec(String(s || '')); return m ? m[3] + '/' + m[2] + '/' + m[1] + (m[4] ? ' ' + m[4] : '') : String(s || ''); };
+  const colunas = ['INCIDENT_NUMBER', 'SITE_CI', 'AREA', 'Supervisor', 'Data', 'REPORTED_DATE', 'SUBMIT_DATE', 'CLEAR_DATE', 'RESOLVED_DATE',
+    'Horas', 'ESER 4h', 'ESER 6h', 'TIPO DE INFRA', 'UNIDADE_RESPONSAVEL2', 'AFAZ', 'Preventiva', 'Causa', 'Ação', 'Ação tomada'];
+  const linhas = doMes.slice().sort((a, b) => String(a.data).localeCompare(String(b.data))).map(x => {
+    const p = det[String(x.incidente || '').trim().toUpperCase()] || {};
+    const h = x.mttrHoras;
+    return [x.incidente, x.site, x.area, p.supervisor || supArea(x.area), dataBr(x.data), p.reported || '', p.submit || '', p.clear || '', p.resolved || '',
+      hrs(h), x.eser4h || '', (h == null || h === '') ? '' : (+h <= 6 ? 'Dentro' : 'Fora'), x.tipoInfra || '', x.unidadeResponsavel2 || '',
+      x.afaz || '', x.preventiva || '', p.causa || '', p.acao || '', p.acaoTomada || ''];
+  });
+  baixarCsvFca(colunas, linhas, nomeArq(mes));
 }
 
 function exportarFcaPreenchidoCsv(){
