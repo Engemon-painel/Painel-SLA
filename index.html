@@ -4068,6 +4068,12 @@ async function exportarHistoricoMes(){
   const det = {}; (PENDENTES_FCA || []).forEach(p => { if(p && p.incidente) det[String(p.incidente).trim().toUpperCase()] = p; });
   const excl = inc => typeof INCIDENTES_EXCLUIDOS !== 'undefined' && INCIDENTES_EXCLUIDOS.has(String(inc || '').trim().toUpperCase());
   const num = v => typeof v === 'number' ? String(Math.round(v * 10000) / 10000).replace('.', ',') : (v == null ? '' : v);
+  const bt = document.getElementById('linkBaseEser'), txtBt = bt ? bt.textContent : '';
+  if(bt){ if(bt.dataset.ocupado) return; bt.dataset.ocupado = '1'; bt.textContent = '⏳ Gerando… (base grande, aguarde)'; }
+  try{ await exportarHistoricoMesFull(det, excl, num, nomeArq); }
+  finally{ if(bt){ bt.textContent = txtBt; delete bt.dataset.ocupado; } }
+}
+async function exportarHistoricoMesFull(det, excl, num, nomeArq){
   try{
     const resp = await fetch('historico_mes.json?_=' + Date.now());
     if(resp.ok){
