@@ -30,6 +30,10 @@
    último dia do mês). O que foi fechado hoje fica de fora até amanhã e aparece
    só no texto de ajuda ("+ N fechadas hoje"). Executada sem Data Fim também
    não entra (não dá para saber o dia).
+
+   ALTERADO (25/11/2026): Meta D-1 (e o Saldo da Aderência) arredondada por Tipo
+   de Preventiva e somada — o saldo do total agora bate com a soma dos saldos
+   de cada tipo.
    ========================================================================= */
 (function () {
   const ARQUIVO_JSON = 'dados_preventiva.json';
@@ -293,6 +297,15 @@
     });
   }
 
+  // ALTERADO (25/11/2026): a meta D-1 é arredondada POR TIPO DE PREVENTIVA e depois somada.
+  // Assim o saldo do total é exatamente a soma dos saldos de cada tipo
+  // (antes o total arredondava uma vez só e podia dar 1 a mais ou a menos — ex.: −62 x soma −61).
+  function metaAte(regs, du, duMes) {
+    const porTipo = {};
+    regs.forEach(r => { const k = r.t || ''; porTipo[k] = (porTipo[k] || 0) + 1; });
+    return Object.values(porTipo).reduce((s, n) => s + Math.round(n * du / duMes), 0);
+  }
+
   const COR = { good:'#059669', warn:'#d97706', bad:'#dc2626', accent:'#0e7c86', muted:'#6b7590' };
   // Meta 100% (verde) · a partir de 95% é o 2º patamar (laranja) · abaixo de 95% vermelho
   const META_ADER = 100, PATAMAR2_ADER = 95;
@@ -307,7 +320,7 @@
     const duRef = dias.filter(d => d.util && d.data <= ref).length;
 
     const planejado = regs.length;
-    const planD1 = Math.round(planejado * duRef / duMes);
+    const planD1 = metaAte(regs, duRef, duMes);
     const realizado = regs.filter(r => r.st === 'Executada').length;   // tudo o que está executado na base agora
     // ALTERADO (10/11/2026): TUDO EM D-1 — Realizado, Entrega, Aderência, Saldo e Pendentes contam só o que foi
     // executado com Data Fim até ONTEM. O que fechou hoje (ou está sem Data Fim) entra só amanhã.
@@ -356,7 +369,7 @@
           <span style="font-size:15px;color:${COR.muted};font-weight:600;">Em aberto <span style="color:#1b2440">${fmt(aberto)}</span></span></div>
         ${realHoje ? `<div class="delta" style="color:${COR.muted}">inclui ${fmt(realHoje)} fechada(s) hoje — saem amanhã</div>` : ''}</div>`;
 
-    grafico_(regs, dias, ref, duMes, planejado);
+    grafico_(regs, dias, ref, duMes, planejado);   // a linha "Planejado Acumulado" usa a mesma meta por tipo
     graficoMensal_();
     tabela(regs);
   }
@@ -372,7 +385,7 @@
       if (d.util) du++;
       acum += porDia[d.data] || 0;
       rot.push(String(d.dia).padStart(2, '0') + '/' + dados.mes.slice(5));
-      plan.push(Math.round(planejado * du / duMes));
+      plan.push(metaAte(regs, du, duMes));
       real.push(d.data <= ref ? acum : null);   // ALTERADO (10/11/2026): linha vai só até D-1
     });
 
