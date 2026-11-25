@@ -19,8 +19,13 @@ function main(workbook: ExcelScript.Workbook): string {
             const d = new Date(Date.UTC(1899, 11, 30) + Math.round(v * 86400000));
             return d.getUTCFullYear() + "-" + dois(d.getUTCMonth() + 1) + "-" + dois(d.getUTCDate());
         }
-        const m = String(v ?? "").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        return m ? m[3] + "-" + m[2] + "-" + m[1] : "";
+        const t = String(v ?? "").trim();
+        const m = t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (m) return m[3] + "-" + m[2] + "-" + m[1];
+        // "25/nov" (texto, sem ano): usa o ano atual
+        const mm = norm(t).match(/^(\d{1,2})\/(JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)\.?$/);
+        if (mm) { const mes = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"].indexOf(mm[2]) + 1; return new Date().getFullYear() + "-" + dois(mes) + "-" + dois(Number(mm[1])); }
+        return "";
     };
     const codigo = (v: string | number | boolean): string => {
         const k = norm(v);
@@ -32,6 +37,7 @@ function main(workbook: ExcelScript.Workbook): string {
     const linhas: Linha[] = [];
     const todasDatas: { [iso: string]: boolean } = {};
 
+    const ehNomeCab = (c: string | number | boolean): boolean => ["COLABORADOR", "COLABORADORES", "TECNICO", "TECNICOS"].indexOf(norm(c)) >= 0;
     const planilhas = workbook.getWorksheets();
     for (const cfg of ABAS) {
         let ws: ExcelScript.Worksheet | undefined = undefined;
@@ -44,17 +50,20 @@ function main(workbook: ExcelScript.Workbook): string {
         const v = usado.getValues();
         // A aba pode ter vários blocos (um por site), cada um com a sua linha
         // "Colaborador | ... | datas". Cada bloco usa as datas do seu cabeçalho.
-        let iNome = 0, iTurno = -1, iHor = -1, iEscala = -1;
+        let iNome = 0, iTurno = -1, iHor = -1, iEscala = -1, iCont = -1;
         let colsData: { iso: string, i: number }[] = [];
         let temCab = false;
         for (let r = 0; r < v.length; r++) {
             const l = v[r];
-            if (l.some(c => norm(c) === "COLABORADOR")) {
+            // ALTERADO (25/11/2026): a aba RESIDENTE usa "Técnicos" no lugar de "Colaborador" no cabeçalho de cada bloco
+            if (l.some(c => ehNomeCab(c)) && (l.some(c => norm(c) === "TURNO") || l.some(c => norm(c) === "COLABORADOR"))) {
                 const cab = l;
                 const col = (nome: string): number => cab.findIndex(c => norm(c) === nome);
-                iNome = col("COLABORADOR"); iTurno = col("TURNO"); iHor = col("HORARIO");
-                colsData = [];
-                cab.forEach((c, i) => { const iso = dataIso(c); if (iso) colsData.push({ iso: iso, i: i }); });
+                iNome = cab.findIndex(c => ehNomeCab(c)); iTurno = col("TURNO"); iHor = col("HORARIO"); iCont = col("CONTATO");
+                const novas: { iso: string, i: number }[] = [];
+                cab.forEach((c, i) => { const iso = dataIso(c); if (iso) novas.push({ iso: iso, i: i }); });
+                // bloco sem as datas no cabeçalho (ex.: Santo André): usa as colunas de data do bloco de cima
+                if (novas.length) colsData = novas;
                 // VOLANTE: a escala (5x2, 12x36) fica numa coluna sem título
                 iEscala = -1;
                 if (cfg.aba === "VOLANTE") {
@@ -70,11 +79,13 @@ function main(workbook: ExcelScript.Workbook): string {
             }
             if (!temCab) continue;
             const nome = lim(l[iNome]);
-            if (!nome || /^(EM PROCESSO|VAGA ABERTA)$/.test(norm(nome))) continue;
+            if (!nome || /^(EM PROCESSO|VAGA ABERTA|VAGA)$/.test(norm(nome)) || ehNomeCab(nome)) continue;
             const turno = iTurno >= 0 ? lim(l[iTurno]) : "";
             const horario = iHor >= 0 ? lim(l[iHor]) : "";
             // só linhas de técnico: tem horário (06:00 as 18:00) ou turno de verdade (não é título de site/assinatura)
-            if (!/\d{1,2}:\d{2}/.test(horario) && !(turno && CODIGOS[norm(turno)] === undefined && norm(turno) !== "FERIAS")) continue;
+            // (ou tem telefone em Contato — técnico sem turno/horário preenchido, ex.: BRUNO HENRIQUE)
+            const temFone = iCont >= 0 && /\d{4}\s*-?\s*\d{4}/.test(lim(l[iCont]));
+            if (!/\d{1,2}:\d{2}/.test(horario) && !(turno && CODIGOS[norm(turno)] === undefined && norm(turno) !== "FERIAS") && !temFone) continue;
             const porData: { [iso: string]: string } = {};
             colsData.forEach(c => { todasDatas[c.iso] = true; const cod = codigo(l[c.i]); if (cod && porData[c.iso] === undefined) porData[c.iso] = cod; });
             linhas.push({
