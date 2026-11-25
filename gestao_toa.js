@@ -473,6 +473,8 @@
   // ---------- escala + horário de entrada (Gestão de Escala; se o técnico não estiver lá, usa Escala/Horário do Organograma) ----------
   const HORA_LEITURA_ROBO = '18:00';   // dias anteriores: horário em que o robô lê a presença no TOA
   function horaEntrada(txt){ const m = /(\d{1,2})\s*[:hH]\s*(\d{2})/.exec(String(txt || '')); return m ? pad2(+m[1]) + ':' + m[2] : ''; }
+  // turno PAR / ÍMPAR: 1 = ímpar, 0 = par, null = não é escala par/ímpar
+  function parImpar(txt){ const n = semAcento(txt); if(/\bimpar(es)?\b/.test(n)) return 1; if(/\bpar(es)?\b/.test(n)) return 0; return null; }
   function escaladoPeloOrg(escala, dia){
     const n = semAcento(escala).replace(/[\s.]/g, '');
     const dw = diaSemana(dia);
@@ -492,16 +494,31 @@
     const pad = ESCALA_PADRAO_SUP[semAcento(c.supervisor)];
     if(pad) c = Object.assign({}, c, pad.forcar ? { escala: pad.escala, horario: pad.horario } : { escala: c.escala || pad.escala, horario: c.horario || pad.horario });
     const tec = escalaDoTecnico(c.nome);
-    const cod = tec ? codigoEscala(tec, dia) : '';
+    let cod = tec ? codigoEscala(tec, dia) : '';
     let escalado = false, fonte = '';
-    if(tec && cod){ escalado = cod === 'X'; fonte = 'escala'; }
+    // NOVO (25/11/2026): turno PAR / ÍMPAR (ex.: Residente — "IMPAR DIURNO 06:00 as 18:00", "PAR NOTURNO 18:00 as 06:00").
+    // Dia ímpar do mês + turno ÍMPAR = trabalha; dia par + turno PAR = trabalha; senão folga.
+    // Falta, atestado, desligado, treinamento etc. lançados na planilha continuam valendo no dia.
+    const txtTec = tec ? [tec.turno, tec.escala, tec.horario].join(' ') : '';
+    const txtOrg = [c.turno, c.escala, c.horario].join(' ');
+    const pi = parImpar(txtTec) !== null ? parImpar(txtTec) : parImpar(txtOrg);
+    const codNorm = semAcento(cod);
+    if(pi !== null && (!codNorm || codNorm === 'x' || codNorm === 'fo' || codNorm === 'fbh')){
+      escalado = (+dia.slice(8, 10)) % 2 === pi; fonte = 'escala'; cod = escalado ? 'X' : 'FO';
+    }
+    else if(tec && cod){ escalado = cod === 'X'; fonte = 'escala'; }
     else {
       const e = escaladoPeloOrg(c.escala, dia);
       if(e !== null){ escalado = e; fonte = 'org'; }
       else if(tec){ fonte = 'escala'; }
     }
-    const horTxt = String((tec && tec.horario) || c.horario || '').trim();
-    return { tec, cod, escalado, fonte, hora: horaEntrada(horTxt), horario: horTxt.replace(/\s*(AS|ÀS|as|às|-|–)\s*/, ' – '), nomeEscala: String((tec && tec.escala) || c.escala || '').trim() };
+    // horário: só a parte "06:00 as 18:00" (o texto do turno pode vir junto, ex.: "IMPAR DIURNO 06:00 as 18:00")
+    const reHora = /\d{1,2}\s*[:hH]\s*\d{2}.*$/;
+    const horBruto = [tec && tec.horario, tec && tec.turno, c.horario, pi !== null ? txtTec : '', pi !== null ? txtOrg : ''].map(x => String(x || '').trim()).find(x => reHora.test(x)) || '';
+    const horTxt = (reHora.exec(horBruto) || [''])[0].trim();
+    const turnoTxt = pi !== null ? String([tec && tec.turno, tec && tec.escala, tec && tec.horario, c.turno, c.escala, c.horario].find(x => parImpar(x) !== null) || '').replace(reHora, '').replace(/\s+/g, ' ').trim() : '';
+    return { tec, cod, escalado, fonte, hora: horaEntrada(horTxt), horario: horTxt.replace(/\s*(AS|ÀS|as|às|-|–)\s*/, ' – '),
+      nomeEscala: turnoTxt || String((tec && tec.escala) || c.escala || '').trim() };
   }
   // NOVO (06/11/2026): turno NOTURNO (ex.: 20:00 – 08:00, cruza a meia-noite). Quem entrou ontem à noite e saiu
   // hoje de manhã aparece com o bonequinho HOJE no TOA, mas essa presença é do turno de ONTEM. Não conta como
