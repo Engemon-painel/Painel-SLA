@@ -459,6 +459,7 @@
     if(n === 'fbh') return { txt: 'Folga BH', cls: '', cor: 'rgba(107,117,144,.14)', tcor: '#6b7590' };
     if(n === 'falta' || n === 'f') return { txt: 'Falta', cls: 'bad' };
     if(n === 'atm' || n.indexOf('atestado') === 0) return { txt: 'Atestado', cls: 'warn' };
+    if(n.indexOf('ferias') === 0) return { txt: 'Férias', cls: '', cor: 'rgba(234,179,8,.18)', tcor: '#92400e' };
     if(n === 'des') return { txt: 'Desligado', cls: 'bad' };
     if(n.indexOf('treinamento') === 0) return { txt: 'Treinamento', cls: 'warn' };
     return { txt: c, cls: 'warn' };
@@ -473,8 +474,6 @@
   // ---------- escala + horário de entrada (Gestão de Escala; se o técnico não estiver lá, usa Escala/Horário do Organograma) ----------
   const HORA_LEITURA_ROBO = '18:00';   // dias anteriores: horário em que o robô lê a presença no TOA
   function horaEntrada(txt){ const m = /(\d{1,2})\s*[:hH]\s*(\d{2})/.exec(String(txt || '')); return m ? pad2(+m[1]) + ':' + m[2] : ''; }
-  // turno PAR / ÍMPAR: 1 = ímpar, 0 = par, null = não é escala par/ímpar
-  function parImpar(txt){ const n = semAcento(txt); if(/\bimpar(es)?\b/.test(n)) return 1; if(/\bpar(es)?\b/.test(n)) return 0; return null; }
   function escaladoPeloOrg(escala, dia){
     const n = semAcento(escala).replace(/[\s.]/g, '');
     const dw = diaSemana(dia);
@@ -496,16 +495,11 @@
     const tec = escalaDoTecnico(c.nome);
     let cod = tec ? codigoEscala(tec, dia) : '';
     let escalado = false, fonte = '';
-    // NOVO (25/11/2026): turno PAR / ÍMPAR (ex.: Residente — "IMPAR DIURNO 06:00 as 18:00", "PAR NOTURNO 18:00 as 06:00").
-    // Dia ímpar do mês + turno ÍMPAR = trabalha; dia par + turno PAR = trabalha; senão folga.
-    // Falta, atestado, desligado, treinamento etc. lançados na planilha continuam valendo no dia.
-    const txtTec = tec ? [tec.turno, tec.escala, tec.horario].join(' ') : '';
-    const txtOrg = [c.turno, c.escala, c.horario].join(' ');
-    const pi = parImpar(txtTec) !== null ? parImpar(txtTec) : parImpar(txtOrg);
-    const codNorm = semAcento(cod);
-    if(pi !== null && (!codNorm || codNorm === 'x' || codNorm === 'fo' || codNorm === 'fbh')){
-      escalado = (+dia.slice(8, 10)) % 2 === pi; fonte = 'escala'; cod = escalado ? 'X' : 'FO';
-    }
+    // ALTERADO (25/11/2026): escala Residente (Controle de Faltas e Atestados) marca o dia com TRB = trabalha;
+    // célula vazia = folga; FÉRIAS, falta, atestado etc. = não trabalha. TRB vale igual ao X da Gestão de Escala.
+    if(semAcento(cod) === 'trb') cod = 'X';
+    const planilhaTrb = !!tec && (tec.codigos || []).some(x => semAcento(x) === 'trb');
+    if(planilhaTrb && !cod && ESCALA && ESCALA.datas.indexOf(dia) !== -1){ escalado = false; fonte = 'escala'; }   // vazio = folga
     else if(tec && cod){ escalado = cod === 'X'; fonte = 'escala'; }
     else {
       const e = escaladoPeloOrg(c.escala, dia);
@@ -514,11 +508,11 @@
     }
     // horário: só a parte "06:00 as 18:00" (o texto do turno pode vir junto, ex.: "IMPAR DIURNO 06:00 as 18:00")
     const reHora = /\d{1,2}\s*[:hH]\s*\d{2}.*$/;
-    const horBruto = [tec && tec.horario, tec && tec.turno, c.horario, pi !== null ? txtTec : '', pi !== null ? txtOrg : ''].map(x => String(x || '').trim()).find(x => reHora.test(x)) || '';
+    const horBruto = [tec && tec.horario, tec && tec.turno, c.horario].map(x => String(x || '').trim()).find(x => reHora.test(x)) || '';
     const horTxt = (reHora.exec(horBruto) || [''])[0].trim();
-    const turnoTxt = pi !== null ? String([tec && tec.turno, tec && tec.escala, tec && tec.horario, c.turno, c.escala, c.horario].find(x => parImpar(x) !== null) || '').replace(reHora, '').replace(/\s+/g, ' ').trim() : '';
+    const turnoTxt = String((tec && (tec.turno || tec.escala)) || '').replace(reHora, '').replace(/\s+/g, ' ').trim();
     return { tec, cod, escalado, fonte, hora: horaEntrada(horTxt), horario: horTxt.replace(/\s*(AS|ÀS|as|às|-|–)\s*/, ' – '),
-      nomeEscala: turnoTxt || String((tec && tec.escala) || c.escala || '').trim() };
+      nomeEscala: turnoTxt || String(c.escala || '').trim() };
   }
   // NOVO (06/11/2026): turno NOTURNO (ex.: 20:00 – 08:00, cruza a meia-noite). Quem entrou ontem à noite e saiu
   // hoje de manhã aparece com o bonequinho HOJE no TOA, mas essa presença é do turno de ONTEM. Não conta como
