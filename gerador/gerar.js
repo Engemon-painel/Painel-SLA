@@ -27,6 +27,8 @@ const TAREFAS = [
              // Frota: planilha da Tamires (CONTROLE DE FROTA - CONSOLIDADA). Vira a aba "Placa" que o script lê;
              // pega a aba que tem a coluna "Placa" e começa a tabela na linha desse cabeçalho.
              { planilha: "frota.xlsx", abas: ["Placa"], cabecalho: "Placa", preferida: "Base ativa" }] },
+  // NOVO (25/11/2026): incidentes do mês atual com TODAS as colunas da aba Historico (botão "Exportar base do mês" do ESER)
+  { planilha: "base_historico.xlsx", saida: "historico_mes.json", script: "historico_mes.ts" },
   { planilha: "afaz.xlsx", saida: "dados_afaz.json", script: "afaz.ts" },
   { planilha: "preventiva.xlsx", saida: "dados_preventiva.json", script: "preventiva.ts", anterior: true },
   { planilha: "nr.xlsx", saida: "base_nr.json", script: "nr.ts" },
@@ -156,6 +158,7 @@ function conferir(t, txt) {
   if (o.erro) return "o script devolveu erro: " + o.erro;
   if (txt.length < 200) return "resultado pequeno demais (" + txt.length + " caracteres)";
   if (t.saida === "dados.json" && (!Array.isArray(o.meses) || o.meses.length === 0)) return "sem meses (aba Historico vazia?)";
+  if (t.saida === "historico_mes.json" && !(o.total > 0)) return "nenhum incidente no mês";
   if (t.saida === "dados_afaz.json" && (!Array.isArray(o.itens) || o.itens.length === 0)) return "nenhum AFAZ aberto";
   if (t.saida === "dados_bh.json" && !(o.totalFuncionarios > 0)) return "nenhum funcionário";
   return "";
