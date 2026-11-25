@@ -498,7 +498,7 @@
     // ALTERADO (25/11/2026): escala Residente (Controle de Faltas e Atestados) marca o dia com TRB = trabalha;
     // célula vazia = folga; FÉRIAS, falta, atestado etc. = não trabalha. TRB vale igual ao X da Gestão de Escala.
     if(semAcento(cod) === 'trb') cod = 'X';
-    const planilhaTrb = !!tec && (tec.codigos || []).some(x => semAcento(x) === 'trb');
+    const planilhaTrb = !!tec && (/residente|volante/.test(semAcento(tec.area)) || (tec.codigos || []).some(x => semAcento(x) === 'trb'));
     if(planilhaTrb && !cod && ESCALA && ESCALA.datas.indexOf(dia) !== -1){ escalado = false; fonte = 'escala'; }   // vazio = folga
     else if(tec && cod){ escalado = cod === 'X'; fonte = 'escala'; }
     else {
