@@ -34,7 +34,7 @@
   let ultimaCarga = 0;
   let carregando = null;
   const estado = { inicio:'', fim:'', supervisor:'', ignorarFds:true, busca:'', aba:'d1',
-    quadro: { d1: { dia:'', status:'', busca:'', log:'nao', sup:'' }, d0: { dia:'', status:'', busca:'', log:'nao', sup:'' } } };
+    quadro: { d1: { dia:'', status:'', busca:'', log:'nao', sup:'', ocio:'' }, d0: { dia:'', status:'', busca:'', log:'nao', sup:'', ocio:'' } } };
   let chartSup = null, chartDia = null, chartTop = null, chartEvo = null;
   let tecEvo = '';   // técnico escolhido na evolução diária ('' = total)
 
@@ -205,6 +205,19 @@
       </div>
       <div class="hint">Técnicos ativos do Organograma com ou sem o bonequinho no console do TOA no dia (aba TOA_PRESENCA, lida pelo robô).</div>
       <div style="overflow:auto; max-height:520px; border-radius:8px;"><table id="toaQ${q}Table"></table></div>
+
+      <!-- NOVO (26/11/2026): técnicos ociosos no dia (0 ou 1 atividade concluída) -->
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:20px 0 4px;">
+        <h2 style="font-size:14px; margin:0;">🟡 Técnicos ociosos — 0 ou 1 atividade no dia</h2>
+        <select id="toaQ${q}Ocio" class="mono" style="${ESTILO_SELECT} margin-left:auto;">
+          <option value="">0 ou 1 atividade</option>
+          <option value="0">Nenhuma atividade</option>
+          <option value="1">Só 1 atividade</option>
+        </select>
+        <span id="toaQ${q}OcioCont" class="mono" style="font-size:11px; color:var(--muted);"></span>
+      </div>
+      <div class="hint">Técnicos ativos do Organograma que trabalharam no dia (logaram no TOA ou lançaram atividade) e concluíram 0 ou 1 atividade (Refeição não conta). Quem nem logou está na tabela de cima (🔴 Não logaram).${q === 'd0' ? ' Hoje = até agora.' : ''}</div>
+      <div style="overflow:auto; max-height:460px; border-radius:8px;"><table id="toaQ${q}OcioTable"></table></div>
     </div>`;
   }
 
@@ -333,6 +346,13 @@
             <div id="toaPresencaFora" class="mono" style="font-size:11px; color:var(--muted); margin-top:10px;"></div>
           </div>
 
+          <!-- NOVO (26/11/2026): ociosos no período -->
+          <div class="panel" style="margin-bottom:16px;">
+            <h2>🟡 Técnicos ociosos no período — dias com 0 ou 1 atividade</h2>
+            <div class="hint">Para cada técnico ativo do Organograma: dias em que trabalhou (logou no TOA ou lançou atividade) e quantos desses dias terminaram com 0 ou 1 atividade concluída. Só dias com base do TOA. Ordenado por mais dias ociosos.</div>
+            <div style="overflow:auto; max-height:520px; border-radius:8px;"><table id="toaOcioTable"></table></div>
+          </div>
+
           <div class="panel">
             <h2>Produtividade por técnico por dia</h2>
             <div class="hint">Atividades concluídas por dia. Vazio = sem lançamento; 0 = lançou mas não concluiu nada.</div>
@@ -376,6 +396,7 @@
       document.getElementById('toaQ' + q + 'Status').addEventListener('change', e => { st.status = e.target.value; renderQuadro(q); });
       document.getElementById('toaQ' + q + 'Log').addEventListener('change', e => { st.log = e.target.value; renderQuadro(q); });
       document.getElementById('toaQ' + q + 'SupF').addEventListener('change', e => { st.sup = e.target.value; renderQuadro(q); });
+      document.getElementById('toaQ' + q + 'Ocio').addEventListener('change', e => { st.ocio = e.target.value; renderQuadro(q); });
       document.getElementById('toaQ' + q + 'Padrao').addEventListener('click', () => { st.dia = diaPadrao(q); renderQuadro(q); });
       let tq;
       document.getElementById('toaQ' + q + 'Busca').addEventListener('input', e => {
@@ -390,7 +411,7 @@
     let t;
     document.getElementById('toaBusca').addEventListener('input', e => {
       clearTimeout(t);
-      t = setTimeout(() => { estado.busca = e.target.value; renderTabelaTecnicos(); }, 200);
+      t = setTimeout(() => { estado.busca = e.target.value; renderTabelaTecnicos(); if(ultimoCalculo) renderOciosos(ultimoCalculo); }, 200);
     });
     pg.querySelectorAll('[data-toa-atalho]').forEach(ch => {
       ch.addEventListener('click', () => {
@@ -889,12 +910,32 @@
         logados: rotaPorDia[dia] ? tecF.filter(c => logado(c, dia)).length : null };
     });
 
+    // NOVO (26/11/2026): ociosos no período — dias trabalhados (logou ou lançou) com 0 ou 1 atividade concluída
+    const concDia = {};
+    noPeriodo.forEach(t => {
+      const m = concDia[t.data] = concDia[t.data] || {};
+      chavesNome(t.recurso).forEach(k => { const o = m[k] = m[k] || { c: 0, t: 0 }; o.c += Number(t.concluidas) || 0; o.t += (Number(t.total) || 0) + (Number(t.refeicao) || 0); });
+    });
+    const diasBaseOrd = dias.filter(d => diasComBase.has(d));
+    const ociososPeriodo = tecF.filter(c => !temRestricao(c)).map(c => {
+      let trab = 0, d0 = 0, d1 = 0, conc = 0; const lista = [];
+      diasBaseOrd.forEach(dia => {
+        const ks = chavesNome(c.nome), m = concDia[dia] || {};
+        const k = ks.find(x => m[x]); const o = k ? m[k] : null;
+        const logou = !!rotaPorDia[dia] && ks.some(x => rotaPorDia[dia].has(x));
+        if(!logou && !(o && o.t > 0)) return;
+        trab++; const n = o ? o.c : 0; conc += n;
+        if(n === 0){ d0++; lista.push(fmtDiaCurto(dia) + ': nenhuma'); } else if(n === 1){ d1++; lista.push(fmtDiaCurto(dia) + ': 1'); }
+      });
+      return { nome: c.nome, supervisor: c.supervisor || '', trab, d0, d1, conc, lista };
+    }).filter(x => x.d0 + x.d1 > 0).sort((a, b) => (b.d0 + b.d1) - (a.d0 + a.d1) || b.d0 - a.d0 || a.nome.localeCompare(b.nome, 'pt-BR'));
+
     const totalConcluidas = toaF.reduce((s, t) => s + (Number(t.concluidas) || 0), 0);
     const totalLancadas = toaF.reduce((s, t) => s + (Number(t.total) || 0), 0);
     const pares = toaF.filter(t => Number(t.total) > 0).length;
 
     return {
-      dias, diasAderencia, diasSemBase, diasPres, toaF, aderencia, presenca, presFora, temPresenca, naoEncontrados, porTec, supervisores, porDia, rotaPorDia,
+      dias, diasAderencia, diasSemBase, diasPres, toaF, aderencia, ociososPeriodo, presenca, presFora, temPresenca, naoEncontrados, porTec, supervisores, porDia, rotaPorDia,
       kpi: {
         concluidas: totalConcluidas,
         lancadas: totalLancadas,
@@ -959,6 +1000,28 @@
     renderAderencia(r);
     renderPresenca(r);
     renderTabelaTecnicos();
+    renderOciosos(r);
+  }
+
+  // NOVO (26/11/2026): tabela de ociosos no período
+  function renderOciosos(r){
+    const tabela = document.getElementById('toaOcioTable');
+    if(!tabela) return;
+    const q = semAcento(estado.busca);
+    const l = (r.ociososPeriodo || []).filter(x => !q || semAcento(x.nome + ' ' + x.supervisor).includes(q));
+    tabela.innerHTML = !l.length ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico com dia ocioso no período.</td></tr></tbody>`
+      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Dias trabalhados</th><th class="num">Dias sem atividade</th><th class="num">Dias com 1 atividade</th><th class="num">% dias ociosos</th><th class="num">Concluídas/dia</th><th>Quais dias</th></tr></thead><tbody>' +
+        l.map(x => { const p = x.trab ? (x.d0 + x.d1) / x.trab : 0;
+          return `<tr>
+            <td style="white-space:nowrap;">${esc(x.supervisor) || '—'}</td>
+            <td style="white-space:nowrap;">${esc(x.nome)}</td>
+            <td class="num">${x.trab}</td>
+            <td class="num" style="color:${COR.bad} !important;">${x.d0 || '—'}</td>
+            <td class="num" style="color:${COR.warn} !important;">${x.d1 || '—'}</td>
+            <td class="num"><span class="pill ${p >= 0.5 ? 'bad' : p >= 0.25 ? 'warn' : 'good'}">${pct(p)}</span></td>
+            <td class="num">${x.trab ? fmt1(x.conc / x.trab) : '—'}</td>
+            <td class="mono" style="font-size:11px; color:${COR.text};">${esc(x.lista.join(' · '))}</td>
+          </tr>`; }).join('') + '</tbody>';
   }
 
   // ---------- quadro do dia (D-1 e D-0): quem está na base e quem fez serviço ----------
@@ -1166,6 +1229,29 @@
               <td>${l.restrito ? '<span class="pill bad">Sim</span>' : '<span class="pill good">Não</span>'}</td>
             </tr>`;
           }).join('') + '</tbody>';
+
+    // ----- NOVO (26/11/2026): técnicos ociosos no dia (0 ou 1 atividade concluída) -----
+    const trabalhou = l => l.logou || l.total > 0 || l.refeicao > 0;   // logou no TOA ou lançou (quem nem logou está na tabela de cima)
+    const ociososTodos = todas.filter(l => l.noOrg && !l.restrito && !l.aguardando && trabalhou(l) && l.concluidas <= 1)
+      .filter(bate).filter(l => !st.sup || mesmoSupervisor(l.supervisor, st.sup));
+    const n0 = ociososTodos.filter(l => l.concluidas === 0).length, n1 = ociososTodos.length - n0;
+    const ociosos = ociososTodos.filter(l => st.ocio === '' || l.concluidas === Number(st.ocio))
+      .sort((a, b) => a.concluidas - b.concluidas || String(a.supervisor).localeCompare(String(b.supervisor), 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
+    document.getElementById('toaQ' + q + 'Ocio').value = st.ocio;
+    document.getElementById('toaQ' + q + 'OcioCont').textContent = semDados ? 'sem base do TOA no dia' : `${ociososTodos.length} técnicos · ${n0} sem atividade · ${n1} com 1 atividade`;
+    document.getElementById('toaQ' + q + 'OcioTable').innerHTML = semDados
+      ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem base do TOA para ${fmtData(dia)}.</td></tr></tbody>`
+      : !ociosos.length ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico ocioso nesse filtro.</td></tr></tbody>`
+      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Concluídas</th><th class="num">Lançadas</th><th>Situação</th><th>Presença</th><th>Escala</th></tr></thead><tbody>' +
+        ociosos.map(l => `<tr>
+          <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
+          <td style="white-space:nowrap;">${esc(l.nome)}</td>
+          <td class="num">${l.concluidas}</td>
+          <td class="num">${l.total}</td>
+          <td style="white-space:nowrap;">${l.concluidas === 0 ? '<span class="pill bad">Nenhuma atividade</span>' : '<span class="pill warn">1 atividade</span>'}</td>
+          <td style="white-space:nowrap;">${!temPresDia ? `<span style="color:${COR.muted};">—</span>` : l.logou ? '<span class="pill good">🟢 Logou</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
+          <td style="white-space:nowrap;">${celEscala(l.ie)}</td>
+        </tr>`).join('') + '</tbody>';
   }
 
   const chartsAder = {};
