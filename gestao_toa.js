@@ -206,8 +206,8 @@
       <div class="hint">Técnicos ativos do Organograma com ou sem o bonequinho no console do TOA no dia (aba TOA_PRESENCA, lida pelo robô).</div>
       <div style="overflow:auto; max-height:520px; border-radius:8px;"><table id="toaQ${q}Table"></table></div>
 
-      <!-- NOVO (26/11/2026): técnicos ociosos no dia (0 ou 1 atividade concluída) -->
-      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:20px 0 4px;">
+      <!-- NOVO (26/11/2026): técnicos ociosos no dia (0 ou 1 atividade concluída) — só no D-1 (a base do TOA é sempre de ontem) -->
+      ${q === 'd1' ? `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:20px 0 4px;">
         <h2 style="font-size:14px; margin:0;">🟡 Técnicos ociosos — 0 ou 1 atividade no dia</h2>
         <select id="toaQ${q}Ocio" class="mono" style="${ESTILO_SELECT} margin-left:auto;">
           <option value="">0 ou 1 atividade</option>
@@ -217,7 +217,7 @@
         <span id="toaQ${q}OcioCont" class="mono" style="font-size:11px; color:var(--muted);"></span>
       </div>
       <div class="hint">Técnicos ativos do Organograma que trabalharam no dia (logaram no TOA ou lançaram atividade) e concluíram 0 ou 1 atividade (Refeição não conta). Quem nem logou está na tabela de cima (🔴 Não logaram).${q === 'd0' ? ' Hoje = até agora.' : ''}</div>
-      <div style="overflow:auto; max-height:460px; border-radius:8px;"><table id="toaQ${q}OcioTable"></table></div>
+      <div style="overflow:auto; max-height:460px; border-radius:8px;"><table id="toaQ${q}OcioTable"></table></div>` : ''}
     </div>`;
   }
 
@@ -396,7 +396,8 @@
       document.getElementById('toaQ' + q + 'Status').addEventListener('change', e => { st.status = e.target.value; renderQuadro(q); });
       document.getElementById('toaQ' + q + 'Log').addEventListener('change', e => { st.log = e.target.value; renderQuadro(q); });
       document.getElementById('toaQ' + q + 'SupF').addEventListener('change', e => { st.sup = e.target.value; renderQuadro(q); });
-      document.getElementById('toaQ' + q + 'Ocio').addEventListener('change', e => { st.ocio = e.target.value; renderQuadro(q); });
+      const selOcio = document.getElementById('toaQ' + q + 'Ocio');
+      if(selOcio) selOcio.addEventListener('change', e => { st.ocio = e.target.value; renderQuadro(q); });
       document.getElementById('toaQ' + q + 'Padrao').addEventListener('click', () => { st.dia = diaPadrao(q); renderQuadro(q); });
       let tq;
       document.getElementById('toaQ' + q + 'Busca').addEventListener('input', e => {
@@ -1230,7 +1231,11 @@
             </tr>`;
           }).join('') + '</tbody>';
 
-    // ----- NOVO (26/11/2026): técnicos ociosos no dia (0 ou 1 atividade concluída) -----
+    // ----- NOVO (26/11/2026): técnicos ociosos no dia (0 ou 1 atividade concluída) — só D-1 -----
+    if(!document.getElementById('toaQ' + q + 'OcioTable')) return;
+    // média do técnico no período (base do TOA, até D-1): concluídas ÷ dias com lançamento
+    const porTecPer = (ultimoCalculo && ultimoCalculo.porTec) || {};
+    const mediaTec = l => { const p = chavesNome(l.nome).map(k => porTecPer[k]).find(Boolean); return p && p.diasLanc ? p : null; };
     const trabalhou = l => l.logou || l.total > 0 || l.refeicao > 0;   // logou no TOA ou lançou (quem nem logou está na tabela de cima)
     const ociososTodos = todas.filter(l => l.noOrg && !l.restrito && !l.aguardando && trabalhou(l) && l.concluidas <= 1)
       .filter(bate).filter(l => !st.sup || mesmoSupervisor(l.supervisor, st.sup));
@@ -1242,13 +1247,14 @@
     document.getElementById('toaQ' + q + 'OcioTable').innerHTML = semDados
       ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Sem base do TOA para ${fmtData(dia)}.</td></tr></tbody>`
       : !ociosos.length ? `<tbody><tr><td style="text-align:center; color:${COR.muted};">Nenhum técnico ocioso nesse filtro.</td></tr></tbody>`
-      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Concluídas</th><th class="num">Lançadas</th><th>Situação</th><th>Presença</th><th>Escala</th></tr></thead><tbody>' +
+      : '<thead><tr><th>Supervisor</th><th>Técnico</th><th class="num">Concluídas</th><th class="num">Lançadas</th><th>Situação</th><th class="num" title="concluídas ÷ dias com lançamento no período (base do TOA até D-1)">Média/dia no período</th><th class="num">Dias c/ lançamento</th><th>Presença</th><th>Escala</th></tr></thead><tbody>' +
         ociosos.map(l => `<tr>
           <td style="white-space:nowrap;">${esc(l.supervisor) || '—'}</td>
           <td style="white-space:nowrap;">${esc(l.nome)}</td>
           <td class="num">${l.concluidas}</td>
           <td class="num">${l.total}</td>
           <td style="white-space:nowrap;">${l.concluidas === 0 ? '<span class="pill bad">Nenhuma atividade</span>' : '<span class="pill warn">1 atividade</span>'}</td>
+          ${(m => m ? `<td class="num" title="${m.concluidas} concluídas em ${m.diasLanc} dia(s) com lançamento"><b>${fmt1(m.media)}</b></td><td class="num">${m.diasLanc}</td>` : `<td class="num" style="color:${COR.muted};">—</td><td class="num" style="color:${COR.muted};">—</td>`)(mediaTec(l))}
           <td style="white-space:nowrap;">${!temPresDia ? `<span style="color:${COR.muted};">—</span>` : l.logou ? '<span class="pill good">🟢 Logou</span>' : '<span class="pill bad">🔴 Não logou</span>'}</td>
           <td style="white-space:nowrap;">${celEscala(l.ie)}</td>
         </tr>`).join('') + '</tbody>';
